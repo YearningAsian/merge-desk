@@ -1,5 +1,6 @@
 import { extname } from "node:path";
 import { truncateLog } from "@/core/events";
+import { isRepoPath } from "@/core/paths";
 import { chooseTestSuite } from "@/server/guard";
 import type {
   LandableChange,
@@ -60,17 +61,7 @@ export function assertRevisions(revisions: Revisions) {
     throw new Error("Revisions must be full commit ids");
 }
 
-// A relative path inside the repository, never into .git or out of it.
-export function isRepoPath(path: string): boolean {
-  if (!path || path.includes("\0") || path.includes("\\") || path.startsWith("/")) return false;
-  if (/^[A-Za-z]:/.test(path)) return false;
-  return path
-    .split("/")
-    .every(
-      (segment) =>
-        segment !== "" && segment !== "." && segment !== ".." && segment.toLowerCase() !== ".git",
-    );
-}
+export { isRepoPath };
 
 export function assertRepoPath(path: string): string {
   if (!isRepoPath(path)) throw new Error(`Path is outside the repository: ${path}`);

@@ -23,7 +23,9 @@ const withToken = (ndjson: string) =>
     .map((line) => {
       const event = JSON.parse(line) as { type?: string; ok?: boolean };
       return JSON.stringify(
-        event.type === "analysis" && event.ok ? { ...event, token: "e2e" } : event,
+        (event.type === "analysis" && event.ok) || event.type === "result"
+          ? { ...event, token: "e2e" }
+          : event,
       );
     })
     .join("\n") + "\n";
@@ -34,7 +36,7 @@ const byPr: Record<number, string> = Object.fromEntries(
 const runs: Record<number, string> = Object.fromEntries(
   prs.pulls.map((pull) => [
     pull.number,
-    readFileSync(join(FIXTURES, `run-${scenarioOf(pull)}.ndjson`), "utf8"),
+    withToken(readFileSync(join(FIXTURES, `run-${scenarioOf(pull)}.ndjson`), "utf8")),
   ]),
 );
 const CLEAN = prs.pulls.find((pull) => pull.head.ref === "demo/clean/rename")!.number;
@@ -60,6 +62,11 @@ async function signIn(page: Page) {
     const { pr } = route.request().postDataJSON() as { pr: number };
     return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: byPr[pr]! });
   });
+  await page.route("**/api/live/record**", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({ json: { entries: [] } })
+      : route.fulfill({ json: { entries: [] } }),
+  );
   const requests: RunBody[] = [];
   await page.route("**/api/live/run", (route) => {
     const body = route.request().postDataJSON() as RunBody;
@@ -395,6 +402,88 @@ test("clean: one click runs the recommended option to VERIFIED, with the merge a
   expect((await download).suggestedFilename()).toBe(`merge-desk-pr-${CLEAN}-combine.patch`);
   await shot(page, "run-verified-1440");
   await noSeriousAxe(page);
+});
+
+test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKNOWN otherwise", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const landed: unknown[] = [];
+  let answer: { status: number; json: Record<string, unknown> } = {
+    status: 502,
+    json: {
+      outcome: "UNKNOWN",
+      reason:
+        "GitHub didn't confirm the branch update. Check the pull request before trying again.",
+    },
+  };
+  await page.route("**/api/live/land", (route) => {
+    landed.push(route.request().postDataJSON());
+    return route.fulfill(answer);
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  const result = detail.getByRole("group", { name: "Result: VERIFIED" });
+  const landButton = result.getByRole("button", {
+    name: "Land: push merge commit to demo/clean/rename",
+  });
+  await expect(landButton).toBeVisible();
+  await expect(result.getByText("Does not merge into demo/base.", { exact: false })).toBeVisible();
+
+  // An answer GitHub didn't confirm is UNKNOWN, never LANDED.
+  await landButton.click();
+  await expect(result.getByRole("group", { name: "Land: UNKNOWN" })).toBeVisible();
+  await expect(result.getByRole("group", { name: "Land: LANDED" })).toHaveCount(0);
+  expect(landed).toEqual([{ pr: CLEAN, token: expect.any(String) }]);
+
+  // Run again, then a confirmed Land.
+  answer = {
+    status: 200,
+    json: {
+      outcome: "LANDED",
+      commit: "e".repeat(40),
+      branch: "demo/clean/rename",
+      mergeable: "mergeable",
+      record: { ok: true },
+    },
+  };
+  await detail.getByRole("button", { name: "Discard this run" }).click();
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await detail
+    .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+    .click();
+  const done = detail.getByRole("group", { name: "Land: LANDED" });
+  await expect(done).toBeVisible();
+  await expect(done.getByRole("link", { name: /eeeeeee on demo\/clean\/rename/ })).toHaveAttribute(
+    "href",
+    `https://github.com/YearningAsian/merge-desk/commit/${"e".repeat(40)}`,
+  );
+  await expect(done.getByText("GitHub says the pull request can merge now.")).toBeVisible();
+  await expect(done.getByText("Recorded on the pull request.")).toBeVisible();
+  await expect(detail.getByText("Nothing has been pushed.")).toHaveCount(0);
+  await shot(page, "landed-1440");
+  await noSeriousAxe(page);
+});
+
+test("a hold is recorded on the pull request as it happens", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const records: Array<{ pr: number; action: string }> = [];
+  await page.route("**/api/live/record**", (route) => {
+    if (route.request().method() === "POST") records.push(route.request().postDataJSON());
+    return route.fulfill({ json: { entries: [] } });
+  });
+  await page.goto(`/live?pr=${HELD}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  const result = detail.getByRole("group", { name: "Result: HELD" });
+  await expect(result.getByText("Recorded on the pull request.")).toBeVisible();
+  expect(records).toEqual([{ pr: HELD, token: expect.any(String), action: "held" }]);
+  await result.getByRole("button", { name: "Discard this attempt" }).click();
+  await expect.poll(() => records.length).toBe(2);
+  expect(records[1]).toMatchObject({ pr: HELD, action: "discarded" });
 });
 
 test("an analysis that fails says why and offers to run it again", async ({ page }) => {

@@ -54,3 +54,29 @@ export async function installationOctokit(
   });
   return new Octokit({ auth: token });
 }
+
+// The App's own identity: its id (to recognise its own comments) and its bot
+// account (the committer of a landed merge). Read once with the App's key.
+export type AppIdentity = { id: number; slug: string; botName: string; botEmail: string };
+let identity: Promise<AppIdentity> | null = null;
+
+export function appIdentity(env: Env = process.env): Promise<AppIdentity> {
+  identity ??= (async () => {
+    const { token } = await appAuth(env)({ type: "app" });
+    const app = new Octokit({ auth: token });
+    const { data } = await app.apps.getAuthenticated();
+    if (!data?.slug) throw new Error("GitHub didn't say which App this is");
+    const botName = `${data.slug}[bot]`;
+    const { data: bot } = await app.users.getByUsername({ username: botName });
+    return {
+      id: data.id,
+      slug: data.slug,
+      botName,
+      botEmail: `${bot.id}+${botName}@users.noreply.github.com`,
+    };
+  })().catch((error) => {
+    identity = null;
+    throw error;
+  });
+  return identity;
+}

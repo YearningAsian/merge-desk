@@ -282,12 +282,14 @@ function ResultCard({
   steps,
   option,
   pr,
+  pushed,
   children,
 }: {
   result: ResultEvent;
   steps: RunSteps;
   option: ResolvedOption;
   pr: number;
+  pushed: boolean;
   children?: React.ReactNode;
 }) {
   const verified = result.verdict === "VERIFIED";
@@ -369,7 +371,7 @@ function ResultCard({
             </Reveal>
           </>
         ) : null}
-        <p className="text-[12.5px] text-muted">Nothing has been pushed.</p>
+        {pushed ? null : <p className="text-[12.5px] text-muted">Nothing has been pushed.</p>}
         {children}
       </div>
     </div>
@@ -387,6 +389,9 @@ export function RunSection({
   onCancel,
   onDiscard,
   onOption,
+  landing,
+  pushed = false,
+  recordNote,
 }: {
   analysis: Analysis;
   canRun: boolean;
@@ -398,6 +403,11 @@ export function RunSection({
   onCancel: () => void;
   onDiscard: () => void;
   onOption: (option: Option) => void;
+  // Land's button and outcome, shown on a VERIFIED result.
+  landing?: React.ReactNode;
+  pushed?: boolean;
+  // Whether a hold was recorded on the pull request.
+  recordNote?: React.ReactNode;
 }) {
   const chosen = analysis.options.find((item) => item.kind === option) ?? analysis.options[0]!;
   return (
@@ -446,20 +456,34 @@ export function RunSection({
             </div>
           ) : null}
           {run.status === "done" ? (
-            <ResultCard result={run.result} steps={run.steps} option={chosen} pr={pr}>
+            <ResultCard
+              result={run.result}
+              steps={run.steps}
+              option={chosen}
+              pr={pr}
+              pushed={pushed}
+            >
               {run.result.verdict === "HELD" ? (
-                <HeldActions
-                  suggestion={suggestInstead(analysis.options, chosen.kind, analysis.older)}
-                  failedOption={chosen}
-                  steer={run.steer}
-                  onTry={onOption}
-                  onSteer={(steer) => onRun(steer)}
-                  onDiscard={onDiscard}
-                />
+                <>
+                  {recordNote}
+                  <HeldActions
+                    suggestion={suggestInstead(analysis.options, chosen.kind, analysis.older)}
+                    failedOption={chosen}
+                    steer={run.steer}
+                    onTry={onOption}
+                    onSteer={(steer) => onRun(steer)}
+                    onDiscard={onDiscard}
+                  />
+                </>
               ) : (
-                <Button size="sm" variant="ghost" onClick={onDiscard}>
-                  Discard this run
-                </Button>
+                <>
+                  {landing}
+                  {pushed ? null : (
+                    <Button size="sm" variant="ghost" onClick={onDiscard}>
+                      Discard this run
+                    </Button>
+                  )}
+                </>
               )}
             </ResultCard>
           ) : null}

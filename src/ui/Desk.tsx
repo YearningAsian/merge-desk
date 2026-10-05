@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitMerge } from "lucide-react";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import type { RunEvent } from "@/core/events";
 import type { Option } from "@/core/honor";
 import type { PullSummary } from "@/core/pulls";
 import { useMediaQuery } from "@/ui/hooks/useMediaQuery";
@@ -14,7 +15,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/ui/primitives/sheet";
 import { Skeleton } from "@/ui/primitives/skeleton";
 import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
-import type { DataSource } from "@/ui/sources/types";
+import type { DataSource, LandOutcome } from "@/ui/sources/types";
+import { LandAction, LandResult, RecordSection, type LandState } from "@/ui/Land";
 import { RunSection } from "@/ui/Run";
 import {
   analysisKey,
@@ -35,6 +37,12 @@ import {
 // Finished analyses come back after a reload of the tab (see ui/cache).
 
 const keyOf = (pull: PullSummary) => analysisKey(pull.number, pull.head.sha, pull.base.sha);
+
+const without = <T,>(map: Record<string, T>, key: string) => {
+  const next = { ...map };
+  delete next[key];
+  return next;
+};
 
 // Restored on the client only; the first render shows the list skeleton
 // either way, so the server and browser agree.
@@ -76,6 +84,14 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   });
   const [state, dispatch] = useReducer(deskReducer, undefined, restore);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const queryClient = useQueryClient();
+  // Land per run; the confirmed landing per pull request (it outlives the
+  // analysis, whose head it just moved); whether each hold was recorded.
+  const [lands, setLands] = useState<Record<string, LandState>>({});
+  const [landed, setLanded] = useState<Record<number, Extract<LandOutcome, { outcome: "LANDED" }>>>(
+    {},
+  );
+  const [recorded, setRecorded] = useState<Record<string, { ok: boolean; reason?: string }>>({});
   const wide = useMediaQuery("(min-width: 768px)");
   const running = useRef(new Map<string, AbortController>());
   const lastOpened = useRef<number | null>(null);
@@ -100,6 +116,10 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   };
   const selectedDone = selected ? doneOf(selected) : null;
   const selectedRun = selected ? runOf(selected) : undefined;
+  const selectedRunKey =
+    selected && selectedDone ? runKey(keyOf(selected), selectedDone.option) : null;
+  const selectedLand = selectedRunKey ? lands[selectedRunKey] : undefined;
+  const selectedRecorded = selectedRunKey ? recorded[selectedRunKey] : undefined;
 
   const analyze = useCallback(
     async (pull: PullSummary) => {
@@ -136,6 +156,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       running.current.get(key)?.abort();
       const controller = new AbortController();
       running.current.set(key, controller);
+      // A new attempt starts clean: no Land outcome or record note from the last one.
+      setLands((map) => without(map, key));
+      setRecorded((map) => without(map, key));
       dispatch({ type: "run/start", key, steer: steer ?? null });
       try {
         const events = source.run(
@@ -148,7 +171,26 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
           },
           controller.signal,
         );
-        for await (const event of events) dispatch({ type: "run/event", key, event });
+        let last: RunEvent | undefined;
+        for await (const event of events) {
+          last = event;
+          dispatch({ type: "run/event", key, event });
+        }
+        // A hold is recorded on the pull request as soon as it happens.
+        if (last && "type" in last && last.verdict === "HELD" && last.token)
+          void source.record(pull.number, last.token, "held").then(
+            () => {
+              setRecorded((map) => ({ ...map, [key]: { ok: true } }));
+              void queryClient.invalidateQueries({
+                queryKey: [source.mode, "record", pull.number],
+              });
+            },
+            (error: unknown) =>
+              setRecorded((map) => ({
+                ...map,
+                [key]: { ok: false, reason: error instanceof Error ? error.message : undefined },
+              })),
+          );
         dispatch({
           type: "run/error",
           key,
@@ -166,8 +208,30 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         if (running.current.get(key) === controller) running.current.delete(key);
       }
     },
-    [source, settings],
+    [source, settings, queryClient],
   );
+
+  // One deliberate click; never retried. The list and the record refresh
+  // afterwards whatever the outcome, since GitHub is the source of truth.
+  const land = async (pull: PullSummary, key: string, token: string) => {
+    setLands((map) => ({ ...map, [key]: { status: "landing" } }));
+    const outcome = await source.land(pull.number, token);
+    setLands((map) => ({ ...map, [key]: outcome }));
+    if (outcome.outcome === "LANDED") setLanded((map) => ({ ...map, [pull.number]: outcome }));
+    void queryClient.invalidateQueries({ queryKey: [source.mode, repo, "pulls"] });
+    void queryClient.invalidateQueries({ queryKey: [source.mode, "record", pull.number] });
+  };
+
+  const discard = (pull: PullSummary, key: string, current: RunState | undefined) => {
+    if (current?.status === "done" && current.result.token)
+      void source.record(pull.number, current.result.token, "discarded").then(
+        () => queryClient.invalidateQueries({ queryKey: [source.mode, "record", pull.number] }),
+        () => undefined,
+      );
+    setLands((map) => without(map, key));
+    setRecorded((map) => without(map, key));
+    dispatch({ type: "run/discard", key });
+  };
 
   const cancelRun = (pull: PullSummary) => {
     const done = doneOf(pull);
@@ -302,10 +366,57 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
             onRun={(steer) => void run(selected, selectedDone, steer)}
             onCancel={() => cancelRun(selected)}
             onDiscard={() =>
-              dispatch({ type: "run/discard", key: runKey(keyOf(selected), selectedDone.option) })
+              discard(selected, runKey(keyOf(selected), selectedDone.option), selectedRun)
             }
             onOption={(option) => dispatch({ type: "option", key: keyOf(selected), option })}
+            pushed={
+              selectedLand !== undefined &&
+              "outcome" in selectedLand &&
+              selectedLand.outcome === "LANDED"
+            }
+            landing={
+              selectedRun?.status === "done" &&
+              selectedRun.result.verdict === "VERIFIED" &&
+              selectedRun.result.token ? (
+                <>
+                  <LandAction
+                    branch={selected.head.ref}
+                    base={selected.base.ref}
+                    state={selectedLand}
+                    onLand={() =>
+                      void land(
+                        selected,
+                        runKey(keyOf(selected), selectedDone.option),
+                        selectedRun.result.token!,
+                      )
+                    }
+                  />
+                  {selectedLand && "outcome" in selectedLand ? (
+                    <LandResult outcome={selectedLand} repo={repo} pullUrl={selected.url} />
+                  ) : null}
+                </>
+              ) : null
+            }
+            recordNote={
+              selectedRecorded ? (
+                <p className="text-[12.5px] text-muted">
+                  {selectedRecorded.ok
+                    ? "Recorded on the pull request."
+                    : `Couldn't record this on the pull request: ${selectedRecorded.reason ?? "GitHub didn't answer"}.`}
+                </p>
+              ) : null
+            }
           />
+        ) : null
+      }
+      landed={
+        landed[selected.number] && landed[selected.number]!.commit === selected.head.sha ? (
+          <LandResult outcome={landed[selected.number]!} repo={repo} pullUrl={selected.url} />
+        ) : null
+      }
+      record={
+        selected.mergeable !== "mergeable" || landed[selected.number] ? (
+          <RecordSection source={source} pr={selected.number} />
         ) : null
       }
     />

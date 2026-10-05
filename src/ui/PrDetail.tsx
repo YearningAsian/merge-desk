@@ -40,6 +40,8 @@ export function PrDetail({
   onRefresh,
   run,
   runLog,
+  landed,
+  record,
 }: {
   pull: PullSummary;
   analysis: AnalysisState | undefined;
@@ -54,6 +56,9 @@ export function PrDetail({
   onRefresh: () => void;
   run?: React.ReactNode;
   runLog?: string | null;
+  // Shown on top while the branch head is the commit Merge Desk landed.
+  landed?: React.ReactNode;
+  record?: React.ReactNode;
 }) {
   const branches = { ours: pull.head.ref, theirs: pull.base.ref };
   const done = analysis?.status === "done" ? analysis : null;
@@ -91,6 +96,7 @@ export function PrDetail({
         </div>
       </header>
 
+      {landed ? <div className="mb-4">{landed}</div> : null}
       {pull.fork ? (
         <Notice>Pull requests from forks aren&apos;t supported yet. Nothing was run.</Notice>
       ) : pull.mergeable === "mergeable" ? (
@@ -156,6 +162,7 @@ export function PrDetail({
           ) : null}
         </>
       )}
+      {record}
     </article>
   );
 }

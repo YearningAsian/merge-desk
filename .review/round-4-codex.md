@@ -189,3 +189,43 @@ No unrelated submission documents/assets were added or changed. The eligibility 
 Fix commit: `e1212e73e18f07b47cfddc4a00aeb60e38641b48`. Report and PLAN updated separately by name. Await learner's **continue**. No push, PR, real Land/reset, merge, deploy, production permission changes or ruleset edits. Later Steps 2–5 and STOP 2 / STOP 3 remain unchanged; separate-model repair review, live integration validation and production shared coordination remain outstanding.
 
 probe.yml is untouched, untracked and unstaged. It schedules at minutes 7/37 hourly and supports workflow_dispatch; Python GETs configured production health/stats/homepages, checks integration flags and branding. It references repository variables, no secrets, has no explicit permissions block and no repository write command; inherited workflow token permissions were not verified. PLAN row 2.6 and its own comment identify the future deployment probe, but git log/review history contain no creation provenance because it was never committed. Its external URL calls were explicitly cleared by the learner. Slice 6 alone owns `permissions: {}`, own-production-URL verification and its separate named-file commit.
+
+## STOP 2 follow-up: bot identity authentication (2026-10-05)
+
+M6 [medium] App JWT used for a public bot-user lookup, preventing Land and decision-record reads.
+
+- Observed by the learner: `GET /users/merge-desk-yearningasian%5Bbot%5D` returned 401, `POST /api/live/land` returned 503/REFUSED, and `GET /api/live/record?pr=3` returned 503. This is not a completed Land or authorization to start Step 4. The original unexpected-behavior stop was reported; the learner then authorized proceeding with the fix.
+- Root cause in reviewed base `0274b862aacf2307133ec4688db9d161a6722933`: `src/server/github/app.ts:65-70` minted an App JWT, successfully fetched App metadata and reused that client for `users.getByUsername`. App JWT authentication does not work for this user endpoint. Official endpoint documentation permits an unauthenticated public lookup: https://docs.github.com/en/rest/users/users#get-a-user . This authentication boundary was missed in the earlier review; the Land route tests mocked appIdentity rather than exercising its HTTP authentication.
+- Smallest fix: retain JWT authentication for `GET /app`, use a separate unauthenticated Octokit solely for the server-derived public bot profile (`app.ts:68,71`). No permission, allowlist, settings, branch-guard, signature, writer or mutation change. Existing lookup errors reject and clear the cached promise (`app.ts:78`), never invent an identity.
+- Claim commit: `fd74b3b757b77e86b852c2f6bef4f4a9c0a7c450` (PLAN only). Fix commit: `1c8e4c0283c1d6461402bc46fc16dd777bffcbed` (app.ts and named regression test only). Actual builder/reviewer: Codex (GPT-6); exact runtime variant unavailable.
+
+### Test-first evidence and actual commands
+
+- Added `tests/server/app-identity.test.ts` before production edits. Real Octokit performs its actual auth/request construction; only credential minting and HTTP are replaced with fixed fake fixtures. No environment file, real private key, token or live write is used.
+- RED: `npm test -- tests/server/app-identity.test.ts` exited 1 with all 3 regressions failing at JWT-bearing bot HTTP 401 before the fix. GREEN: same command exited 0, 3/3 passed. Tests cover successful identity derivation and fail-closed recovery after App or bot lookup failure.
+- `npx prettier --write src/server/github/app.ts tests/server/app-identity.test.ts`; `git diff --check`: passed, named files only.
+- `npm test`: exit 0, **253 tests / 30 files passed**.
+- `npm run typecheck`: exit 0.
+- `npm run lint`: exit 0, **0 errors / 1 existing warning**, ignored `.review/run-check.mts:43` unused token binding.
+- `npm run e2e`: exit 0, **12/12 browser tests passed**. Port 3100 was initially free, so Playwright ran its configured `npm run build && npx next start -p 3100` against a fresh production build. Browser tests use recorded fixtures, not real Land. Existing FORCE_COLOR/NO_COLOR and out-of-repository lockfile warnings were present.
+- One read-only real provider check used `new Octokit().users.getByUsername({ username: 'merge-desk-yearningasian[bot]' })` with no auth: HTTP **200**, type Bot. It confirms the public lookup works, not the entire authenticated appIdentity or Land round trip. No secret or env file was read or printed.
+- `node --version`: v26.3.0; `npm --version`: 11.16.0 for these local checks. Previous PR CI on 0274b86 used the repository's Node 24 configuration and succeeded; updated-head CI must be checked separately.
+- One exploratory Get-Content attempted nonexistent vitest.config.ts; rg found vitest.config.mts, which was then read. No unexpected command failed twice. Deliberate RED failures and synthetic provider refusals were expected verification.
+
+### Fresh independent affected-boundary review
+
+ROUND 1 of this follow-up, code, STOP 2 App identity fix, reviewer: fresh isolated Codex (GPT-6), same model; exact variant unavailable. An earlier read-only diagnostic agent failed with a usage-limit message and produced no review. The fresh fix reviewer subsequently completed successfully.
+
+Reviewed base 0274b862aacf2307133ec4688db9d161a6722933 and working fix over status-only fd74b3b. Reviewed bytes were then committed unchanged in 1c8e4c0. Scope: app.ts and app-identity.test.ts; probe.yml excluded. SHA-256 of concatenated raw binary app diff against base and new-test diff against NUL: `383a55eefe827ea7343dce5a994c349752a07f916a627f3fdcd77302d10522f2`.
+
+Checked every-side-effect-path focus items 1-8 at the affected boundary, plus App identity provenance, request authentication, caching/error recovery, Land/record callers, comment ownership/seal, installation permissions, session/signed-run/repository/branch/tree/deadline and writer guards. The new unauthenticated client only performs a public GET. No alternate write path or guard bypass was found. Independently ran the targeted test: **3/3 passed**; the reviewer did not independently rerun RED or the full suites. Primary also rechecked the final source and failure propagation after the fix.
+
+M6 closed by the regression `resolves the committer using App auth for metadata and no App JWT for the public bot`, plus lookup-failure recovery tests. Verdict: **CLEAN ROUND, 0 high / 0 medium / 0 low in this affected scope**. No live operation, real credentials, settings change, Land, reset, push or deployment was performed by the independent reviewer. Successful cache concurrency was not independently exercised. This same-model review does not fulfill the outstanding separate-model-before-merge gate.
+
+### Preserved gates and branch evidence
+
+STOP 2 remains: the learner performs the original #1 and #2 checks and reports observations with "landed" before Step 4. The REFUSED attempt on demo/drop/fix-b (#3) does not substitute for those checks. No manual clicks, scripted Land/replay/reset, merge, deploy or repository settings changes occurred during this repair.
+
+The original all-branch baseline `.review/slice5-before-land.json` at 2026-10-05T21:15:55.4834654Z remains byte-for-byte preserved, SHA-256 `0D07F384967E91C1192978728CAC906D40651932527E924EE1F02F86B84BE135`. The additional snapshot at 21:24:15Z showed all nine heads unchanged, including feat/land. Updating the existing PR for this authorized repair will advance feat/land; that change must be disclosed separately, not hidden by overwriting the baseline or silently treating the original Step 4 no-other-branch-moved condition as passed. A new all-head snapshot is required before subsequent manual checks.
+
+probe.yml remains untouched, untracked and unstaged; verified SHA-256 `48E3B2A27DB383BA740450ED564EBA1B1850A483148D8A156588B18ADF8BD125`. Original round 4 policy findings, L1 and readiness gaps remain as previously recorded; this narrow authentication fix does not resolve them.

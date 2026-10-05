@@ -7,6 +7,7 @@ import { LandError, landMerge } from "@/server/github/land";
 import { readPull } from "@/server/github/prs";
 import { checkLand } from "@/server/guard";
 import { verifyRun } from "@/server/pipeline/run";
+import { recordSeal } from "@/server/sign";
 import { deskLink, entryFor } from "@/server/record";
 import { guardLive } from "@/server/session";
 
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
       pr,
       appId: app.id,
       deskUrl: deskLink(request, pr),
+      seal: recordSeal(requireEnv("SESSION_SECRET")),
       entry: entryFor(run, {
         action: run.drops ? "dropped" : "landed",
         who: guard.login,

@@ -64,8 +64,8 @@ async function signIn(page: Page) {
   });
   await page.route("**/api/live/record**", (route) =>
     route.request().method() === "GET"
-      ? route.fulfill({ json: { entries: [] } })
-      : route.fulfill({ json: { entries: [] } }),
+      ? route.fulfill({ json: { entries: [], note: null } })
+      : route.fulfill({ json: { entries: [], note: null } }),
   );
   const requests: RunBody[] = [];
   await page.route("**/api/live/run", (route) => {
@@ -473,7 +473,7 @@ test("a hold is recorded on the pull request as it happens", async ({ page }) =>
   const records: Array<{ pr: number; action: string }> = [];
   await page.route("**/api/live/record**", (route) => {
     if (route.request().method() === "POST") records.push(route.request().postDataJSON());
-    return route.fulfill({ json: { entries: [] } });
+    return route.fulfill({ json: { entries: [], note: null } });
   });
   await page.goto(`/live?pr=${HELD}`);
   const detail = page.getByRole("article");

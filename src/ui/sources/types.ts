@@ -12,7 +12,10 @@ export interface DataSource {
   run(input: RunRequest, signal: AbortSignal): AsyncIterable<RunEvent>;
   land(pr: number, token: string): Promise<LandOutcome>;
   record(pr: number, token: string, action: "held" | "discarded"): Promise<RecordEntry[]>;
-  readRecord(pr: number, signal?: AbortSignal): Promise<RecordEntry[]>;
+  readRecord(
+    pr: number,
+    signal?: AbortSignal,
+  ): Promise<{ entries: RecordEntry[]; note: string | null }>;
 }
 
 // What the browser sends to run an option: the analysis token the server

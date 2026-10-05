@@ -136,7 +136,8 @@ export function RecordSection({ source, pr }: { source: DataSource; pr: number }
     queryKey: [source.mode, "record", pr],
     queryFn: ({ signal }) => source.readRecord(pr, signal),
   });
-  const entries = query.data ?? [];
+  const entries = query.data?.entries ?? [];
+  const note = query.data?.note ?? null;
   return (
     <Section
       title="Record"
@@ -147,6 +148,7 @@ export function RecordSection({ source, pr }: { source: DataSource; pr: number }
         </span>
       }
     >
+      {note ? <p className="mb-2 text-[12.5px] text-wait-text">{note}</p> : null}
       {query.isError ? (
         <p className="text-[13px] text-muted">{query.error.message}</p>
       ) : entries.length === 0 ? (

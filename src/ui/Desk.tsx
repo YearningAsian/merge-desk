@@ -92,6 +92,19 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     {},
   );
   const [recorded, setRecorded] = useState<Record<string, { ok: boolean; reason?: string }>>({});
+  // Record updates for one pull request go one at a time from this tab (the
+  // server also serializes and reads back), so a quick discard after an
+  // automatic hold record can't race it.
+  const recordQueue = useRef(new Map<number, Promise<unknown>>());
+  const queueRecord = useCallback(<T,>(pr: number, work: () => Promise<T>): Promise<T> => {
+    const previous = recordQueue.current.get(pr) ?? Promise.resolve();
+    const next = previous.then(work, work);
+    recordQueue.current.set(
+      pr,
+      next.catch(() => undefined),
+    );
+    return next;
+  }, []);
   const wide = useMediaQuery("(min-width: 768px)");
   const running = useRef(new Map<string, AbortController>());
   const lastOpened = useRef<number | null>(null);
@@ -178,7 +191,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         }
         // A hold is recorded on the pull request as soon as it happens.
         if (last && "type" in last && last.verdict === "HELD" && last.token)
-          void source.record(pull.number, last.token, "held").then(
+          void queueRecord(pull.number, () => source.record(pull.number, last.token!, "held")).then(
             () => {
               setRecorded((map) => ({ ...map, [key]: { ok: true } }));
               void queryClient.invalidateQueries({
@@ -208,7 +221,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         if (running.current.get(key) === controller) running.current.delete(key);
       }
     },
-    [source, settings, queryClient],
+    [source, settings, queryClient, queueRecord],
   );
 
   // One deliberate click; never retried. The list and the record refresh
@@ -224,7 +237,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
 
   const discard = (pull: PullSummary, key: string, current: RunState | undefined) => {
     if (current?.status === "done" && current.result.token)
-      void source.record(pull.number, current.result.token, "discarded").then(
+      void queueRecord(pull.number, () =>
+        source.record(pull.number, current.result.token!, "discarded"),
+      ).then(
         () => queryClient.invalidateQueries({ queryKey: [source.mode, "record", pull.number] }),
         () => undefined,
       );

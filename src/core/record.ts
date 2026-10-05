@@ -4,8 +4,9 @@ import { RunCheck } from "./run";
 
 // The decision record: one Merge Desk comment per pull request, found by its
 // marker and updated in place. A readable table for people, plus the same
-// entries as JSON in a hidden block for Merge Desk to read back. Pure; the
-// GitHub calls live in server/github/comment.ts.
+// entries as JSON in a hidden block, sealed with a key only the server has,
+// so an edit made outside Merge Desk is noticed rather than trusted. Pure;
+// the GitHub calls live in server/github/comment.ts.
 
 export const MARKER = "<!-- merge-desk:record -->";
 const DATA_OPEN = "<!-- merge-desk:data";
@@ -37,23 +38,42 @@ export const RecordEntry = z.object({
     .nullable(),
 });
 export type RecordEntry = z.infer<typeof RecordEntry>;
+const Entries = z.array(RecordEntry);
+
+// The server's keyed seal over the entries (server/sign.ts recordSeal).
+export type RecordSeal = {
+  seal: (text: string) => string;
+  check: (text: string, mac: string) => boolean;
+};
+
+const Data = z.object({ v: z.literal(1), entries: z.unknown(), mac: z.string().max(200) });
+
+// Entries in schema key order, so the sealed text is the same however they
+// were built or read back.
+const canonical = (entries: RecordEntry[]) => JSON.stringify(Entries.parse(entries));
 
 export type ParsedRecord = { ok: true; entries: RecordEntry[] } | { ok: false; reason: string };
 
 // Reads the entries back from a comment body. A body without the marker is
-// simply not ours; one with the marker whose data can't be read is refused,
-// so an edited comment is never silently overwritten and its history lost.
-export function parseRecord(body: string): ParsedRecord {
+// simply not ours. One with the marker is accepted only with exactly one
+// data block, at the very end, whose seal checks out; anything else was
+// changed outside Merge Desk and is refused, never trusted or overwritten.
+export function parseRecord(body: string, seal: RecordSeal): ParsedRecord {
   if (!body.includes(MARKER)) return { ok: true, entries: [] };
+  const edited = {
+    ok: false as const,
+    reason: "The Merge Desk comment was changed outside Merge Desk.",
+  };
   const start = body.indexOf(DATA_OPEN);
-  const end = start === -1 ? -1 : body.indexOf(DATA_CLOSE, start + DATA_OPEN.length);
-  if (start === -1 || end === -1)
-    return { ok: false, reason: "The Merge Desk comment was edited and its data is missing." };
+  if (start === -1 || start !== body.lastIndexOf(DATA_OPEN)) return edited;
+  const end = body.indexOf(DATA_CLOSE, start + DATA_OPEN.length);
+  if (end === -1 || body.slice(end + DATA_CLOSE.length).trim() !== "") return edited;
   try {
-    const data = JSON.parse(body.slice(start + DATA_OPEN.length, end));
-    return { ok: true, entries: z.array(RecordEntry).parse(data) };
+    const data = Data.parse(JSON.parse(body.slice(start + DATA_OPEN.length, end)));
+    const entries = Entries.parse(data.entries);
+    return seal.check(canonical(entries), data.mac) ? { ok: true, entries } : edited;
   } catch {
-    return { ok: false, reason: "The Merge Desk comment was edited and its data can't be read." };
+    return edited;
   }
 }
 
@@ -71,26 +91,52 @@ const WORDS: Record<RecordAction, string> = {
   discarded: "Discarded",
 };
 
-// Table cells: no pipes or line breaks, nothing that could close a comment.
+// Text from commits, branches, authors and the model, made inert for a
+// GitHub comment: every character that could start markup, a mention, a
+// link, an issue reference, a code span or a comment is written as an HTML
+// entity (shown as itself), and line breaks become spaces.
+const ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "@": "&#64;",
+  "[": "&#91;",
+  "]": "&#93;",
+  "(": "&#40;",
+  ")": "&#41;",
+  "\\": "&#92;",
+  "`": "&#96;",
+  "|": "&#124;",
+  "#": "&#35;",
+  ":": "&#58;",
+  "!": "&#33;",
+  "*": "&#42;",
+  _: "&#95;",
+  "~": "&#126;",
+};
 const cell = (text: string) =>
   text
-    .replace(/\|/g, "\\|")
-    .replace(/[\r\n]+/g, " ")
-    .replace(/<!--|-->/g, "")
-    .trim();
+    .replace(/[\r\n\t]+/g, " ")
+    .trim()
+    .replace(/[&<>@[\]()\\`|#:!*_~]/g, (char) => ENTITIES[char]!);
 
 const checksText = (checks: RecordEntry["checks"]) =>
   checks.length
     ? checks.map((check) => `${check.step} ${check.state.replace("_", " ")}`).join(", ")
     : "none";
 
-export function renderRecord(entries: RecordEntry[], deskUrl: string | null): string {
+const sha7 = (sha: string) => (/^[0-9a-f]{7,40}$/.test(sha) ? `\`${sha.slice(0, 7)}\`` : "");
+
+export function renderRecord(
+  entries: RecordEntry[],
+  options: { deskUrl: string | null; seal: RecordSeal; note?: string | null },
+): string {
   const rows = entries
     .map((entry) =>
       [
         cell(entry.at.replace("T", " ").replace(/\.\d+Z$/, " UTC")),
-        `@${cell(entry.who)}`,
-        WORDS[entry.action] + (entry.commit ? ` \`${entry.commit.slice(0, 7)}\`` : ""),
+        cell(entry.who),
+        WORDS[entry.action] + (entry.commit ? ` ${sha7(entry.commit)}` : ""),
         cell(OPTION_LABELS[entry.option]),
         cell(entry.reason ?? ""),
         cell(checksText(entry.checks)),
@@ -102,23 +148,29 @@ export function renderRecord(entries: RecordEntry[], deskUrl: string | null): st
     .map((entry) => {
       const dropped = entry.dropped!;
       const commits = dropped.commits
-        .map((commit) => `\`${commit.sha.slice(0, 7)}\` ${cell(commit.subject)}`)
+        .map((commit) => `${sha7(commit.sha)} ${cell(commit.subject)}`)
         .join("; ");
-      return `- ${WORDS[entry.action]} by @${cell(entry.who)}: ${dropped.side} (\`${cell(dropped.branch)}\`) by ${cell(dropped.authors.join(", ") || "nobody")} in ${cell(dropped.files.join(", "))}: ${commits || "no commits"}. The commits stay in the branch history.`;
+      return `- ${WORDS[entry.action]} by ${cell(entry.who)}: ${dropped.side} (${cell(dropped.branch)}) by ${cell(dropped.authors.join(", ") || "nobody")} in ${cell(dropped.files.join(", "))}: ${commits || "no commits"}. The commits stay in the branch history.`;
     });
+  const normalized = Entries.parse(entries);
+  const text = JSON.stringify(normalized);
   // JSON can't close the hidden block: "--" is written as an escape.
-  const data = JSON.stringify(entries).replace(/--/g, "-\\u002d");
+  const data = JSON.stringify({ v: 1, entries: normalized, mac: options.seal.seal(text) }).replace(
+    /--/g,
+    "-\\u002d",
+  );
   return [
     MARKER,
     "### Merge Desk record",
     "",
     "Every decision Merge Desk made on this pull request. Merge Desk writes only to this pull request's branch and never deletes commits.",
+    ...(options.note ? ["", `> ${options.note}`] : []),
     "",
     "| When | Who | What | Option | Reason shown | Checks |",
     "|---|---|---|---|---|---|",
     ...rows,
     ...(drops.length ? ["", "**Dropped work (recoverable)**", "", ...drops] : []),
-    ...(deskUrl ? ["", `[Open in Merge Desk](${deskUrl})`] : []),
+    ...(options.deskUrl ? ["", `[Open in Merge Desk](${options.deskUrl})`] : []),
     "",
     `${DATA_OPEN}\n${data}\n${DATA_CLOSE}`,
   ].join("\n");

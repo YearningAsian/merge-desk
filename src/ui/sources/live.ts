@@ -16,6 +16,7 @@ const LandAnswer = z.union([
   z.object({ outcome: z.enum(["REFUSED", "UNKNOWN"]), reason: z.string() }),
 ]);
 const Entries = z.object({ entries: z.array(RecordEntry) });
+const Read = z.object({ entries: z.array(RecordEntry), note: z.string().nullable() });
 
 async function failure(response: Response): Promise<SourceError> {
   const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
@@ -94,6 +95,6 @@ export const liveSource: DataSource = {
   async readRecord(pr, signal) {
     const response = await fetch(`/api/live/record?pr=${pr}`, { signal, cache: "no-store" });
     if (!response.ok) throw await failure(response);
-    return Entries.parse(await response.json()).entries;
+    return Read.parse(await response.json());
   },
 };

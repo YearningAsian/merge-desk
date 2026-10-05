@@ -5,6 +5,7 @@ import { appIdentity, installationOctokit } from "@/server/github/app";
 import { readRecord, upsertRecord } from "@/server/github/comment";
 import { readPull } from "@/server/github/prs";
 import { verifyRun } from "@/server/pipeline/run";
+import { recordSeal } from "@/server/sign";
 import { deskLink, entryFor } from "@/server/record";
 import { guardLive } from "@/server/session";
 
@@ -27,8 +28,9 @@ export async function GET(request: Request) {
   try {
     const octokit = await installationOctokit(REPO, { pull_requests: "read" });
     const app = await appIdentity();
-    const record = await readRecord(octokit, REPO, pr, app.id);
-    return record.ok ? json(200, { entries: record.entries }) : json(409, { error: record.reason });
+    const seal = recordSeal(requireEnv("SESSION_SECRET"));
+    const record = await readRecord(octokit, { repo: REPO, pr, appId: app.id, seal });
+    return json(200, { entries: record.entries, note: record.note });
   } catch {
     return json(503, { error: "GitHub isn't reachable right now." });
   }
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
       pr,
       appId: app.id,
       deskUrl: deskLink(request, pr),
+      seal: recordSeal(requireEnv("SESSION_SECRET")),
       entry: entryFor(run, {
         action,
         who: guard.login,

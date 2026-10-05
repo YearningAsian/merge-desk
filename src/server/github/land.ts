@@ -27,10 +27,12 @@ export function landMessage(
   refs: { head: string; base: string },
   login: string,
 ) {
+  // The model's description stays on one line, so it can't add trailers.
+  const description = (record.description ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
   return [
     `Merge ${refs.base} into ${refs.head} (Merge Desk)`,
     "",
-    `${OPTION_LABELS[record.option]}${record.description ? `: ${record.description}` : ""}`,
+    `${OPTION_LABELS[record.option]}${description ? `: ${description}` : ""}`,
     "Checked on a scratch copy: it parses, the choice is honored, and the tests pass.",
     `Landed by @${login} with Merge Desk.`,
   ].join("\n");

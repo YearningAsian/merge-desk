@@ -101,3 +101,20 @@ export function verify<T>(
     exp: envelope.exp,
   };
 }
+
+// The decision record's seal: an HMAC over its entries with a key derived
+// separately from the token key, so a record comment edited on GitHub is
+// noticed rather than trusted.
+export function recordSeal(secret: string) {
+  if (secret.trim().length < MIN_SECRET_LENGTH)
+    throw new SignatureError("Sealing needs a SESSION_SECRET of at least 32 characters");
+  const key = Buffer.from(hkdfSync("sha256", secret, "merge-desk", "merge-desk record v1", 32));
+  return {
+    seal: (text: string) => mac(key, text).toString("base64url"),
+    check: (text: string, sealed: string) => {
+      const actual = Buffer.from(sealed, "base64url");
+      const wanted = mac(key, text);
+      return actual.length === wanted.length && timingSafeEqual(actual, wanted);
+    },
+  };
+}

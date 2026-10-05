@@ -1,7 +1,7 @@
 import type { Octokit } from "@octokit/rest";
 import { describe, expect, it, vi } from "vitest";
 import type { RunRecord } from "@/core/run";
-import { LandError, landMerge } from "@/server/github/land";
+import { LandError, landMerge, landMessage } from "@/server/github/land";
 
 const head = "a".repeat(40);
 const base = "b".repeat(40);
@@ -106,5 +106,18 @@ describe("landMerge", () => {
     await expect(landMerge(octokit, input())).rejects.toMatchObject({
       outcome: "UNKNOWN",
     });
+  });
+});
+
+// Review round 1, L1: model text stays on one line of the commit message.
+describe("landMessage", () => {
+  it("keeps the description on one line, so it can't add trailers", () => {
+    const message = landMessage(
+      { ...record, description: "x\n\nCo-authored-by: Someone <someone@example.com>" },
+      { head: "demo/clean/rename", base: "demo/base" },
+      "YearningAsian",
+    );
+    expect(message.split("\n")).toHaveLength(5);
+    expect(message).not.toMatch(/^Co-authored-by/m);
   });
 });

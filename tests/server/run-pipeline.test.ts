@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { RunRecord } from "@/core/run";
+import { signRun, verifyRun } from "@/server/pipeline/run";
 import type { RunEvent } from "@/core/events";
 import { MalformedOutputError } from "@/server/errors";
 import { runPipeline, type Proposer } from "@/server/pipeline/run";
@@ -24,6 +26,13 @@ function fakeRunner(overrides: Partial<Runner> = {}): Runner & { calls: string[]
         conflicted,
         changedFiles: [API, "playground/test/retry.test.js"],
         patch: `diff for ${files.length}`,
+        tree: "f".repeat(40),
+        changes: files.map((file) => ({
+          path: file.path,
+          mode: "100644" as const,
+          content: file.content,
+        })),
+        changesNote: null,
       };
     },
     parseCheck: async (paths) => {
@@ -295,5 +304,46 @@ describe("runPipeline", () => {
       }),
     );
     expect(calls).toBe(1);
+  });
+});
+
+describe("signed run records", () => {
+  const secret = "s".repeat(48);
+  const record: RunRecord = {
+    v: 1,
+    repo: "YearningAsian/merge-desk",
+    pr: 1,
+    verdict: "VERIFIED",
+    option: "combine",
+    drops: null,
+    revisions: { head: "a".repeat(40), base: "b".repeat(40) },
+    tree: "c".repeat(40),
+    changes: [{ path: "playground/src/api.js", mode: "100644", content: "x" }],
+    changesNote: null,
+    description: "kept both",
+    reason: "Both fit.",
+    summary: ["ours: rename, present"],
+    checks: [{ step: "tests", state: "passed" }],
+    analysisModel: "gemini-3.5-flash-lite",
+    proposeModel: "gemini-3.5-flash-lite",
+    steer: null,
+    finishedAt: "2026-10-05T12:00:00.000Z",
+  };
+  const expected = { user: "YearningAsian", repo: record.repo, pr: 1 };
+
+  it("verifies for the same user, repository and pull request", () => {
+    const token = signRun(record, { user: "YearningAsian", secret });
+    expect(verifyRun(token, expected, { secret })).toEqual(record);
+  });
+
+  it("refuses another user, another pull request, a changed byte or an expired record", () => {
+    const token = signRun(record, { user: "YearningAsian", secret, now: 1_000 });
+    const at = { secret, now: 2_000 };
+    expect(() => verifyRun(token, { ...expected, user: "someone-else" }, at)).toThrow();
+    expect(() => verifyRun(token, { ...expected, pr: 2 }, at)).toThrow();
+    const [version, payload, mac] = token.split(".");
+    const flipped = `${version}.${payload!.slice(0, -2)}AA.${mac}`;
+    expect(() => verifyRun(flipped, expected, at)).toThrow();
+    expect(() => verifyRun(token, expected, { secret, now: 1_000 + 16 * 60 * 1000 })).toThrow();
   });
 });

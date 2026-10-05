@@ -2,6 +2,7 @@ import { extname } from "node:path";
 import { truncateLog } from "@/core/events";
 import { chooseTestSuite } from "@/server/guard";
 import type {
+  LandableChange,
   AppliedProposal,
   CommitInfo,
   ConflictedFile,
@@ -37,6 +38,7 @@ export interface Shell {
 }
 
 export const RUN_LIMIT_MS = 120_000;
+export const MAX_LANDABLE_BYTES = 2_000_000;
 export const TEST_LIMIT_MS = 30_000;
 export const SHA = /^[0-9a-f]{40}$/;
 
@@ -208,7 +210,55 @@ export async function commitProposal(
     .split("\n")
     .filter(Boolean);
   const patch = (await git(shell, ["diff", "--binary", "HEAD^1", "HEAD"])).stdout;
-  return { conflicted: state.conflicted, changedFiles, patch };
+  const tree = (await git(shell, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+  const landable = await landableChanges(shell);
+  return { conflicted: state.conflicted, changedFiles, patch, tree, ...landable };
+}
+
+// Every file the merge commit changes against the head, with its new text and
+// mode, so Land can rebuild exactly this tree on GitHub (and check the tree id
+// matches). NUL-separated output, so unusual file names parse safely.
+async function landableChanges(
+  shell: Shell,
+): Promise<{ changes: LandableChange[] | null; changesNote: string | null }> {
+  const refuse = (changesNote: string) => ({ changes: null, changesNote });
+  const fields = async (args: string[]) =>
+    (await git(shell, args)).stdout.split("\0").filter((field) => field !== "");
+
+  const numstat = await fields(["diff", "--numstat", "-z", "--no-renames", "HEAD^1", "HEAD"]);
+  for (const entry of numstat)
+    if (entry.startsWith("-\t-\t")) return refuse(`binary file: ${entry.slice(4)}`);
+
+  const status = await fields(["diff", "--name-status", "-z", "--no-renames", "HEAD^1", "HEAD"]);
+  const changed: Array<{ path: string; deleted: boolean }> = [];
+  for (let i = 0; i + 1 < status.length; i += 2)
+    changed.push({ path: assertRepoPath(status[i + 1]!), deleted: status[i] === "D" });
+
+  const kept = changed.filter((file) => !file.deleted).map((file) => file.path);
+  const modes = new Map<string, string>();
+  if (kept.length)
+    for (const entry of await fields(["ls-tree", "-z", "HEAD", "--", ...kept])) {
+      const tab = entry.indexOf("\t");
+      modes.set(entry.slice(tab + 1), entry.split(" ")[0]!);
+    }
+
+  const changes: LandableChange[] = [];
+  let bytes = 0;
+  for (const file of changed) {
+    if (file.deleted) {
+      changes.push({ path: file.path, mode: null, content: null });
+      continue;
+    }
+    const mode = modes.get(file.path);
+    if (mode !== "100644" && mode !== "100755")
+      return refuse(`unsupported file type (${mode ?? "unknown"}): ${file.path}`);
+    const content = await shell.readText(file.path);
+    if (content === null) return refuse(`could not read ${file.path}`);
+    bytes += Buffer.byteLength(content);
+    if (bytes > MAX_LANDABLE_BYTES) return refuse("the change is larger than 2 MB");
+    changes.push({ path: file.path, mode, content });
+  }
+  return { changes, changesNote: null };
 }
 
 // A syntax-only parse of TypeScript text. It never executes the candidate.

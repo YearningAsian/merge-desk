@@ -87,7 +87,11 @@ function Step({ step }: { step: StepRow }) {
             Raw log
           </button>
           <Reveal open={open}>
-            <pre className="mt-1.5 max-h-72 overflow-auto rounded-[6px] border border-hair bg-surface p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
+            <pre
+              tabIndex={0}
+              aria-label={`${step.label}: raw log`}
+              className="mt-1.5 max-h-72 overflow-auto rounded-[6px] border border-hair bg-surface p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap"
+            >
               {step.log}
             </pre>
           </Reveal>

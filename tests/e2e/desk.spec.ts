@@ -14,8 +14,28 @@ const prs = JSON.parse(readFileSync(join(FIXTURES, "prs.json"), "utf8")) as {
 };
 const stream = (scenario: string) =>
   readFileSync(join(FIXTURES, `analyze-${scenario}.ndjson`), "utf8");
+// The recorded analyses carry no signature; the replayed one gets a stand-in
+// token so the desk lets it run (the run route is replayed too).
+const withToken = (ndjson: string) =>
+  ndjson
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const event = JSON.parse(line) as { type?: string; ok?: boolean };
+      return JSON.stringify(
+        event.type === "analysis" && event.ok ? { ...event, token: "e2e" } : event,
+      );
+    })
+    .join("\n") + "\n";
+const scenarioOf = (pull: { head: { ref: string } }) => pull.head.ref.split("/")[1]!;
 const byPr: Record<number, string> = Object.fromEntries(
-  prs.pulls.map((pull) => [pull.number, stream(pull.head.ref.split("/")[1]!)]),
+  prs.pulls.map((pull) => [pull.number, withToken(stream(scenarioOf(pull)))]),
+);
+const runs: Record<number, string> = Object.fromEntries(
+  prs.pulls.map((pull) => [
+    pull.number,
+    readFileSync(join(FIXTURES, `run-${scenarioOf(pull)}.ndjson`), "utf8"),
+  ]),
 );
 const CLEAN = prs.pulls.find((pull) => pull.head.ref === "demo/clean/rename")!.number;
 const HELD = prs.pulls.find((pull) => pull.head.ref === "demo/held/caller")!.number;
@@ -40,7 +60,20 @@ async function signIn(page: Page) {
     const { pr } = route.request().postDataJSON() as { pr: number };
     return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: byPr[pr]! });
   });
+  const requests: RunBody[] = [];
+  await page.route("**/api/live/run", (route) => {
+    const body = route.request().postDataJSON() as RunBody;
+    requests.push(body);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/x-ndjson",
+      body: runs[body.pr]!,
+    });
+  });
+  return requests;
 }
+
+type RunBody = { pr: number; token: string; option: string; steer?: string };
 
 async function noHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(
@@ -264,6 +297,104 @@ test("settings pick the model; keys open help and details; a reload reuses the a
   await detail.getByRole("button", { name: "Analyze with Gemini 3.8 Flash" }).click();
   await expect.poll(() => bodies.length).toBe(2);
   expect(bodies[1]).toEqual({ pr: CLEAN, model: "gemini-3.8-flash" });
+});
+
+test("held: steps tick to HELD with the failed check, then steer and retry or discard", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const requests = await signIn(page);
+  await page.goto(`/live?pr=${HELD}`);
+  const detail = page.getByRole("article");
+  await expect(detail.getByRole("button", { name: "Run checks" })).toBeVisible();
+
+  // Cmd/Ctrl+Enter runs the option the slider is on (combine, no drop).
+  await page.keyboard.press("Control+Enter");
+  const result = detail.getByRole("group", { name: "Result: HELD" });
+  await expect(result).toBeVisible();
+  expect(requests).toEqual([{ pr: HELD, token: "e2e", option: "combine" }]);
+  await expect(result.getByText("Held at tests")).toBeVisible();
+  await expect(detail.getByRole("list", { name: "Run steps" })).toContainText("exit 1");
+  await expect(page.getByRole("status").filter({ hasText: "is HELD" })).toHaveCount(1);
+  await expect(page).toHaveTitle(`HELD #${HELD} | Merge Desk`);
+  await expect(page.locator(`[data-pr="${HELD}"]`)).toContainText("HELD");
+  await expect(result.getByRole("button", { name: /^Try / })).toBeVisible();
+  await noPageScroll(page);
+  await shot(page, "run-held-1440");
+  await noSeriousAxe(page);
+
+  // Steer and retry sends one line with the same option.
+  await result.getByRole("textbox").fill("keep the old positional call working too");
+  await result.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1]).toEqual({
+    pr: HELD,
+    token: "e2e",
+    option: "combine",
+    steer: "keep the old positional call working too",
+  });
+  await expect(detail.getByText('"keep the old positional call working too"')).toBeVisible();
+
+  // Discard returns to the run button; nothing else is asked of the server.
+  await detail
+    .getByRole("group", { name: "Result: HELD" })
+    .getByRole("button", { name: "Discard this attempt" })
+    .click();
+  await expect(detail.getByRole("button", { name: "Run checks" })).toBeVisible();
+  expect(requests).toHaveLength(2);
+});
+
+test("drop: the confirmation names the lost work, an early release cancels, Ctrl+Enter confirms", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const requests = await signIn(page);
+  await page.goto(`/live?pr=${DROP.number}`);
+  const detail = page.getByRole("article");
+  // The recorded analysis recommends keeping ours, which drops theirs.
+  await expect(detail.getByText(/This drops theirs: 1 commit by YearningAsian/)).toBeVisible();
+  await expect(detail.getByText(/it will undo this change on/)).toBeVisible();
+  const hold = detail.getByRole("button", { name: "Hold to drop theirs and run" });
+
+  // Let go before 800 ms: nothing runs.
+  await hold.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  expect(requests).toHaveLength(0);
+  await shot(page, "drop-confirm-1440");
+
+  // The deliberate keyboard alternative confirms at once.
+  await page.locator("body").press("Control+Enter");
+  const result = detail.getByRole("group", { name: "Result: VERIFIED" });
+  await expect(result).toBeVisible();
+  expect(requests).toEqual([{ pr: DROP.number, token: "e2e", option: "keep_ours" }]);
+  await expect(result.getByText(/dropped as chosen/)).toBeVisible();
+  await noSeriousAxe(page);
+});
+
+test("clean: one click runs the recommended option to VERIFIED, with the merge and its patch", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const requests = await signIn(page);
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  const result = detail.getByRole("group", { name: "Result: VERIFIED" });
+  await expect(result).toBeVisible();
+  expect(requests).toEqual([{ pr: CLEAN, token: "e2e", option: "combine" }]);
+  await expect(page).toHaveTitle(`VERIFIED #${CLEAN} | Merge Desk`);
+  await result.getByRole("button", { name: /Show the merge/ }).click();
+  await expect(result.getByLabel("The merge, compared with the pull request's head")).toContainText(
+    "getUser",
+  );
+  const download = page.waitForEvent("download");
+  await result.getByRole("button", { name: "Download patch" }).click();
+  expect((await download).suggestedFilename()).toBe(`merge-desk-pr-${CLEAN}-combine.patch`);
+  await shot(page, "run-verified-1440");
+  await noSeriousAxe(page);
 });
 
 test("an analysis that fails says why and offers to run it again", async ({ page }) => {

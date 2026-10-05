@@ -1,0 +1,19 @@
+{"t":0,"step":"revisions","state":"queued"}
+{"t":0,"step":"propose","state":"queued"}
+{"t":0,"step":"write","state":"queued"}
+{"t":0,"step":"parse","state":"queued"}
+{"t":1,"step":"honor","state":"queued"}
+{"t":1,"step":"tests","state":"queued"}
+{"t":1,"step":"revisions","state":"running"}
+{"t":311,"step":"revisions","state":"passed","detail":"head d320552 · base a41f224"}
+{"t":311,"step":"propose","state":"running"}
+{"t":1952,"step":"propose","state":"passed","detail":"Gemini (gemini-3.5-flash-lite): Keep ours to parse string amounts and validate finite numbers"}
+{"t":1952,"step":"write","state":"running"}
+{"t":6495,"step":"write","state":"passed","detail":"1 file differs from the head: playground/test/money-rounding.test.js"}
+{"t":6496,"step":"parse","state":"running"}
+{"t":6725,"step":"parse","state":"passed","detail":"playground/src/money.js: node --check"}
+{"t":6725,"step":"honor","state":"running"}
+{"t":6727,"step":"honor","state":"passed","detail":"ours: parse string amounts and validate finite numbers before rounding, present\ntheirs: round cents using an epsilon nudge for precision, dropped as chosen","log":"Keep ours: inside the conflicts the result must match ours and none of theirs; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"parse string amounts and validate finite numbers before rounding\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"round cents using an epsilon nudge for precision\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  }\n}"}
+{"t":6727,"step":"tests","state":"running"}
+{"t":7406,"step":"tests","state":"passed","detail":"node --test (playground): passed (exit 0, 679 ms)","log":"✔ fetchUser returns the user (1.227333ms)\n✔ displayName uses the user's name (0.235624ms)\n✔ chargeCustomer charges a positive amount (0.843856ms)\n✔ chargeCustomer refuses a zero amount (0.421424ms)\n✔ chargeCustomer records the currency (0.168462ms)\n✔ chargeMonthly charges the plan price (0.148735ms)\n✔ toCents parses price strings (0.986257ms)\n✔ toCents refuses text that is not an amount (0.50942ms)\n✔ toCents rounds 19.99 to 1999 cents (0.856311ms)\n✔ toCents rounds 0.29 to 29 cents (0.188638ms)\n✔ toCents converts whole dollars (0.727607ms)\n✔ fetchUser retries after HTTP 429 (0.891428ms)\n✔ fetchUser gives up after two retries (0.541116ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 375.112999\n"}
+{"t":8564,"type":"result","verdict":"VERIFIED","failed":[],"summary":["ours: parse string amounts and validate finite numbers before rounding, present","theirs: round cents using an epsilon nudge for precision, dropped as chosen"],"description":"Keep ours to parse string amounts and validate finite numbers","changedFiles":["playground/test/money-rounding.test.js"],"patch":"diff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\n"}

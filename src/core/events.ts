@@ -44,6 +44,7 @@ export const ResultEvent = z.object({
   description: z.string().max(2_000).optional(),
   changedFiles: z.array(z.string()).max(500).optional(),
   patch: z.string().max(1_000_000).optional(),
+  token: z.string().max(4_000_000).optional(), // the signed run record, added by the server
 });
 export type ResultEvent = z.infer<typeof ResultEvent>;
 

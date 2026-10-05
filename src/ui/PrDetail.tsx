@@ -1,71 +1,22 @@
 "use client";
 
-import { ChevronRight, ExternalLink, RotateCw } from "lucide-react";
-import { useId, useState } from "react";
+import { ExternalLink, RotateCw } from "lucide-react";
 import type { Option } from "@/core/honor";
 import { modelLabel } from "@/core/models";
 import type { PullSummary } from "@/core/pulls";
 import { AnalysisView } from "@/ui/Analysis";
 import { DevDetails } from "@/ui/DevDetails";
 import { Options } from "@/ui/Options";
+import { Section } from "@/ui/Section";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Kbd } from "@/ui/primitives/kbd";
-import { Reveal } from "@/ui/primitives/reveal";
 import type { AnalysisState } from "@/ui/state";
-import { cn } from "@/ui/utils";
 
 // One pull request, top to bottom: header, Analysis, Options, then the run
 // (once one exists) and Details. Sections fold smoothly; Details starts
 // folded. Pull requests with nothing to resolve say so plainly instead of
 // showing empty sections.
-
-export function Section({
-  title,
-  aside,
-  open: controlled,
-  onOpenChange,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  aside?: React.ReactNode;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [own, setOwn] = useState(defaultOpen);
-  const open = controlled ?? own;
-  const setOpen = onOpenChange ?? setOwn;
-  const id = useId();
-  return (
-    <section className="border-t border-hair pt-3">
-      <h3 className="flex min-h-7 items-center gap-2">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => setOpen(!open)}
-          className="-ml-1 inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-[13px] font-semibold text-ink hover:bg-ink/[0.05]"
-        >
-          <ChevronRight
-            aria-hidden
-            className={cn(
-              "size-4 text-muted transition-transform duration-200",
-              open && "rotate-90",
-            )}
-          />
-          {title}
-        </button>
-        {aside}
-      </h3>
-      <Reveal open={open} id={id}>
-        <div className="pt-3 pb-5">{children}</div>
-      </Reveal>
-    </section>
-  );
-}
 
 function Notice({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -88,6 +39,7 @@ export function PrDetail({
   onOption,
   onRefresh,
   run,
+  runLog,
 }: {
   pull: PullSummary;
   analysis: AnalysisState | undefined;
@@ -101,6 +53,7 @@ export function PrDetail({
   onOption: (option: Option) => void;
   onRefresh: () => void;
   run?: React.ReactNode;
+  runLog?: string | null;
 }) {
   const branches = { ours: pull.head.ref, theirs: pull.base.ref };
   const done = analysis?.status === "done" ? analysis : null;
@@ -197,7 +150,7 @@ export function PrDetail({
               </Section>
               {run}
               <Section title="Details" open={detailsOpen} onOpenChange={onDetailsOpen}>
-                <DevDetails analysis={done.analysis} steps={done.steps} />
+                <DevDetails analysis={done.analysis} steps={done.steps} runLog={runLog} />
               </Section>
             </>
           ) : null}

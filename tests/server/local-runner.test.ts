@@ -102,6 +102,40 @@ describe("LocalRunner on a real git merge", () => {
     }
   }, 60_000);
 
+  it("reports every change with its text, enough to rebuild the exact merge tree", async () => {
+    const runner = new LocalRunner({ source: repo });
+    try {
+      const applied = await runner.applyProposal({ head: ours, base: theirs }, [
+        { path: API, content: candidate("clean", "combined", API) },
+      ]);
+      expect(applied.changesNote).toBeNull();
+      expect(applied.changes!.map((change) => change.path)).toEqual([
+        API,
+        "playground/test/retry.test.js",
+      ]);
+      // What Land will do on GitHub, done here with git plumbing: start from
+      // the head's tree, write each changed file, and compare the tree ids.
+      const env = { ...process.env, GIT_INDEX_FILE: join(repo, ".git", "land-test-index") };
+      const plumb = (args: string[], input?: string) =>
+        execFileSync("git", ["-c", "core.autocrlf=false", "-C", repo, ...args], {
+          encoding: "utf8",
+          env,
+          input,
+        }).trim();
+      plumb(["read-tree", ours]);
+      for (const change of applied.changes!) {
+        if (change.content === null) plumb(["update-index", "--force-remove", change.path]);
+        else {
+          const blob = plumb(["hash-object", "-w", "--stdin"], change.content);
+          plumb(["update-index", "--add", "--cacheinfo", `${change.mode},${blob},${change.path}`]);
+        }
+      }
+      expect(plumb(["write-tree"])).toBe(applied.tree);
+    } finally {
+      await runner.dispose();
+    }
+  }, 60_000);
+
   it("fails the real tests when the retry was dropped", async () => {
     const runner = new LocalRunner({ source: repo });
     try {

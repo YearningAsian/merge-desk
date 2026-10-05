@@ -15,7 +15,16 @@ import { Skeleton } from "@/ui/primitives/skeleton";
 import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource } from "@/ui/sources/types";
-import { analysisKey, deskReducer, initialDesk, type DeskState } from "@/ui/state";
+import { RunSection } from "@/ui/Run";
+import {
+  analysisKey,
+  deskReducer,
+  initialDesk,
+  runKey,
+  type AnalysisState,
+  type DeskState,
+  type RunState,
+} from "@/ui/state";
 
 // The one screen: pull requests on the left, the open one on the right.
 // Below 768 px the list is the home view and the detail opens as a
@@ -81,6 +90,16 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
 
   const pulls = query.data?.pulls ?? [];
   const selected = pulls.find((pull) => pull.number === state.selected) ?? null;
+  const doneOf = (pull: PullSummary) => {
+    const analysis = state.analyses[keyOf(pull)];
+    return analysis?.status === "done" ? analysis : null;
+  };
+  const runOf = (pull: PullSummary): RunState | undefined => {
+    const done = doneOf(pull);
+    return done ? state.runs[runKey(keyOf(pull), done.option)] : undefined;
+  };
+  const selectedDone = selected ? doneOf(selected) : null;
+  const selectedRun = selected ? runOf(selected) : undefined;
 
   const analyze = useCallback(
     async (pull: PullSummary) => {
@@ -108,6 +127,69 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     [source, settings],
   );
 
+  // Runs the chosen option on the analysis the server signed. Never retried
+  // automatically; a cancel or a dropped connection ends it as not pushed.
+  const run = useCallback(
+    async (pull: PullSummary, done: Extract<AnalysisState, { status: "done" }>, steer?: string) => {
+      if (!done.token) return;
+      const key = runKey(keyOf(pull), done.option);
+      running.current.get(key)?.abort();
+      const controller = new AbortController();
+      running.current.set(key, controller);
+      dispatch({ type: "run/start", key, steer: steer ?? null });
+      try {
+        const events = source.run(
+          {
+            pr: pull.number,
+            token: done.token,
+            option: done.option,
+            ...(steer ? { steer } : {}),
+            ...(chosenModel(settings) ? { model: chosenModel(settings) } : {}),
+          },
+          controller.signal,
+        );
+        for await (const event of events) dispatch({ type: "run/event", key, event });
+        dispatch({
+          type: "run/error",
+          key,
+          reason: "The run ended without a verdict. Nothing was pushed.",
+        });
+      } catch (error) {
+        dispatch({
+          type: "run/error",
+          key,
+          reason: controller.signal.aborted
+            ? "Cancelled. Nothing was pushed."
+            : `${error instanceof Error ? error.message : "The run failed."} Nothing was pushed.`,
+        });
+      } finally {
+        if (running.current.get(key) === controller) running.current.delete(key);
+      }
+    },
+    [source, settings],
+  );
+
+  const cancelRun = (pull: PullSummary) => {
+    const done = doneOf(pull);
+    if (done) running.current.get(runKey(keyOf(pull), done.option))?.abort();
+  };
+
+  // The tab title carries the open pull request's run, so a run can be
+  // watched from another tab.
+  const runWord =
+    selectedRun?.status === "running"
+      ? "Running"
+      : selectedRun?.status === "done"
+        ? selectedRun.result.verdict
+        : null;
+  useEffect(() => {
+    const base = "Live mode | Merge Desk";
+    document.title = runWord && selected ? `${runWord} #${selected.number} | Merge Desk` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [runWord, selected]);
+
   const open = (number: number) => {
     lastOpened.current = number;
     linkTo(number);
@@ -128,9 +210,20 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   });
 
   // Desk-wide keys (the list and the slider handle their own): A analyze
-  // again, D details, O open on GitHub, R refresh, comma settings, ? help.
+  // again, D details, O open on GitHub, R refresh, comma settings, ? help,
+  // and Cmd/Ctrl+Enter to run (for a drop, that is the confirmation).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.altKey) {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("input, textarea, select, [contenteditable=true], [data-overlay]"))
+          return;
+        if (!selected || !selectedDone?.token || selectedRun?.status === "running") return;
+        if (selectedRun?.status === "done") return;
+        event.preventDefault();
+        void run(selected, selectedDone);
+        return;
+      }
       if (!shortcutTarget(event)) return;
       const current = selected ? state.analyses[keyOf(selected)] : undefined;
       const analyzable = selected?.mergeable === "conflicting" && !selected.fork;
@@ -159,6 +252,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     if (pull.mergeable === "checking") return "checking";
     const analysis = state.analyses[keyOf(pull)];
     if (!analysis) return "needs";
+    const current = runOf(pull);
+    if (current?.status === "running") return "run-running";
+    if (current?.status === "done") return current.result.verdict === "HELD" ? "held" : "verified";
     return analysis.status === "running"
       ? "running"
       : analysis.status === "done"
@@ -181,16 +277,60 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       onAnalyze={() => void analyze(selected)}
       onOption={(option) => dispatch({ type: "option", key: keyOf(selected), option })}
       onRefresh={() => void query.refetch()}
+      runLog={
+        selectedRun?.events.length
+          ? selectedRun.events
+              .map((event) => {
+                if (!("type" in event)) return JSON.stringify(event);
+                // The signed record authorizes Land; it never goes in a copied log.
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { token, ...rest } = event;
+                return JSON.stringify(rest);
+              })
+              .join("\n")
+          : null
+      }
+      run={
+        selectedDone ? (
+          <RunSection
+            analysis={selectedDone.analysis}
+            canRun={Boolean(selectedDone.token)}
+            option={selectedDone.option}
+            run={selectedRun}
+            pr={selected.number}
+            baseRef={selected.base.ref}
+            onRun={(steer) => void run(selected, selectedDone, steer)}
+            onCancel={() => cancelRun(selected)}
+            onDiscard={() =>
+              dispatch({ type: "run/discard", key: runKey(keyOf(selected), selectedDone.option) })
+            }
+            onOption={(option) => dispatch({ type: "option", key: keyOf(selected), option })}
+          />
+        ) : null
+      }
     />
   ) : null;
+
+  // One polite announcement for the open pull request's run.
+  const announcement =
+    selected && selectedRun
+      ? selectedRun.status === "running"
+        ? `Running checks for pull request ${selected.number}.`
+        : selectedRun.status === "done"
+          ? `Pull request ${selected.number} is ${selectedRun.result.verdict}.`
+          : `The run for pull request ${selected.number} stopped. Nothing was pushed.`
+      : "";
 
   return (
     <main
       id="main"
       tabIndex={-1}
       aria-label="Merge Desk"
-      className="flex min-h-0 flex-1 outline-none"
+      className="relative flex min-h-0 flex-1 outline-none"
     >
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       <div className="flex w-full min-w-0 flex-col border-hair bg-surface md:w-[360px] md:shrink-0 md:border-r">
         {query.isPending ? (
           <ListSkeleton />

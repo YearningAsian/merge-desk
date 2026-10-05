@@ -1,4 +1,4 @@
-import { AnalyzeEvent } from "@/core/events";
+import { AnalyzeEvent, RunEvent } from "@/core/events";
 import { PullList } from "@/core/pulls";
 import { readNdjson } from "@/ui/ndjson";
 import { SourceError, type DataSource } from "./types";
@@ -28,5 +28,16 @@ export const liveSource: DataSource = {
     });
     if (!response.ok || !response.body) throw await failure(response);
     yield* readNdjson(response.body, AnalyzeEvent);
+  },
+
+  async *run(input, signal) {
+    const response = await fetch("/api/live/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+      signal,
+    });
+    if (!response.ok || !response.body) throw await failure(response);
+    yield* readNdjson(response.body, RunEvent);
   },
 };

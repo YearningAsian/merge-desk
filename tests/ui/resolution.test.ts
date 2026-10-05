@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reproduceCommands, SCALE, snap } from "@/ui/resolution";
+import { reproduceCommands, SCALE, snap, suggestInstead } from "@/ui/resolution";
 
 const ALL = [...SCALE];
 const NO_COMBINE = ["keep_ours", "keep_theirs"] as const;
@@ -44,5 +44,35 @@ describe("reproduceCommands", () => {
     expect(reproduceCommands({ head: "main;rm -rf ~", base })).toBeNull();
     expect(reproduceCommands({ head, base: "$(curl evil)" })).toBeNull();
     expect(reproduceCommands({ head: head.slice(0, 7), base })).toBeNull();
+  });
+});
+
+describe("suggestInstead", () => {
+  const option = (kind: "combine" | "keep_ours" | "keep_theirs", recommended = false) =>
+    ({
+      kind,
+      label: kind,
+      summary: "",
+      recommended,
+      reason: null,
+      keeps: [],
+      drops: null,
+    }) as never;
+
+  it("suggests the recommendation when another option was held", () => {
+    const options = [option("combine"), option("keep_ours", true), option("keep_theirs")];
+    expect(suggestInstead(options, "combine", null)?.kind).toBe("keep_ours");
+  });
+
+  it("when the recommendation was held, keeps the newer side's work", () => {
+    const options = [option("combine", true), option("keep_ours"), option("keep_theirs")];
+    expect(suggestInstead(options, "combine", { side: "ours", byMs: 2 * 86_400_000 })?.kind).toBe(
+      "keep_theirs",
+    );
+    expect(suggestInstead(options, "combine", null)?.kind).toBe("keep_ours");
+  });
+
+  it("suggests nothing when nothing else was offered", () => {
+    expect(suggestInstead([option("keep_ours", true)], "keep_ours", null)).toBeNull();
   });
 });

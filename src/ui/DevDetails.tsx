@@ -7,9 +7,10 @@ import { reproduceCommands } from "@/ui/resolution";
 import type { Steps as StepMap } from "@/ui/state";
 import { Steps } from "@/ui/Steps";
 
-// For developers, folded by default: the exact commits everything here is
-// bound to, what each analysis step did and how long it took (with its raw
-// log), and commands that recreate the same conflict in a local clone.
+// Folded by default: the exact commits everything here is bound to, what
+// each analysis step did and how long it took (with its raw log), commands
+// that recreate the same conflict in a local clone, and the latest run's
+// event log to copy (its signed token left out).
 
 const seconds = (ms: number) => (ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
@@ -17,7 +18,15 @@ function Heading({ children }: { children: React.ReactNode }) {
   return <h4 className="text-[12px] font-semibold text-muted">{children}</h4>;
 }
 
-export function DevDetails({ analysis, steps }: { analysis: Analysis; steps: StepMap }) {
+export function DevDetails({
+  analysis,
+  steps,
+  runLog,
+}: {
+  analysis: Analysis;
+  steps: StepMap;
+  runLog?: string | null;
+}) {
   const { head, base } = analysis.revisions;
   const commands = reproduceCommands(analysis.revisions);
   const total = Math.max(0, ...Object.values(steps).map((step) => step?.t ?? 0));
@@ -51,6 +60,18 @@ export function DevDetails({ analysis, steps }: { analysis: Analysis; steps: Ste
         </Heading>
         <Steps label="Analysis steps" steps={analysisSteps(steps)} />
       </div>
+
+      {runLog ? (
+        <div className="flex items-center gap-2">
+          <Heading>Run log</Heading>
+          <span className="text-[12px] text-muted">
+            every event of the latest run, as JSON lines
+          </span>
+          <CopyButton text={runLog} label="Copy run log" className="ml-auto text-[12px] text-muted">
+            Copy
+          </CopyButton>
+        </div>
+      ) : null}
 
       {commands ? (
         <div>

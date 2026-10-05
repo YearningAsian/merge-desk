@@ -30,10 +30,23 @@ export type PreparedMerge = {
 
 export type ProposedFile = { path: string; content: string };
 
+// One file the merge changes against the head: its new text and mode, or
+// null content for a deletion. Land rebuilds the same tree from these.
+export type LandableChange = {
+  path: string;
+  mode: "100644" | "100755" | null;
+  content: string | null;
+};
+
 export type AppliedProposal = {
   conflicted: ConflictedFile[];
   changedFiles: string[]; // the local merge commit compared with the head
   patch: string; // `git apply`-able diff of the merge against the head
+  tree: string; // the merge commit's tree id (content-addressed)
+  // Null when the change set can't be carried as text (binary, symlink,
+  // submodule or too large); Land then refuses and the patch remains.
+  changes: LandableChange[] | null;
+  changesNote: string | null;
 };
 
 export type ParseResult = { path: string; state: "passed" | "failed" | "not_run"; detail: string };

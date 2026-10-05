@@ -1,4 +1,5 @@
 import type { Option } from "@/core/honor";
+import type { OlderSide, ResolvedOption } from "@/core/options";
 
 // Pure helpers behind the resolution slider and the developer details.
 
@@ -46,4 +47,25 @@ export function reproduceCommands(revisions: { head: string; base: string }): st
     `git switch --detach ${head}`,
     `git merge --no-ff ${base}`,
   ].join("\n");
+}
+
+// After a hold, the option to suggest instead: the analysis's recommendation
+// if that wasn't the one held; otherwise the newer side's work (the same rule
+// the analysis follows when both sides change one behavior), then combine,
+// then whatever else was offered. Null when nothing else was offered.
+export function suggestInstead(
+  options: ResolvedOption[],
+  held: Option,
+  older: OlderSide,
+): ResolvedOption | null {
+  const others = options.filter((option) => option.kind !== held);
+  if (!others.length) return null;
+  const recommended = others.find((option) => option.recommended);
+  if (recommended) return recommended;
+  const newer = older ? (older.side === "ours" ? "keep_theirs" : "keep_ours") : null;
+  return (
+    others.find((option) => option.kind === newer) ??
+    others.find((option) => option.kind === "combine") ??
+    others[0]!
+  );
 }

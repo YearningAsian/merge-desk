@@ -1,7 +1,9 @@
 import { truncateLog, type RunEvent, type StepId, type StepState } from "@/core/events";
 import { checkChoiceHonored, type Option } from "@/core/honor";
+import { RunRecord } from "@/core/run";
 import { MalformedOutputError } from "@/server/errors";
 import type { AppliedProposal, ProposedFile, Revisions, Runner } from "@/server/runner/types";
+import { sign, verify, type SignedScope } from "@/server/sign";
 
 // The run pipeline: propose, write on a scratch copy, then three checks that
 // the model can't influence. VERIFIED only when every step passed; anything
@@ -28,6 +30,9 @@ export type RunInput = {
   steer?: string;
   maxRetries?: number;
   now?: () => number;
+  // Sees the scratch copy's merge once written, so the caller can sign
+  // exactly what was checked (tree id and changed files) for Land.
+  onApplied?: (applied: AppliedProposal) => void;
 };
 
 const ORDER: StepId[] = ["revisions", "propose", "write", "parse", "honor", "tests"];
@@ -135,6 +140,7 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
       }
       changedFiles = applied.changedFiles;
       patch = applied.patch;
+      input.onApplied?.(applied);
       yield step(
         "write",
         "passed",
@@ -208,4 +214,33 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     ...(changedFiles ? { changedFiles } : {}),
     ...(patch ? { patch } : {}),
   };
+}
+
+// A finished run, signed for this user, repository, pull request and the
+// exact head and base it ran on. Land and the decision record accept only a
+// record this server signed, unexpired (15 minutes), for the same user.
+export type RunSigner = { user: string; secret: string; now?: number };
+
+const runScope = (record: RunRecord, user: string): SignedScope => ({
+  kind: "result",
+  user,
+  repo: record.repo,
+  pr: record.pr,
+  head: record.revisions.head,
+  base: record.revisions.base,
+});
+
+export function signRun(record: RunRecord, signer: RunSigner): string {
+  return sign(runScope(RunRecord.parse(record), signer.user), record, signer);
+}
+
+export function verifyRun(
+  token: string,
+  expected: { user: string; repo: string; pr: number },
+  options: { secret: string; now?: number },
+): RunRecord {
+  const { scope, body } = verify(token, { kind: "result", ...expected }, RunRecord, options);
+  if (scope.head !== body.revisions.head || scope.base !== body.revisions.base)
+    throw new Error("Signed revisions do not match the run");
+  return body;
 }

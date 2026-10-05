@@ -15,16 +15,31 @@ import { cn } from "@/ui/utils";
 // move focus, Enter or Space opens. Focus (outline) and the open row (filled,
 // with an ink bar) look different.
 
-export type RowState = "needs" | "running" | "analyzed" | "failed" | "checking" | "mergeable";
+export type RowState =
+  | "needs"
+  | "running"
+  | "analyzed"
+  | "failed"
+  | "checking"
+  | "mergeable"
+  | "run-running"
+  | "held"
+  | "verified";
 
-// Red and green are kept for HELD and VERIFIED; list states stay quiet.
-const STATE: Record<RowState, { word: string; tone: "wait" | "neutral" | "outline" }> = {
+// Red and green are kept for HELD and VERIFIED; other list states stay quiet.
+const STATE: Record<
+  RowState,
+  { word: string; tone: "wait" | "neutral" | "outline" | "ok" | "stop" }
+> = {
   needs: { word: "Needs resolution", tone: "neutral" },
   running: { word: "Analyzing", tone: "wait" },
   analyzed: { word: "Options ready", tone: "neutral" },
   failed: { word: "Analysis failed", tone: "wait" },
   checking: { word: "Checking", tone: "wait" },
   mergeable: { word: "Can merge", tone: "outline" },
+  "run-running": { word: "Running checks", tone: "wait" },
+  held: { word: "HELD", tone: "stop" },
+  verified: { word: "VERIFIED", tone: "ok" },
 };
 
 // Once analyzed, a row shows the option chosen on its slider, in that side's

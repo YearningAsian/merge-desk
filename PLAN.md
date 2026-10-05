@@ -181,4 +181,6 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
 - **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic checks, real sandbox tests and current GitHub guards do.
 
-_Last updated: 2026-10-05, 5-build slice 5 built on feat/land, review round 3 CLEAN; waiting for the learner before any push or real Land (agent)_
+Current task (2026-10-05): Codex (GPT-6) claimed independent slice 5 review round 4 of `main...266edda` on `feat/land` (PLAN 2.2). Earlier rounds stay unread until independent findings are formed. `.github/workflows/probe.yml` is untracked and parked for slice 6; do not stage it. Stop after the review report, before push or real Land.
+
+_Last updated: 2026-10-05, independent slice 5 review round 4 in progress (Codex, GPT-6)_

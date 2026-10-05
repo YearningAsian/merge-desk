@@ -1,6 +1,7 @@
 ---
 doc: spec
 status: approved
+stack_review: 2026-10-04
 ---
 
 # Merge Desk — Technical Spec
@@ -29,10 +30,10 @@ Each step streams to your screen as it happens. If all three pass, **Land** asks
 PRD ref: `prd.md > The Core Journey`.
 
 1. **Open Merge Desk** → `/live` checks your session cookie (or `/demo` needs none) → the server lists open pull requests on `merge-desk` via the GitHub API → the list shows conflicting ones first.
-2. **Select a conflicting pull request** → the browser calls `POST /api/live/analyze` → the server re-reads the pull request and records the **start head commit** → a sandbox clones the repository at that commit and runs `git merge` with the base branch → conflicted files come back with their three versions (base, ours, theirs) and commit details → sandbox destroyed → the server computes each side's changes (deterministic) and asks Gemini for one-line intents and options (structured JSON, validated) → the browser shows **Analysis**.
+2. **Select a conflicting pull request** → the browser calls `POST /api/live/analyze` → the server re-reads the pull request and records the **start head and base commit SHAs** → a sandbox checks out that exact head and merges that exact base commit → conflicted files come back with their three versions (base, ours, theirs) and commit details → sandbox destroyed → the server computes each side's changes (deterministic) and asks Gemini for one-line intents and options (structured JSON, validated) → the browser shows **Analysis**.
 3. **See the options** → shown from the same analysis: each option with what it keeps, drops and whose work; one Recommended with its reason.
 4. **Choose and confirm** → drops need the inline confirm (Cmd/Ctrl+Enter or hold) → the browser calls `POST /api/live/run` with the signed analysis and the chosen option.
-5. **Watch the agent** → the server streams steps: re-check the head commit is unchanged → Gemini proposes the merged files and a one-line description → a fresh sandbox clones at the start head, merges, writes the proposal, commits locally → parse check → choice-honored check → tests with network off → sandbox destroyed → result.
+5. **Watch the agent** → the server streams steps: re-check both head and base commits are unchanged → Gemini proposes the merged files and a one-line description → a fresh sandbox checks out the signed head, merges the signed base, writes the proposal, commits locally → network deny-all before candidate code runs → parse check → choice-honored check → real tests → sandbox destroyed → result.
 6. **Verified** → result card with the description and diff → **Land** (`POST /api/live/land`) → server re-runs the Land guards → creates the merge commit through the GitHub API and moves the branch forward only (refused if it moved) → the pull request shows as mergeable.
    **Held** → result card with the failed check, what was tried, the diff and a **Download patch** button → pick another option, steer and retry, or discard.
 7. **Recorded** → the server updates the pull request's single Merge Desk comment with the entry.
@@ -41,30 +42,44 @@ In demo mode, steps 2 to 7 come from a recording file played back with its origi
 
 ## Stack
 
-Versions verified against the npm registry and official pages on 2026-10-04 (workspace `STACK.md` Update Check Protocol).
+Reviewed on **2026-10-04** using the workspace `STACK.md` Update Check Protocol, npm release metadata and official service documentation. These are **planned exact pins**, not installed dependencies or a passing build. The complete package inventory, sources, compatibility exceptions and scaffold checks are in [docs/stack.md](../docs/stack.md); rationale and alternatives are in [ADR 0001](../docs/adr/0001-stack.md).
 
 | Piece | Version | Why | Docs |
 |---|---|---|---|
-| Node.js | 24 LTS (24.21.0) | Workspace standard; sandbox images ship Node 24 | https://nodejs.org/en/about/previous-releases |
-| Next.js (App Router) | 16.3.x | Workspace standard; streaming route handlers; one-click Vercel deploy | https://nextjs.org/docs |
-| React | 19.3.x | Comes with Next | https://react.dev |
-| TypeScript | 6.0.x | **Not 7.0:** the ESLint TypeScript plugin supports `<6.1` | https://www.typescriptlang.org/docs/ |
-| Tailwind CSS | 4.3.x | Workspace standard; fast dense styling | https://tailwindcss.com/docs |
-| Zod | 4.6.x | Validates every model response and request body; makes the JSON schema sent to Gemini | https://zod.dev |
-| `@google/genai` | 2.27.x | Official Gemini SDK, structured output | https://ai.google.dev/gemini-api/docs |
-| Gemini model | `gemini-3.8-flash` | Latest stable Flash on the official models page; fast and cheap per call | https://ai.google.dev/gemini-api/docs/models |
-| `@vercel/sandbox` | 3.5.x | Throwaway microVM per run; network policy; auth via Vercel OIDC | https://vercel.com/docs/vercel-sandbox |
-| `@octokit/rest` + `@octokit/auth-app` | 22.x + latest | GitHub REST calls; GitHub App installation tokens | https://docs.github.com/en/rest |
-| `diff` | 9.x | Line diffs for the diff view and the choice-honored check | https://github.com/kpdecker/jsdiff |
-| Vitest | 5.0.x | Unit tests (core logic) | https://vitest.dev |
-| Playwright | 1.63.x | End-to-end on demo mode; stills | https://playwright.dev |
-| ESLint | 9.39.x | Workspace hold at 9 for Next projects | https://eslint.org/docs |
+| Node.js | 24.21.0 LTS | Latest LTS; local/CI exact patch, Vercel Node 24 major, sandbox Node 24 image | https://nodejs.org/en/download |
+| npm | 12.2.0 | One package manager; preserves existing commands and `npm ci` snapshot workflow | https://docs.npmjs.com/ |
+| Next.js (App Router) | 16.3.8 | UI and Node streaming Route Handlers in one Vercel deployment | https://nextjs.org/docs |
+| React + React DOM | 19.3.0 + 19.3.0 | Explicit matching pins; accepted by Next and UI package peers | https://react.dev |
+| TypeScript | 6.0.3 | Latest compatible compiler and parser API; 7.0.2 is stable but outside the lint chain's support | https://typescript-eslint.io/users/dependency-versions/ |
+| Tailwind CSS + PostCSS plugin | 4.3.3 + 4.3.3 | CSS-first semantic tokens, compact responsive styling | https://tailwindcss.com/docs/installation/using-postcss |
+| shadcn/ui + `radix-ui` | CLI 4.21.1 + 1.6.7 | Owned component source with accessible sheet, sections, options and tooltips | https://ui.shadcn.com/docs |
+| `lucide-react` | 1.52.0 | Consistent SVG icons with named actions and visible status words | https://lucide.dev/guide/react |
+| `clsx` + `tailwind-merge` + `class-variance-authority` | 2.1.1 + 3.7.0 + 0.7.1 | `cn()` helper and shared button/badge variants | https://github.com/dcastil/tailwind-merge |
+| `tw-animate-css` | 1.4.0 | Generated component CSS; override to short, reduced-motion-aware transitions | https://github.com/Wombosvideo/tw-animate-css |
+| `@tanstack/react-query` | 5.104.1 | PR fetch/cache/focus refresh and pending/error handling; never retries Land automatically | https://tanstack.com/query/latest/docs/framework/react/overview |
+| `@pierre/diffs` | 1.5.1 | Read-only highlighted split/unified diffs; stable `FileDiff`/`PatchDiff` only | https://diffs.com/llms-full.txt |
+| Zod | 4.6.5 | Request, stream, recording and model validation; JSON schema generation | https://zod.dev |
+| `@google/genai` | 2.27.0 | Official SDK; GA Interactions API with structured JSON and `store: false` | https://ai.google.dev/gemini-api/docs/interactions-overview |
+| Gemini model | `gemini-3.8-flash` | Current stable Flash; structured output, no preview/latest alias | https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash |
+| `@vercel/sandbox` | 3.5.1 | Ephemeral microVM; Node 24 image, snapshots, network policy, OIDC | https://vercel.com/docs/sandbox/sdk-reference |
+| `@octokit/rest` + `@octokit/auth-app` | 22.0.1 + 8.3.1 | GitHub REST calls and repository-scoped installation tokens | https://github.com/octokit/auth-app.js |
+| `iron-session` | 9.0.1 | Maintained sealed-cookie sessions for the approved database-free sign-in | https://github.com/vvo/iron-session |
+| `diff` | 9.0.0 | Pure line comparisons for the choice-honored check; renderer stays separate | https://github.com/kpdecker/jsdiff |
+| Vitest + V8 coverage | 5.0.3 + 5.0.3 | Core/guard/schema tests, with matching coverage package | https://vitest.dev |
+| Playwright + axe | 1.63.0 + 4.13.0 | Desktop/phone journeys, keyboard/focus checks and accessibility scans | https://playwright.dev/docs/accessibility-testing |
+| ESLint + Next config + typescript-eslint | 9.39.5 + 16.3.8 + 8.71.0 | Latest compatible flat-config lint chain; React/import/a11y plugins exclude ESLint 10 | https://nextjs.org/docs/app/api-reference/config/eslint |
+| Prettier | 3.9.9 | Predictable formatting in editor and CI | https://prettier.io/docs/ |
 
-**Verify early in the build:** Gemini structured output (`responseJsonSchema`) on `gemini-3.8-flash`; Vercel Sandbox pricing and the plan's spend controls; the Vercel function maximum duration on this plan; `@octokit/auth-app` current major; that GitHub rejects workflow-file changes from the app on the Git Data API path (see *Land guards*).
+**Version policy:** recheck this snapshot immediately before scaffolding; use exact direct pins and one committed `package-lock.json`, with `npm ci` in CI and snapshots. Never install with `--force` or `--legacy-peer-deps` to hide conflicts. TypeScript 6 and ESLint 9 are deliberate compatibility exceptions to latest stable; Node stays on latest LTS. Revisit those holds when the full toolchain supports the newer majors. shadcn is a source generator, so commit its generated components and `components.json`; its CLI version does not pin the remote component registry.
+
+**Deployment polish:** add `@sentry/nextjs` **11.4.0** for redacted error reporting and `@vercel/speed-insights` **2.0.0** for real performance measurements after the core journeys work. Keep prompts, source code, raw logs, cookies and signed artifacts out of telemetry. Plain structured server logs work without those integrations. No additional database, agent framework, editor or animation engine is needed for this scope.
+
+**Verify early in the build:** a schema-valid Gemini Interactions call; sandbox create/merge/deny-all/test/teardown; snapshot reuse; a real Octokit App round trip; Pierre rendering with Next production build; available quotas and spend settings on the actual accounts; and GitHub rejection of workflow-file writes (Merge Desk refuses them independently).
 
 ## Where It Runs and How Someone Tries It
 
 - **Hosting:** Vercel (learner has an account). Production URL decided at first deploy; it goes into the GitHub App's callback list.
+- **Execution:** live routes use `runtime = 'nodejs'`, `maxDuration = 240`, and a 210-second overall request deadline including retries and cleanup. Each sandbox is still capped at 120 seconds and tests at 30 seconds. Current Fluid compute allows up to 300 seconds on Hobby; streaming does not extend the limit. No durable run resume: reload loses an in-progress run as documented below. [Function duration](https://vercel.com/docs/functions/configuring-functions/duration).
 - **Judges and visitors:** open `/demo` (or `/judge`, a short itinerary through the three demo pull requests). No sign-in, no keys, nothing written. The screen says **"Demo: recorded from a real run"** with **Reset**.
 - **Live mode:** `/live`, "Sign in with GitHub", YearningAsian only. Phone and desktop.
 - **Local:**
@@ -88,6 +103,17 @@ From `prd.md > Look and Feel`; no new design discovery.
 - **Phone:** one column; the detail opens as a full-height sheet; actions pinned at the bottom; hold-to-confirm with a visible progress ring (no haptics on the web).
 - **Copy tone:** plain, short, factual. Never "safe" or "correct"; say what was checked.
 
+### UI/UX implementation and acceptance
+
+Implements `prd.md > Screens and Layout`, `Look and Feel`, `Phone`, `States and Boundaries`.
+
+- **Design system:** shadcn components restyled with this document's density and semantic Tailwind tokens (`surface`, `ink`, `muted`, `ours`, `theirs`, `ok`, `stop`, `wait`). Add Button, Badge, Sheet, Accordion/Collapsible, RadioGroup, Tooltip, Skeleton, Textarea/Field and Kbd only as used. Radix is the single primitive family. Essential errors, holds and drop confirmations stay inline.
+- **Phone sheet:** named dialog, focus trap, visible close, Escape and focus return to the selected PR. Use `100dvh`, native scrolling and safe-area padding for sticky bottom actions. Keep pointer hold-to-confirm, with cancel on release/leave/blur, plus an accessible deliberate keyboard confirmation; never require a long press as the only input method.
+- **Keyboard and feedback:** shortcuts ignore editable fields; list focus and selected row are distinct; status changes use a polite live region without announcing every log line. Skeletons preserve layout; loading, empty, unavailable and stale states each have a concrete next action. Touch actions meet 44 px targets while desktop rows remain compact. Verify contrast for small text and code washes.
+- **Data and run lifecycle:** TanStack Query owns fetched data; a typed React reducer owns selection, open sections and streamed steps. Cache keys include mode, repository, PR and revision where relevant. Live PRs refetch on focus and after Land/record changes. A changed head **or base** invalidates analysis. Mutations use `retry: false`, with no optimistic Verified/Landed status; pipeline retries alone follow the approved two-retry rule. Demo Reset clears playback state and its cache.
+- **Code review:** `DiffView` wraps `@pierre/diffs` in a lazy-loaded client component: split on desktop, unified on phone, selectable code, visible line numbers and a wrap/scroll control. Theme its Shadow DOM through documented options/CSS variables. Use stable read-only APIs; skip experimental unresolved-conflict/editor/token hooks. Load only JS/TS/JSON and required languages, bound file/log size, and show plain `<pre>` fallback while loading or if rendering fails.
+- **Verification:** Playwright covers held, verified, chosen drop, reset and stale revision flows on desktop and phone; axe scans representative open-sheet/result states. Check keyboard focus return, confirmation cancellation, reduced motion and horizontal overflow explicitly. Automating axe does not replace keyboard and screen-reader review.
+
 ## Components
 
 ### Mode and data source
@@ -96,7 +122,7 @@ The desk UI takes a **data source** with one interface (`listPullRequests`, `ana
 
 ### Desk layout
 Implements `prd.md > Screens and Layout`, `prd.md > Phone`.
-`Desk` renders the left pull request list and the right detail (header, Analysis, Options, Run, Result) on one screen. Sections collapse and expand; the one needing attention is open. Below 768 px it becomes one column and the detail opens in a `Sheet`.
+`Desk` renders the left pull request list and the right detail (header, Analysis, Options, Run, Result) on one screen. shadcn/Radix Accordion and Collapsible manage sections; the one needing attention is open. Below 768 px it becomes one column and the detail opens in a named, full-height shadcn/Radix `Sheet`. Shared tokens and primitive source live under `src/ui/primitives/`; a client provider hosts TanStack Query.
 
 ### Pull request list
 Implements `prd.md > Pull request list`, `prd.md > States and Boundaries` (no conflicts, already mergeable).
@@ -104,11 +130,11 @@ Live: `GET /api/live/prs`. Server lists open pull requests on `merge-desk` and r
 
 ### Conflict analysis
 Implements `prd.md > Conflict analysis`.
-`pipeline/analyze` runs: read pull request → runner prepares the merge (clone at head, fetch base, `git merge --no-commit`, read stages `:1:` `:2:` `:3:` for each conflicted file, collect commit metadata per side) → `core/atoms` computes each side's changes → `gemini/analyze` returns one-line intents per side plus options. The response is validated with Zod; the server returns the analysis **signed with HMAC** so a later run can trust its head commit, files and options without re-asking the model.
+`pipeline/analyze` runs: read pull request → runner prepares the merge (checkout exact head SHA, fetch exact base SHA, `git merge --no-commit`, read stages `:1:` `:2:` `:3:` for each conflicted file, collect commit metadata per side) → `core/atoms` computes each side's changes → `gemini/analyze` returns one-line intents per side plus options. The response is validated with Zod; the server returns the analysis **signed with HMAC** so a later run can trust its repository, PR, head/base SHAs, files and options without re-asking the model. Signed artifacts include the user, issue/expiry time and schema version, and are validated server-side.
 
 ### Resolution options
 Implements `prd.md > Resolution options`.
-Gemini proposes two or three options of kind `combine`, `keep_ours` or `keep_theirs`, one `recommended` with a reason. `core/options` validates them and fills in, from git data rather than the model, **what each option keeps and drops: commits, files and authors**. "Older side" means the side whose latest commit is older (labelled when one side's latest commit is older by more than a day).
+Gemini proposes two or three options of kind `combine`, `keep_ours` or `keep_theirs`, one `recommended` with a reason. `core/options` validates them and fills in, from git data rather than the model, **what each option keeps and drops: commits, files and authors**. shadcn/Radix RadioGroup keeps option selection keyboard-accessible. "Older side" means the side whose latest commit is older (labelled when one side's latest commit is older by more than a day).
 
 ### Drop confirmation
 Implements `prd.md > Intentional drops`.
@@ -117,24 +143,24 @@ Implements `prd.md > Intentional drops`.
 ### Run pipeline and runners
 Implements `prd.md > Live run and checks`.
 `pipeline/run` emits a fixed step list; each step moves through queued, running, passed, failed or not run:
-1. **Head unchanged:** re-read the pull request; if the head moved since analysis, stop ("Pull request changed; re-run").
+1. **Revisions unchanged:** re-read the pull request; if the head or base moved since analysis, stop ("Pull request changed; re-run").
 2. **Propose merge:** `gemini/propose` returns merged contents for the conflicted files and a one-line description (Zod-validated). An optional steer instruction from the user is included on retries.
-3. **Write on scratch copy:** a fresh runner clones at the start head, merges the base, writes the proposed files, `git add`, commits locally, and returns the changed file list plus contents.
-4. **It parses:** `node --check` for `.js`/`.mjs`/`.cjs`; for `.ts`/`.tsx`, a syntax-only parse with the repository's own TypeScript. Unsupported file types show **not run** and hold.
+3. **Write on scratch copy:** a fresh runner checks out the signed head and merges the signed base, writes the proposed files, `git add`, commits locally, and returns the changed file list plus contents. Network policy becomes deny-all before any candidate code or candidate-loaded tools execute.
+4. **It parses:** `node --check` for `.js`/`.mjs`/`.cjs`; for `.ts`/`.tsx`, a syntax-only parse with the trusted snapshot's pinned TypeScript 6 compiler API. Unsupported file types show **not run** and hold.
 5. **Choice honored:** `core/honor` (see *Choice-honored check*).
 6. **Tests:** the sandbox's **network is switched to deny-all** first; then the test suite chosen by `server/guard.ts`, with a 30-second limit:
-   - every file the merge changes is under `playground/` → `node --test playground/` (no dependencies, no install);
+   - every file the merge changes is under `playground/` → `node --test` with working directory `playground/` (no dependencies, no install);
    - otherwise → `npm run test:core` (the app's unit tests, dependencies from the snapshot).
    Output is captured and shown. If the command can't run or exceeds the limit, the step shows **not run** or failed, and the merge is held.
 
-Automatic retries: at most two, and only on a malformed model response or a parse failure. After that it waits for the user.
+Automatic retries: at most two, and only on a malformed model response or a parse failure, within the overall request deadline. After that it waits for the user. A network disconnect cancels further work when detected; `finally` cleanup and the sandbox timeout bound orphaned attempts. It never causes Land automatically.
 
 **Runner interface** (`server/runner/types.ts`): `prepareMerge`, `applyProposal`, `parseCheck`, `runTests`, `dispose`.
 - `SandboxRunner`: a sandbox starts either from a git clone or from a snapshot, so dependencies work in two stages:
-  - **Dependency snapshot (once per lockfile):** `Sandbox.create({ source: { type: "git", url } })`, `npm ci`, then `snapshot()`, remembered by lockfile hash. Runs whose changes are all under `playground/` skip it.
-  - **Every run:** `Sandbox.create({ source: { type: "snapshot", snapshotId } or { type: "git", url, revision }, persistent: false, timeout: 120_000, resources: { vcpus: 2 } })`, then `git fetch` the start head and the base commit and check out the start head. If the lockfile differs from the snapshot's, `npm ci` runs as its own visible step, outside the 30-second test budget.
+  - **Dependency snapshot:** build from a trusted revision, using the Node 24 image and `npm ci --ignore-scripts` where supported; explicitly review any required install scripts. Call `snapshot()` (which stops that VM) and remember its ID by image, lockfile, manifests and installation-policy hash. Only dependency-free JavaScript-only runs under `playground/` skip it; TS/TSX requires the trusted snapshot's pinned compiler even inside `playground/`. Dependency changes hold until an appropriate trusted snapshot is prepared; never run a PR's install scripts while network access is open.
+  - **Every run:** `Sandbox.create` with the snapshot source or a public git source at the exact revision, `image: "vercel/sandbox/node:24"` for fresh git boots, `persistent: false`, `timeout: 120_000`, two vCPUs and `tags: { app: "merge-desk" }`. Snapshot boots inherit their image. Fetch the signed head/base SHAs and check out the signed head. Source cannot be both snapshot and git; a restored dependency snapshot must fetch the requested commits.
   - `dispose()` calls `stop()` in a `finally`, pass or fail.
-- `LocalRunner`: `os.tmpdir()` working folder, local `git` and `npm` through `child_process` with the same 2-minute ceiling; folder deleted in a `finally`. No network isolation locally (documented).
+- `LocalRunner`: `os.tmpdir()` working folder, local `git` and `npm` through `child_process` with the same 2-minute ceiling; folder deleted in a `finally`. Trusted manual dogfood/recording fallback only; unavailable on the public Vercel deployment. It has no cloud network isolation and is not equivalent isolation for arbitrary PR code.
 
 ### Choice-honored check
 Implements `prd.md > Intentional drops`, `prd.md > Live run and checks`. Pure code in `src/core/honor.ts`; the model never grades itself.
@@ -146,6 +172,7 @@ For each conflicted file with base **B**, ours **O**, theirs **T**, result **R**
 - **Nothing else lost:** outside the conflict regions, R equals git's own merge result for that file.
 
 The output names each side's intent with **present** or **MISSING**, plus the evidence lines, for example "theirs: retry on 429, MISSING (3 lines)". Ambiguous matches fail closed (held).
+This is bounded line/rename evidence, not a proof of general semantic intent. The result shows the rule and evidence used; actual tests provide a separate gate.
 
 ### Held merges
 Implements `prd.md > Held merges`.
@@ -156,12 +183,13 @@ Implements `prd.md > Landing a merge`.
 `POST /api/live/land` with the signed run result. **Land guards**, all enforced in `server/guard.ts` and `github/land.ts`, each refusing with a plain reason:
 1. The session login is YearningAsian and the repository is `YearningAsian/merge-desk`.
 2. The target is the pull request's **head branch**, which must live in this repository (**fork branches are refused**: "Can't land: this branch lives in a fork") and must not be `main`, the repository's default branch, or the pull request's base branch.
-3. The merge must not add, change or delete anything under `.github/workflows/`. The app has no Workflows permission, so GitHub would reject it; Merge Desk holds it first ("This merge changes CI workflow files; resolve it locally or on GitHub").
-4. Re-read the pull request: the head must still be the run's start head ("Pull request changed; re-run").
+3. The merge must not add, change or delete anything under `.github/workflows/`. The app has no Workflows permission; Merge Desk refuses these changes independently ("This merge changes CI workflow files; resolve it locally or on GitHub"). Verify GitHub's enforcement on this API path during the integration check rather than assuming it.
+4. Re-read the pull request: both head and base must still match the signed run's SHAs ("Pull request changed; re-run").
 
 Then, with an installation token scoped to this repository and only the permissions the call needs: create blobs for the changed files, a tree based on the head's tree, and a **merge commit** with parents `[start head, base commit]` (author: the signed-in user's GitHub noreply address; committer: the app). Move `refs/heads/<head branch>` with `force: false`; GitHub refuses anything that isn't a fast-forward, which also catches a push between guard 4 and the update. Finally, update the decision record.
 
 It never merges the pull request into its base and never force-pushes. A repository rule on `main` (see *Repository safeguards*) backs this up even if the code had a bug.
+The head ref update and base recheck are not one atomic transaction: the base can advance after the final read. Re-read the PR after Land and display its actual mergeability; wait while GitHub computes it. Landed means the checked commit was applied. A concurrent base change can require another run, so do not promise immediate mergeability in that case.
 
 ### Decision record
 Implements `prd.md > Decision record`.
@@ -187,24 +215,25 @@ Implements `prd.md > Demo mode and live mode`.
 
 ### Sign-in and guards
 Implements `prd.md > States and Boundaries` (Permissions).
-"Sign in with GitHub" uses the **GitHub App's user authorization**: `/api/auth/github` redirects to GitHub with a random `state`; `/api/auth/callback` exchanges the code, calls `GET /user`, and **refuses any login other than `YearningAsian`**. The user token is used once and discarded. The session is a sealed, HTTP-only, `SameSite=Lax` cookie holding the login and an expiry (8 hours). Every `/api/live/*` route checks the session **and** the repository allowlist.
+"Sign in with GitHub" uses the **GitHub App's user authorization**: `/api/auth/github` redirects to GitHub with a random `state`; `/api/auth/callback` exchanges the code, calls `GET /user`, and **refuses any login other than `YearningAsian`**. The user token is used once and discarded. `iron-session` seals the HTTP-only, `SameSite=Lax` session cookie with `ttl: 28_800`, Secure in production, holding the login and an expiry (8 hours). Every `/api/live/*` route checks the session **and** the repository allowlist; mutating routes also validate the expected origin/CSRF protection. Session sealing is not a substitute for those guards.
 
 ### Engineering support
 From the hackathon kit: `GET /api/health` (booleans only: GitHub App configured, Gemini configured, sandbox available, recordings present), `GET /api/stats` (`docs/FACTS.json`), `/judge`, CI (lint, typecheck, unit tests, build, em-dash check, secret scan) and a production probe.
+Add recordings schema validation, formatting and Playwright/axe journeys to the scaffold's checks. Structured logs carry request/run IDs, step duration and outcome, with no tokens, source, prompts or raw test output. Deployment polish can add the optional Sentry/Speed Insights integrations from the stack table after the kernel works.
 
 ## Data Model
 
 | Data | Where it lives | How it changes | When you leave and come back |
 |---|---|---|---|
 | Session | Sealed HTTP-only cookie: `{ login, exp }` | Set at sign-in; cleared at sign-out or expiry | Still signed in for 8 hours |
-| Pull request list | Fetched from GitHub on open and on window focus | Never stored | Re-fetched |
+| Pull request list | GitHub, cached in TanStack Query in browser memory | Refetch on open/focus and invalidate after record/Land | Re-fetched; no persistent browser cache |
 | Analysis | Returned to the browser, HMAC-signed by the server | Replaced on each analysis | Lost on reload; re-analyze (one sandbox run) |
 | Run events | Streamed to the browser (newline-delimited JSON) | Appended per step | A run in progress is lost on reload; its sandbox stops at the timeout; nothing was pushed |
 | Run result | In the browser; signed by the server for Land | Per run | Lost on reload |
 | Decision record | One GitHub comment on the pull request | Updated in place on land, drop, hold and discard | Permanent, visible on GitHub |
 | Demo recordings | `demo/recordings/*.json` in this repository | Re-captured from live runs when the flow changes | Static |
 | Demo branches | `demo/*` branches, `demo-seed/*` tags | Land adds merge commits; `demo:reset` rebuilds them | Reset to the seed at any time |
-| UI state (selection, open sections) | Browser memory | User actions | Reset on reload |
+| UI state (selection, open sections, step lifecycle) | Typed React reducer in browser memory | User actions and validated stream events | Reset on reload |
 
 **Event shape** (shared by live streams and recordings): `{ t: msSinceStart, step: StepId, state: "queued" | "running" | "passed" | "failed" | "not_run", detail?: string, log?: string }`.
 **Recording file:** `{ scenario, capturedAt, source: { repo, pr, headSha }, analysis, option, events[], result }`. `npm run recordings:check` validates every file against the schema in CI.
@@ -242,7 +271,7 @@ merge-desk/
 │   │   ├── env.ts                    # INTEGRATIONS, requireEnv, integrationStatus
 │   │   ├── session.ts                # sealed cookie
 │   │   ├── guard.ts                  # allowlists, Land guards, test-suite choice
-│   │   ├── sign.ts                   # HMAC sign/verify for analysis and run results
+│   │   ├── sign.ts                   # HMAC: user, repo, PR, head/base SHAs, expiry and payload
 │   │   ├── github/app.ts             # app JWT, installation tokens
 │   │   ├── github/prs.ts             # list, mergeability, compare, head re-check
 │   │   ├── github/land.ts            # blobs, tree, merge commit, ref update (force: false)
@@ -256,8 +285,13 @@ merge-desk/
 │   │   ├── pipeline/analyze.ts       # read → prepare → atoms → model → signed analysis
 │   │   └── pipeline/run.ts           # head check → propose → write → parse → honor → tests
 │   └── ui/
+│       ├── primitives/               # owned shadcn/Radix source, restyled to tokens
+│       ├── providers.tsx             # client QueryClient boundary
+│       ├── utils.ts                  # clsx + tailwind-merge cn() helper; shadcn alias
+│       ├── state.ts                  # typed selection/run reducer; no I/O
+│       ├── hooks/usePullRequests.ts  # mode/repo/PR/revision query keys and invalidation
 │       ├── Desk.tsx, PrList.tsx, Analysis.tsx, Options.tsx, DropConfirm.tsx
-│       ├── RunSteps.tsx, Result.tsx, HeldActions.tsx, DiffView.tsx
+│       ├── RunSteps.tsx, Result.tsx, HeldActions.tsx, DiffView.tsx  # lazy read-only Pierre renderer
 │       ├── Sheet.tsx, HoldToConfirm.tsx, ModeBanner.tsx
 │       └── sources/{types,live,recorded}.ts   # the only difference between modes
 ├── playground/                       # demo code under test; no dependencies
@@ -274,13 +308,15 @@ merge-desk/
 ├── docs/                             # FACTS, pitch, brand, stack, adr
 ├── .github/workflows/ci.yml          # pull requests into main only
 ├── .env.example
+├── components.json                  # shadcn registry/style/alias configuration
+├── package-lock.json                # one exact transitive dependency resolution
 └── package.json                      # dev, build, lint, typecheck, test, test:core, e2e, live:local, demo:reset, recordings:check
 ```
 
 ## Configuration
 
 Server-only environment variables (`.env.example` lists names with placeholders):
-`GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GEMINI_API_KEY`, `SESSION_SECRET` (32+ random bytes, also used for HMAC), `ALLOWED_LOGINS=YearningAsian`, `ALLOWED_REPOS=YearningAsian/merge-desk`, `RUNNER=sandbox|local`, `DAILY_LIVE_RUN_CAP=30`. Vercel Sandbox authenticates with the deployment's OIDC token (no key). Nothing secret is ever sent to the browser or into a sandbox. The allowlists are also defaults in code, so an empty variable can never widen access.
+`GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.8-flash`, `SESSION_SECRET` (32+ random bytes; derive a separate signing key for HMAC), `ALLOWED_LOGINS=YearningAsian`, `ALLOWED_REPOS=YearningAsian/merge-desk`, `RUNNER=sandbox|local`, `DAILY_LIVE_RUN_CAP=30`. Vercel Sandbox authenticates with the deployment's OIDC token (no key). Optional deployment error reporting uses `SENTRY_DSN` and server-only build credentials when enabled. Nothing secret is ever sent to the browser or into a sandbox. The allowlists are also defaults in code, so an empty variable can never widen access. The public deployment always uses the sandbox runner.
 
 ## External Services and Dependencies
 
@@ -305,21 +341,21 @@ Calls (installation token for `merge-desk`, minted per run with only the permiss
 Docs: https://docs.github.com/en/apps/creating-github-apps , https://docs.github.com/en/rest/git , https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets . Rate limits: installation tokens have their own hourly limit (verify the current number); this app makes tens of calls per run.
 
 ### Gemini API
-`models.generateContent` with model `gemini-3.8-flash`, `responseMimeType: "application/json"` and a JSON schema made from the Zod schema; 30-second timeout per call. Two calls per run (analyze, propose); a retry adds one. Key server-side only. Cost: per-token Flash pricing (verify current price); set a budget alert or quota cap in Google AI Studio / Cloud. Docs: https://ai.google.dev/gemini-api/docs/structured-output
+Use `client.interactions.create` with model `gemini-3.8-flash`, `store: false`, and `response_format: { type: "text", mime_type: "application/json", schema: z.toJSONSchema(...) }`. Extract the returned text, parse JSON and validate against the same Zod schema; structured output alone never authorizes a merge. Set a 30-second call deadline. Two calls per analyze-and-run journey; a retry adds one. Key server-side only. Google recommends this GA API for new projects; no server-managed conversation state or background interaction is needed. Verify quota and current pricing on the learner's account; an alert is not a hard quota. Docs: https://ai.google.dev/gemini-api/docs/interactions-overview , https://ai.google.dev/gemini-api/docs/structured-output
 
 ### Vercel Sandbox
-`Sandbox.create({ source: { type: "snapshot", snapshotId } | { type: "git", url: "https://github.com/YearningAsian/merge-desk.git", revision: <start head> }, persistent: false, timeout: 120_000, resources: { vcpus: 2 } })`; `snapshot()` once per lockfile; `runCommand` for `git`, parse and tests; `sandbox.update({ networkPolicy: "deny-all" })` before tests; `stop()` in `finally`. The public repository clones without a token. Limits (Hobby): 10 concurrent, 45-minute sessions. Cost: per active CPU and memory time (verify pricing); spend cap set in the Vercel dashboard. Docs: https://vercel.com/docs/vercel-sandbox
+Use `Sandbox.create` with a git source at the signed revision or a trusted dependency snapshot, explicit `persistent: false`, `timeout: 120_000`, two vCPUs and the application tag. Fresh git boots specify `image: "vercel/sandbox/node:24"`; snapshot boots inherit it. Use `runCommand` for git/parse/tests and `sandbox.update({ networkPolicy: "deny-all" })` before candidate code executes; `stop()` in `finally`. The public repository clones without a token. Hobby currently permits ten concurrent sandboxes and 45-minute provider sessions; the app's shorter deadline still applies. Hobby creation pauses when free quotas are exhausted. Paid spend management can pause production after a delayed threshold check, so it is not an instantaneous hard cap. Docs: https://vercel.com/docs/sandbox/sdk-reference , https://vercel.com/docs/sandbox/pricing , https://vercel.com/docs/spend-management
 
 ### Spending guards
-- Per run: 2-minute sandbox timeout, 30-second test limit, teardown in `finally`, at most two automatic retries.
-- Per day: `DAILY_LIVE_RUN_CAP` (default 30) counted from sandboxes tagged `app=merge-desk` created today (verify `Sandbox.list` tag filtering early; if it doesn't work, count in the session cookie, since live mode has one user).
-- Account level (learner): Vercel spend cap; Gemini budget alert or quota.
+- Per request: 210-second overall deadline including retries/cleanup; each sandbox 2 minutes; tests 30 seconds; teardown in `finally`; at most two automatic retries.
+- Per day: `DAILY_LIVE_RUN_CAP` (default 30) is a **usage throttle**, checked server-side against paginated `Sandbox.list({ tags: { app: "merge-desk" } })` records created in the current UTC day. Count analysis/run/retry/snapshot boots as operations consistently and refuse live work if accounting is unavailable. Do not fall back to a cookie counter, which resets and races. List/count is not atomic admission control; do not describe this as a guaranteed daily run or dollar limit.
+- Account level (learner): verify Hobby quotas or paid Vercel production-pause settings and Gemini enforced quota settings before enabling live mode. Alerts and delayed pause checks do not guarantee a hard budget ceiling. If a strict atomic daily limit is required, add a durable atomic counter through a separate stack decision; it is not silently supplied by this database-free design.
 
 ## Important Failure Modes
 
 - **Sandbox slow or unavailable** → the step fails with "Sandbox didn't start: <reason>", nothing is pushed, Retry is offered. For recording day: `npm run live:local` uses the laptop runner.
 - **Model returns something invalid or unexpected** (bad JSON, files outside the conflict, instructions planted in code comments) → Zod validation fails or `core/honor` fails → failed step → held. The model's output is data only and cannot unlock anything.
-- **Pull request changed during review or before Land** → "Pull request changed; re-run". Land's fast-forward-only update is the final guard.
+- **Pull request head or base changed during review or before Land** → "Pull request changed; re-run". Signed exact SHAs and Land's fast-forward-only update guard the checked result.
 - **A Land guard trips** (fork branch, protected or base branch, CI workflow files) → Land is refused with the reason; nothing is written.
 - **GitHub still computing mergeability** (`mergeable_state` null) → row shows "Checking" and refreshes.
 - **Tests can't run** (missing command, over 30 s) → **not run** or failed, held. A pass is never shown without a real exit code 0.
@@ -341,7 +377,7 @@ Docs: https://docs.github.com/en/apps/creating-github-apps , https://docs.github
 
 **Learner decisions (2026-10-04):**
 - Approach: Next.js on Vercel, no database, demo mode from recordings, live mode in a sandbox.
-- **Cloud sandbox** for live runs, because the phone needs live mode for the video. Hard spend cap, 2-minute per-run timeout, teardown after every run. **Laptop fallback** with one command, same code.
+- **Cloud sandbox** for live runs, because the phone needs live mode for the video. Spend control requested; the review below records provider limitations instead of promising a hard cap. 2-minute sandbox timeout, teardown after every run. **Laptop fallback** with one command, same pipeline for trusted manual runs.
 - **GitHub App** (not an OAuth app), installed only on `merge-desk`, minimum permissions (Contents and Pull requests read and write; Checks dropped); sign-in restricted to YearningAsian. The GitHub App costs one extra secret (the private key) and `@octokit/auth-app` over an OAuth app; no fallback needed.
 - **One repository:** demo pull requests live inside `merge-desk`, with safeguards (see *Demo scenarios inside the repository*, *Repository safeguards*). Dogfooding on its own feature branches, with unit tests under 30 seconds. Live mode runs only on `merge-desk`, enforced in code.
 - **Held merges download as a patch;** no branch is created.
@@ -349,15 +385,15 @@ Docs: https://docs.github.com/en/apps/creating-github-apps , https://docs.github
 
 **Implementation details derived from those decisions (agent):**
 - Land pushes through GitHub's Git Data API from the server with a fast-forward-only ref update, so the sandbox needs no token.
-- Land guards refuse fork branches, protected or base branches, and CI workflow changes before any write.
+- Land guards refuse fork branches, default/base branches, changes disallowed by repository protection, and CI workflow changes before any write.
 - Demo pull requests target `demo/base`; the reset script can only touch `demo/*`; CI runs only for pull requests into `main`; a ruleset on `main` keeps the app out of it.
-- Analysis and run results are HMAC-signed so the browser can't alter the head commit, files or option between steps.
+- Analysis and run results are HMAC-signed so the browser can't alter the user, repository, PR, head/base commits, files or option between steps.
 - Tests run with the sandbox network set to deny-all; the suite is chosen by which files the merge changes.
 - The commit author is the signed-in user; the committer is the app.
 
 **Assumptions to confirm (flagged):**
 1. **Held and discarded entries update the decision-record comment.** That is a write to GitHub, but never code.
-2. **Demo scenarios:** *clean* (rename versus retry, combine both, verified); *held* (a signature change on one side and a new call site on the other: git merges the text, but the tests fail); *drop* (both sides fix the same bug differently; keep the newer fix).
+2. **Demo scenarios:** *clean* (rename versus retry, combine both, verified); *held* (a real overlapping textual conflict, plus a signature/call-site mismatch that makes the proposed merge fail the actual tests); *drop* (both sides fix the same bug differently; keep the newer fix). Every seeded PR must start with a real textual conflict so it enters the conflicting-PR analysis flow.
 3. **"Older side"** is the side whose latest commit is older (from `prd.md > Open Questions`).
 4. **The dogfood conflict** is two real feature branches from this build that edit the same file.
 5. **Dropping the base branch's side** is allowed with an explicit warning that merging the pull request will undo that change.
@@ -365,4 +401,6 @@ Docs: https://docs.github.com/en/apps/creating-github-apps , https://docs.github
 
 **One useful unknown:** can a cloud sandbox clone, merge and run the tests fast enough to watch? *Investigation:* the first build slice runs the *held* demo scenario through `SandboxRunner` and prints the time for each step. *Evidence needed:* the test step under 30 seconds and the whole run under 2 minutes. If not, use the dependency snapshot, fewer vCPUs or the local runner for recording.
 
-**Open, check early in the build:** Gemini structured output on `gemini-3.8-flash`; Vercel Sandbox pricing and spend controls; the function maximum duration (runs stream for up to about 2 minutes); `Sandbox.list` tag filtering for the daily cap; that the Git Data API path rejects workflow-file changes without the Workflows permission (Merge Desk holds them first either way); the production domain for the GitHub App callback.
+**Stack review (agent, requested 2026-10-04):** exact stable pins, compatibility holds, shadcn/Radix/Query/Pierre UX layer, iron-session, current GA Google Interactions API and Sandbox image API, signed head/base revisions and trusted dependency snapshots. No product feature expansion or scaffold is included. `docs/stack.md` and ADR 0001 hold the source-backed decision and upgrade triggers.
+
+**Open, check early in the build:** authenticated Interactions structured output on `gemini-3.8-flash`; the learner's Sandbox/Gemini quota and spend settings; whole-request timing under the chosen function duration; complete tagged accounting and its non-atomic limitations; normal dependency resolution plus Pierre/shadcn Next production build; trusted snapshot policy; that the Git Data API path rejects workflow-file changes without Workflows permission (Merge Desk refuses them first either way); and the production domain for the GitHub App callback.

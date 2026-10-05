@@ -27,9 +27,9 @@
 
 - **The problem:** about 1 in 5 merges in 143 open source projects caused a conflict; in 75.23% of those a developer had to reason about program logic to resolve it, and code associated with a merge conflict was twice as likely to have a bug ([Brindescu, Ahmed, Jensen, Sarma, *Empirical Software Engineering* 2019](https://doi.org/10.1007/s10664-019-09735-4)). Coding agents now open many parallel PRs against the same files, so conflicts arrive faster than reviewers.
 - **The gap:** AI merge drivers already exist, but they write the model's output straight into the file and ask you to review it by hand. Nothing checks that the merged code still does what *each* branch meant to do. A resolution that compiles and quietly drops one side's change looks exactly like a good one.
-- **Our mechanic:** a GitHub gate. Merge Desk proposes a resolution per conflict hunk, verifies it (parses, both sides' intents present, CI green on a resolution branch), and only then unlocks a follow-up PR that makes the original PR mergeable. It never pushes to the base branch.
+- **Our mechanic:** a visible verification gate. Gemini proposes a resolution, then parsing, a deterministic choice-honored check and the selected sandbox tests must pass before Land adds a merge commit to the original PR's head branch. Chosen drops are checked against the selected option. These checks provide bounded evidence, not semantic proof. It never pushes to the base branch.
 - **Beat A (held):** branch `rename` renames `fetchUser` to `getUser`; branch `retry` adds a retry on HTTP 429 inside `fetchUser`. A naive resolution keeps the rename and drops the retry. Merge Desk shows "theirs: retry on 429, MISSING", the intent check fails, the resolution is HELD and nothing is pushed.
-- **Beat B (lands):** the verified resolution (`getUser` with the retry) passes the live checks (parses, both intents present, tests pass); Land commits it to the PR's own branch and the PR turns mergeable.
+- **Beat B (lands):** the verified resolution (`getUser` with the retry) passes the live checks (parses, choice honored, tests pass); Land commits it to the PR's own branch after rechecking head/base SHAs, and the PR turns mergeable.
 - **Who it's for:** a developer on a small team whose PR just went red because a teammate merged first (scope). First user: the learner, on this repo.
 - **Who pays (hypothesis):** small teams and teams running coding agents, per active repository.
 
@@ -60,7 +60,7 @@
 | Presentation: "does the video clearly demonstrate the project working end-to-end? Does the pitch communicate what problem is solved, who it's for, and why it matters?" | Under-3-minute video, real UI, Beat A then Beat B, problem/audience/why stated | A |
 | Execution: can a judge verify it | `/judge` + public `/api/health` + `/api/stats` + the demo repo's PR history | A |
 
-**Headline number:** "Of N real historical conflict hunks, an unchecked AI resolution dropped an intent in X; Merge Desk held all X." Placeholder until the replay eval (row 2.9) writes it to `docs/FACTS.json`. Never type a number from memory.
+**Potential later headline:** "Of N real historical conflict hunks, an unchecked AI resolution dropped an intent in X; Merge Desk held all X." Replay evaluation is deferred by the PRD. Do not use this claim unless row 2.9 is later built and measured into `docs/FACTS.json`. The core demo's proof is actual check output and PR history. Never type a measured number from memory.
 
 ---
 
@@ -83,26 +83,26 @@
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
 | 1.1 | Repo, `.gitignore`, `.env.example`, README stub | root | A | 🟡 | 0.2 | Repo public; `.env.example` with scaffold |
-| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ⬜ | 1.1 | |
+| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ⬜ | 1.1 | Stack documentation reviewed in 0.7; scaffold, lockfile and build still pending. Recheck pins before install |
 | 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | ⬜ | 1.2 | |
 | 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | ⬜ | 1.2 | Workflows held back until the app exists |
 | 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
-| 1.6 | **Gate:** live GitHub round trip from a test: create a `merge-desk/*` branch, commit a tree, read its check runs on the demo repo; one live LLM call returning a schema-valid proposal | `tests/github.live.test.ts`, `tests/llm.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this |
+| 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this; verify trusted snapshots, Node image, actual quotas and request duration |
 
 ### Phase 2: Build
 
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
-| 2.1 | Resolver core (pure): parse diff3 hunks; deterministic strategies first (identical, one side only, whitespace); intent verifier | `src/core/**` | B | ⬜ | 1.3 | Table tests incl. the rename-vs-retry case |
-| 2.2 | State in GitHub: resolution branch = lease (ref create is atomic); PR comment = record | `src/server/github/**` | B | ⬜ | 1.6 | No DB unless caps need one |
-| 2.3 | API routes: propose, verify, land, status (explicit failure shapes) | `src/app/api/**` | B | ⬜ | 2.1 | Review round before merge |
-| 2.4 | Desk UI: PR list, conflict view (intents side by side), checks, Land | `src/app/**` | A | ⬜ | 2.3 | No login for judges on the demo repo |
-| 2.5 | **Checkpoint:** Beat A held + Beat B lands, twice on localhost | n/a | both | ⬜ | 2.4 | If red, stop and fix |
+| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | ⬜ | 1.3 | Combine/drop/rename/ambiguity tests; line evidence is not semantic proof |
+| 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | ⬜ | 1.6 | Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
+| 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | ⬜ | 2.1 | Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
+| 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | ⬜ | 2.3 | shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |
+| 2.5 | **Checkpoint:** Beat A held + Beat B lands twice locally; chosen drop works; capture real recordings | `demo/recordings/**` | both | ⬜ | 2.4 | PRD priority: held → verified → chosen drop → options → rest; validate recording schemas |
 | 2.6 | Deploy to Vercel + env + probe | `.github/workflows/probe.yml` | B | ⬜ | 2.5 | |
 | 2.7 | `/judge` itinerary against production | `src/app/judge/**` | A | ⬜ | 2.6 | |
 | 2.8 | FACTS measured with provenance | `docs/FACTS.json` | A | ⬜ | 2.5 | |
-| 2.9 | Depth: replay eval on real historical merges of a public repo (unchecked AI vs gated) | `eval/**` | A | ⬜ | 2.1 | Produces the headline number |
-| 2.10 | Depth: `merge-desk` git merge driver (`%O %A %B %P`), same core, exits non-zero to keep markers when unverified | `cli/**` | B | ⬜ | 2.1 | ✂️ if behind |
+| 2.9 | Later: replay eval on real historical merges (unchecked AI vs gated) | `eval/**` | A | ⬜ | 2.1 | Deferred by approved PRD; no measured headline until this is actually built |
+| 2.10 | Later: git merge driver sharing the pure core | `cli/**` | B | ⬜ | 2.1 | Deferred by approved PRD; outside this web POC |
 
 ### Phase 3: Freeze and harden
 
@@ -166,7 +166,7 @@ Merge rule: CI green on the merged result, and a clean adversarial round for sid
 | `GET /api/health` | B | judges, probe | `{ ok, at, integrations: Record<string, boolean> }` |
 | `GET /api/stats` | A | `/judge`, writeup | contents of `docs/FACTS.json` |
 | Status vocabulary | B | UI, copy | PROPOSED, HELD, VERIFYING, VERIFIED, LANDED, REFUSED, UNKNOWN. Never "safe", "correct" or "bug-free": say what was verified. |
-| GitHub writes | B | Land | Only a merge commit on the PR's own head branch (what GitHub's web conflict editor does) and scratch `merge-desk/*` branches. Never the base branch, never a force-push. Held merges write nothing. |
+| GitHub writes | B | Land/record | Land adds a merge commit only to the PR's own head branch after head/base guards; never the base/default branch or force-push. Holds/discards update only the decision comment. Demo replay performs no writes. |
 
 Contract changes: tell the other lane before committing; mark the commit `⚠️ CONTRACT`.
 
@@ -174,10 +174,10 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 
 ## Decisions
 
-- **D1 Honesty:** "verified" always lists what was checked (parses, intents present, CI result). A held resolution says why.
+- **D1 Honesty:** "verified" lists the actual parse, choice-honored evidence and test results; it is not a semantic correctness claim. A held resolution says why.
 - **D2 Vocabulary:** only the status words above, everywhere.
 - **D3 Demo data:** the demo repository is ours and labelled as a demo; the replay eval uses real public history.
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
-- **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic verifier and CI do.
+- **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic checks, real sandbox tests and current GitHub guards do.
 
-_Last updated: 2026-10-04, Phase 0 event rules recorded (agent)_
+_Last updated: 2026-10-04, stack/UX documentation reviewed; approved sandbox and demo/live architecture synchronized (agent)_

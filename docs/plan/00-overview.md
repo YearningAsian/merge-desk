@@ -9,8 +9,9 @@
 
 | Persona | Moment | What they need |
 |---|---|---|
-| Reviewer of agent-written PRs | Two agent PRs touch the same function | See what each side meant, not just the markers; trust that neither change was dropped |
-| Maintainer of a busy repo | A long-lived branch falls behind `main` | A resolution they can verify in one screen, gated by their own CI |
+| Developer on a small team (first user) | A teammate merges first and their pull request conflicts | See both sides' intentions, choose a resolution and inspect the checks before landing |
+| Reviewer of agent-written PRs | Two agent PRs touch the same function | See required changes and any intentional drops, with evidence and test output |
+| Maintainer of a busy repo | A long-lived branch falls behind `main` | A resolution they can inspect in one screen, checked against the selected test suite |
 | Platform / dev-productivity team | Rolling out coding agents | A policy: no AI merge lands without a recorded verification |
 
 ## Existing approaches and the gap
@@ -19,12 +20,15 @@
 - **Structured / semi-structured merge tools.** Resolve some syntactic conflicts by understanding the language's structure; they cannot reconcile two changes of intent.
 - **AI merge drivers** (plug into git as a merge driver, send base/ours/theirs to a model, write the answer back, several model providers, caching, whitespace-only shortcuts). Fast, but the model's output goes straight into the file and the tools themselves advise reviewing every result by hand. Nothing checks that each side's change survived.
 
-**Merge Desk's wedge:** keep the good parts of AI merge drivers (git-native flow, deterministic shortcuts before any model call, provider choice, caching by content hash) and add the missing step: **the merge waits for proof.** Proof is (1) the result parses, (2) a deterministic check finds each side's intent in the result, (3) the repository's own CI passes on a resolution branch. The model proposes; code and CI decide.
+**Merge Desk's wedge:** **the merge waits for proof.** The UI shows the sides' intentions, the available choices and what each choice drops. Before Land unlocks, (1) the result parses, (2) a deterministic line-change check confirms the selected option was honored, and (3) the selected test suite actually passes in a scratch runner. Cloud candidate code runs with the network disabled and dependencies come from trusted snapshots. These checks do not prove semantic correctness; the UI names their scope and evidence. The model proposes; code and tests decide.
 
 ## The signature moment
 
 - **Beat A, held:** `rename` renames `fetchUser` to `getUser`; `retry` adds a retry on HTTP 429 inside `fetchUser`. A naive resolution keeps the rename and drops the retry. Merge Desk shows "theirs: retry on 429, MISSING" and holds it. Nothing is pushed.
-- **Beat B, lands:** the verified resolution keeps both. CI goes green on `merge-desk/resolve-<pr>`, Merge unlocks, and the original PR becomes mergeable.
+- **Beat B, lands:** the verified resolution keeps both, passes the choice-honored check and the sandbox tests. Land adds a merge commit on the pull request's own head branch, and the original PR becomes mergeable. It never merges into the base branch or overwrites history.
+- **Chosen drop:** the user confirms what will be lost; checks run against that choice, and the decision records the dropped branch and commits so the work remains recoverable.
+
+The public demo replays real recordings and writes nothing. Live mode uses GitHub App sign-in, accepts only YearningAsian and operates only on `YearningAsian/merge-desk`. Seeded demo pull requests target `demo/base`, never `main`. See [../../devpost/spec.md](../../devpost/spec.md) for the three scenarios and safeguards, and [../stack.md](../stack.md) for dependencies.
 
 ## Business model (hypothesis)
 
@@ -34,9 +38,9 @@ Per active repository, sold to teams running coding agents at volume; the buyer 
 
 | Risk | Mitigation |
 |---|---|
-| Intent check is fooled (intent described loosely, or present but broken) | Intent check is one of three gates; CI is the backstop; the UI says what was checked, never "correct" |
-| Prompt injection inside code or comments steers the model | The model's output is data; it cannot unlock anything; only `merge-desk/*` branches are writable |
-| Writes to GitHub from a public demo can be abused | Demo repo only, fine-grained token scoped to it, atomic branch-as-lease per PR, rate limits before any model call |
-| Large files or many hunks blow the latency budget | Deterministic strategies first; per-hunk calls; cache by content hash; size cap with an explicit REFUSED reason |
-| Model cost | Hunk-level prompts, caching, daily cap |
+| Required lines are present but behavior is broken | Deterministic checks and actual tests are separate gates; ambiguous evidence holds the run; the UI says what was checked, never "correct" |
+| Prompt injection inside code or comments steers the model | Model output is schema-validated data; only deterministic checks and tests can unlock Land; server guards restrict every write |
+| GitHub access or public traffic is abused | Public demo is static and writes nothing; live mode checks the learner login and repository allowlists; GitHub App permissions and a `main` ruleset constrain writes |
+| Large files, dependencies or many conflicts exceed the run budget | Input caps, trusted dependency snapshots and explicit timeouts; changed dependency manifests and unsupported or incomplete checks hold the merge |
+| Model or sandbox cost | Recorded public demo, bounded calls, a non-atomic server-side usage throttle and verified account quotas/pause settings; alerts and delayed pause checks do not guarantee a hard budget ceiling |
 | Looks like a reskin of a model | The verifier and the gate are the work; the AI disclosure says exactly which parts are model calls |

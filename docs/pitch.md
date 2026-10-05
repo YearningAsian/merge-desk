@@ -1,20 +1,21 @@
 # Expo pitch and judge Q&A
 
 Numbers come from `docs/FACTS.json` (as of <!-- asOf -->). Say them exactly as written there.
+Draft only: the app is not scaffolded or deployed. Align final claims with the approved spec and actual live evidence; public demo replay and authenticated live mode must be distinguished.
 
 ## The 90-second pitch (one person talks, the other drives)
 
 1. **Hook (10 s).** About 1 in 5 merges hits a conflict, and code tied to a merge conflict is twice as likely to have a bug (Brindescu et al., 2019, 143 open source projects). <!-- add why you personally care -->
 2. **The gap (10 s).** AI merge tools write the model's answer into your file and leave you to check it. A merge that compiles but drops one side's change looks exactly like a good one.
-3. **What we built (10 s).** Merge Desk: the AI proposes the merge, and nothing lands until both branches' intent is still there and the tests pass.
+3. **What we built (10 s).** <!-- Merge Desk: Gemini proposes the merge, and Land waits for parsing, a deterministic check against your choice and actual sandbox tests. Say this only after it works. -->
 4. **Beat A (20 s).** <!-- open the demo PR; the rename-vs-retry conflict; the naive merge drops the retry; HELD, "theirs: retry on 429, missing" -->
-5. **Beat B (20 s).** <!-- the verified merge keeps both; CI goes green on merge-desk/resolve-<pr>; Merge unlocks; the original PR turns mergeable -->
-6. **Proof (10 s).** <!-- headline number from the replay eval, from FACTS -->
+5. **Beat B (20 s).** <!-- the proposal keeps both; choice-honored evidence and real sandbox tests pass; Land adds a merge commit to the PR's own branch; the original PR turns mergeable -->
+6. **Proof (10 s).** <!-- show the actual check output and PR history. Replay evaluation is deferred; use an evaluation number only if it was built and measured into FACTS. -->
 7. **Close (10 s).** <!-- teams running coding agents at volume; point at the QR -->
 
 ## If they only have 30 seconds
 
-"<!-- AI resolves the conflict, but the merge waits until both sides' intent survives and CI is green. Scan this, try it on our demo repo, no login. -->"
+"<!-- Gemini proposes the merge; code checks the chosen changes and runs the tests before Land. Public demo replays real recorded runs with no sign-in. The video shows learner-only live mode. -->"
 
 ## Things to have ready
 
@@ -24,20 +25,20 @@ Numbers come from `docs/FACTS.json` (as of <!-- asOf -->). Say them exactly as w
 
 ## Judge questions, with honest answers
 
-**Is it real (repos, CI, AI)?**
-<!-- Real GitHub repo, real Actions CI, real model calls. The demo repo is ours. -->
+**Is it real (repo, tests, AI)?**
+<!-- After verification: real GitHub repo, Gemini calls and isolated tests. The public demo replays those real runs; live mode is authenticated. App development CI is separate from the per-run sandbox test gate. -->
 
 **What does the AI actually decide?**
-<!-- It proposes a merge and names each side's intent. It never unlocks the merge: the deterministic intent check and CI do. -->
+<!-- It proposes a merge and explains each side's intent. It never unlocks Land: parsing, the deterministic choice-honored check and actual tests do. Those checks do not prove general semantic correctness. -->
 
 **What if the model is wrong?**
-<!-- A wrong merge fails the intent check or CI and is HELD; the conflict stays for a person. -->
+<!-- If the proposal fails a check, it is HELD and pushes no code. A person can choose another option, steer and retry, discard or download the patch. Passing checks are bounded evidence, not a guarantee. -->
 
 **How good is it, measured how?**
-<!-- Replay eval on real historical merges: unchecked AI vs gated, from FACTS. -->
+<!-- State actual measured evidence from FACTS. Historical replay evaluation is deferred, so do not claim its results. -->
 
 **How is this different from existing AI merge drivers?**
-<!-- They write the answer and ask you to review. We verify each side's intent and require CI before anything lands, and show the conflict as two intents instead of raw markers. -->
+<!-- We show explanations, keeps/drops and options before action, then require a deterministic check against the chosen changes and real tests before Land. Intentional drops stay recorded and recoverable. -->
 
 **What is still open?**
 <!-- Two honest limits. -->

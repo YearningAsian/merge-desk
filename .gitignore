@@ -37,3 +37,7 @@ Thumbs.db
 .env.local
 .env.*.local
 .claude/worktrees/
+
+# installed agent skills (third-party curriculum; reinstall from skills-lock.json)
+.agents/
+agent/

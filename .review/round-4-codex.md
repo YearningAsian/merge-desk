@@ -229,3 +229,147 @@ STOP 2 remains: the learner performs the original #1 and #2 checks and reports o
 The original all-branch baseline `.review/slice5-before-land.json` at 2026-10-05T21:15:55.4834654Z remains byte-for-byte preserved, SHA-256 `0D07F384967E91C1192978728CAC906D40651932527E924EE1F02F86B84BE135`. The additional snapshot at 21:24:15Z showed all nine heads unchanged, including feat/land. Updating the existing PR for this authorized repair will advance feat/land; that change must be disclosed separately, not hidden by overwriting the baseline or silently treating the original Step 4 no-other-branch-moved condition as passed. A new all-head snapshot is required before subsequent manual checks.
 
 probe.yml remains untouched, untracked and unstaged; verified SHA-256 `48E3B2A27DB383BA740450ED564EBA1B1850A483148D8A156588B18ADF8BD125`. Original round 4 policy findings, L1 and readiness gaps remain as previously recorded; this narrow authentication fix does not resolve them.
+
+## Autonomous slice 5 closure (2026-10-05)
+
+The learner's latest instruction supersedes STOP 2, STOP 3, manual clicks/the "landed" message and the separate merge-go checkpoint. It explicitly authorizes automated original #1/#2 checks, demo-only resets, bounded repairs, named-file commits/pushes and a conditional exact-head merge commit for #4 using the existing account's permitted administrator authority. It does not authorize production deployment, ruleset changes, failed/missing-requirement bypass, main force-push or app main-merge capability. Earlier STOP descriptions above are historical evidence, not the active gate. Claim commit: `0c9e0d1a6279105f97d36523bdb1f39a4790c8d2` (PLAN only). Primary: Codex (GPT-6), runtime variant unavailable.
+
+### Preserved baseline and separate #3 events
+
+The original `.review/slice5-before-land.json` remains byte-for-byte unchanged, timestamp `2026-10-05T21:15:55.4834654Z`, SHA-256 `0D07F384967E91C1192978728CAC906D40651932527E924EE1F02F86B84BE135`. Later all-head snapshots were added, never substituted for it. The old feature head `0274b862aacf2307133ec4688db9d161a6722933` advanced to `9e8905f98422740327a6c211a28ed09a6c207a1a` only for the previously authorized bot-authentication repair and status commits. The new closure pushes must be recorded separately.
+
+Two distinct #3 events were verified before reset:
+
+| Event | GitHub commit and parents | Effect |
+| --- | --- | --- |
+| App Land | `0ae387a2f5c580fce38b19e5e8222c5cb11cde0e`; parents `[d32055264f2be740c52c32093f766dce73438942, a41f224f7a69b10eabb38387d237110019ac4f25]`; tree `7a6bdb16b7b9b2adae24699ed5386d0a4e00deef` | Moved only `demo/drop/fix-b`. App comment `6003595433`, created `2026-10-05T21:43:05Z`, verified by App ownership, server seal and PR scope. |
+| Subsequent GitHub PR merge | `65392e68c70337ad5802033446851a1c03afd1ce`; parents `[a41f224f7a69b10eabb38387d237110019ac4f25, 0ae387a2f5c580fce38b19e5e8222c5cb11cde0e]`; merged by YearningAsian at `2026-10-05T21:44:02Z` | Moved `demo/base`, closed #3. This was not a base write by Land. |
+
+Safe evidence: `slice5-live-reconcile-2026-10-05T22-16-45-145Z.json`. #3 is additional evidence, not a substitute for #1/#2. Resetting its branches cannot reopen the already merged PR; no replacement PR was silently created.
+
+### Reset confinement inspected before any authorized reset
+
+The actual reset script constructs a complete validated plan before its write loop (`scripts/demo-reset.mts:25,45`). `DemoBranch` validates every configured branch through `checkWritableBranch(branch, "demo-only")` (`src/core/demo.ts:7`), and `planBranchWrites` checks every branch and full target SHA before returning the plan (`:39`). The conservative ref syntax, nonempty `demo/` prefix and demo-only scope are enforced at `src/core/scope.ts:25-40`. Every push checks again at `scripts/lib/git.mts:54-55`:
+
+```ts
+const check = checkWritableBranch(branch);
+if (!check.ok) throw new Error(check.reason);
+```
+
+The reset's explicit expected-old `--force-with-lease=refs/heads/${check.branch}:${expectCurrent}` is an operator-only fixture operation. The app never calls it, and Land still uses `force: false` plus atomic `beforeOid`. The learner explicitly authorized restoring `demo/base` despite its #3 merge, after evidence preservation.
+
+Three actual `npm run demo:reset -- --yes` executions succeeded: initial restoration of base `65392e6...` to `a41f224...` and drop head `0ae387a...` to `d320552...`; restoration of the first #1 Land to its seed head before the repeat; final restoration after the repeat. Each operation was followed by a full branch inventory. Every demo branch returned to its seed, main remained `4ad4011b57c6f9bb08a15f0f81a309b6e2ab1217`, and #1 returned to CONFLICTING/DIRTY before repeat and after final reset. Immediate GitHub UNKNOWN while recomputing was not treated as a conflict or mergeability confirmation.
+
+### Actual supported-flow observations
+
+The ignored local evidence harness used the same `/api/live/{analyze,run,land,record}` routes as the desk, with a fixed allowlisted session sealed in memory. It performed one deliberate Land POST at a time and inspected actual GitHub branches, commit trees/parents and comments before any subsequent operation. The UI's automatic HELD record and Discard sequence was reproduced through its supported record endpoint. Cookies, keys and full signed analysis/run credentials were never printed or saved. Comment seals were verified in memory; only selected fields and body hashes were saved.
+
+| Check | Actual observation |
+| --- | --- |
+| Original #1 Run checks | Recommended combine; all six checks passed, signed VERIFIED at `2026-10-05T22:18:23.572Z`. |
+| Original #1 Land | HTTP 200 LANDED, commit `0d9ccc86f79856fd8e6cc1485af5c2aa5123427c`. Only `demo/clean/rename` moved. Parents exactly `[df6c107561c4dbe0caf18ba287d2a98af5355eaf, a41f224f7a69b10eabb38387d237110019ac4f25]`. GitHub tree `d10d0dfa39c83f4dfd4c363a613b33a8cc9f6e46` equals the signed checked tree. GitHub later confirmed MERGEABLE/CLEAN. |
+| #1 decision record | Exactly one authentic App record, comment `6004283429`, created `22:18:28Z`; matching landed entry and commit. |
+| Original #2 Run checks | Recommended combine; parsing/honor passed, real tests failed; signed HELD. No branch moved. |
+| #2 automatic HELD and Discard | Both HTTP 200. Comment `6004290422` was created at `22:18:53Z`, then the same comment updated at `22:18:55Z`; its body hash changed, HELD and discarded entries were preserved, App ownership/seal/PR scope verified. Exactly one authentic record; no branch moved. |
+| Fresh #1 repeat Land after reset | Signed VERIFIED, HTTP 200 LANDED, commit `67533c8eaf82ca9474f6c8a1efef5007edc12763`; same correct parents and checked tree. Only `demo/clean/rename` moved. Same authentic comment `6004283429` updated with both Land entries. |
+| Replay of that exact signed run | HTTP 409 REFUSED: "Pull request changed since the run; run it again." No branch moved. |
+| One signature byte XOR-changed | HTTP 403 REFUSED: "This run can't land: it expired (15 minutes) or belongs elsewhere. Run it again." This was the fresh token's tampered signature, not an observed expiry. No branch moved. |
+| Final reset | Seed branches restored, #1/#2 conflicting, their authentic comments retained. #3 remains merged historical evidence. |
+
+Evidence files: `slice5-live-first-2026-10-05T22-17-59-538Z.json`, `slice5-live-repeat-2026-10-05T22-19-33-134Z.json`, `slice5-live-final-2026-10-05T22-21-50-417Z.json`. Before/after inventories around each operation compare all remote branches, not just demo branches. No unrelated branch movement occurred. Authorized feature pushes and the eventual main merge/status push are separate branch events, not passed off as "no other branch moved."
+
+At `2026-10-05T22:40:23.1064906Z`, pre-final-push remote heads were:
+
+| Branch | Full SHA |
+| --- | --- |
+| demo/base | `a41f224f7a69b10eabb38387d237110019ac4f25` |
+| demo/clean/rename | `df6c107561c4dbe0caf18ba287d2a98af5355eaf` |
+| demo/clean/retry | `69c68f87e4fbe70966df802aaf39ed39593256a8` |
+| demo/drop/fix-a | `a41f224f7a69b10eabb38387d237110019ac4f25` |
+| demo/drop/fix-b | `d32055264f2be740c52c32093f766dce73438942` |
+| demo/held/caller | `999e936f3866bf011ffa6d36af9c98760f97789a` |
+| demo/held/signature | `586cb92434fa72752e779fd47cfdcfa92a5836ed` |
+| feat/land | `9e8905f98422740327a6c211a28ed09a6c207a1a` |
+| main | `4ad4011b57c6f9bb08a15f0f81a309b6e2ab1217` |
+
+Snapshot: `slice5-pre-final-push-all-heads-20261005T2240231520684Z.json`. Later final-head evidence will be appended after actual writes.
+
+### Focused UI fixes and fresh review findings
+
+`d534dc34500ede9627b0d3f034280b49bb865391` separates file conflicts from readiness, lists current-head check snapshots and known blockers, links head/base commits and provides **Review and merge on GitHub**. Public check GETs use a separate unauthenticated client, with exact-head caching, a bounded entry count, request timeout and provider rate-limit cooldown; no App permission expansion. Missing/truncated/unavailable/empty evidence never proves passing requirements. Historical Land results retain their checked revisions, option and attempt time, while refreshed PR metadata determines current status. The old speculative "base probably moved" and conflict-free merge-permission claims were removed. Six new unit and two initial browser regressions were test-first: readiness RED 4 failed/3 passed then GREEN 7/7; cache/rate RED 2 failed/7 passed then GREEN 9/9; browser RED 2/2 then targeted GREEN 3/3.
+
+Fresh final review round 1: actual model **claude-sonnet-5-5**, Claude Code 2.1.289, firstParty; requested alias sonnet. Exact source scope `4ad4011b57c6f9bb08a15f0f81a309b6e2ab1217...b0c6194a9971ee5ee5c3835f11d9acac9f98d1fa`. It reviewed 139 named public files and the exact affected diff, with earlier Codex/round reports, PLAN, environment values, private profile and session history withheld. Source-only, no tools/test execution. Input SHA-256 `83e38b9db76508e3e894d6d8c6ce1e5aeb61003d1c79ac85340a2e8e5d65660a`; report `slice5-final-claude-sonnet-r1.md`, safe source manifest alongside it. First bare-mode invocation failed before any model use because bare mode ignores OAuth; documented safe-mode isolation preserved OAuth and disabled customization/tools/session reuse for the successful fresh retry. No login or credential inspection was performed.
+
+Round 1 found **0 high / 2 medium / 3 low**. Earlier reviews did not cover the new UI changes; these findings were not hidden by calling the old review sufficient.
+
+| Finding | Disposition and test-first evidence |
+| --- | --- |
+| Final-R1 M1, medium: Discard after pending/UNKNOWN Land could post a contradictory discarded entry and hide uncertainty | Fixed in `1e42b067701f36d456147eeedc213a404ff39400`. Synchronous per-run and per-PR interlocks prevent new Run/Land/Discard across options during pending/UNKNOWN, preserve history and remove "Nothing has been pushed". Other PRs remain usable. Original pending/REFUSED regressions RED 2/2, independent UNKNOWN RED 1/1. Root independently found an option-switch bypass in the first per-run fix; a corrected-setup browser regression then failed on the actual bypass before the PR-wide repair. Final targeted GREEN 6/6. Full browser suite also checks ordinary pre-Land VERIFIED discard. Interlock is tab-local; server CAS/signed-run guards still govern other callers. |
+| Final-R1 M2, medium: retained record lock refusal not actionable | Fixed in `56c38fc2e245b2d413174fe64d6c29a94c06a0aa`. Portable opaque lock reference and operator instructions; no private path/scope leakage, TTL, takeover, automatic unlock or unsafe retry. Real local-lock regression RED 1 failed/2 passed, GREEN 3/3; callback remains blocked and exact lock still exists. `src/server/record-writer.ts:47`, `tests/server/record-writer.test.ts:23`, `docs/record-reconciliation.md`. Root separately rechecked source/tests/docs and unchanged locking semantics. |
+| Final-R1 L1, low: transient check failure/pending cached too long | Fixed in `788be3dca4cdb250aa14104c36089899ff583098`. UNKNOWN/pending expire after one minute, stable/none retain the disclosed maximum; rate-limit cooldown still wins. Same-head behavioral regressions RED 2 failed/9 passed, GREEN 11/11, `tests/server/prs.test.ts:192`. |
+| Final-R1 L2, low: definite REFUSED could not be manually retried | Fixed with M1. A new explicit click rechecks the same signed run and every server guard; no automatic retry. Browser RED before implementation; regression `tests/e2e/desk.spec.ts:522` asserts two deliberate Land requests, identical token, only one Run. |
+| Final-R1 L3, low: guard covers workflows, not actions/CODEOWNERS | Deferred additional hardening, not claimed prevented. Canonical slice-5 guard is the merge delta's `.github/workflows/`; writes remain demo-only and never main. Do not silently broaden the approved policy or claim a whole-PR configuration scan. Track for slice 6/security planning. |
+
+The review skill defines CLEAN ROUND as zero highs and requires medium dispositions; this closure uses the stricter requirement of zero unresolved high/medium. Low L3 and the earlier older-valid-same-PR rollback limit remain explicitly disclosed, not described as fixed or accepted on the learner's behalf. Fresh follow-up verdict and final-head attestation are appended after they actually occur.
+
+### Measured verification at final code head
+
+Exact final code/docs/config head: `1e42b067701f36d456147eeedc213a404ff39400`. Additional closure commits since the previous published feature head include status claim `0c9e0d1`, UI `d534dc3`, deployment guard `e54f9b3b7513a31230ecf05fc9cd346f435f654b`, formatting-only test commit `b0c6194`, accurate local-source README `996dfec5f2f6bc04f862bb587fab39d89f1ec21b`, transient-cache fix `788be3d`, lock guidance `56c38fc`, ambiguity/manual-refusal recovery `1e42b06`. The exact ancestry list is also captured before final push. Metadata-only final-head changes require byte-equivalence rechecking against the review manifest and CI on their exact head.
+
+- Primary `npm test`: exit 0, **262 tests / 30 files**, 73.84 seconds.
+- Primary `npm run e2e`: exit 0, **19/19 browser tests**, fresh configured build/start on previously free port 3100. All new regressions and the added pre-Land discard case passed; fixture-based browser tests are not live GitHub evidence.
+- Primary `npm run format:check`: exit 0, all matched files formatted.
+- Primary `npm run lint`: exit 0, **0 errors / 1 existing ignored scratch warning** at `.review/run-check.mts:43`; production sources have no reported findings.
+- Primary `npm run typecheck`: exit 0.
+- Primary `npm run build`: separate final exit 0; fresh build also passed inside e2e. Existing outer-lockfile/color warnings only.
+- Primary `npm run test:playground`: **6/6 passed**.
+- Additional real provider smoke: `node node_modules/vitest/vitest.mjs run --config vitest.live.config.mts --reporter=default`, **2/2 tests / 2 files**, exit 0 at `2026-10-05T22:33:29.290Z`. A fresh schema-valid Gemini call and real Sandbox create/merge/network denial/protected-source test run/disposal passed. `runTests` must complete actual `protectSource` before returning the failed-test state required by this smoke; setup failure returns not_run and would fail it. This is bounded evidence for that owned fixture, not a general sandbox security certification. Safe selected output only, `slice5-live-provider-2026-10-05T22-33-12-222Z.json`.
+- Node v26.3.0/npm 11.16.0 locally. Exact final-head GitHub CI must prove clean Node 24/npm 12.2.0 installation separately; earlier CI at 9e8905f already did so.
+- Initial format check failed for one test mock's wrapping; named-file formatting and repeat passed. Initial lint failed for 19 intentional dynamic-payload any annotations in the ignored evidence collector; scoped rationale was added and repeat passed. A later local CommonJS helper lint reported two require-import errors; helper converted to ESM and targeted lint passed. No production lint finding was bypassed.
+- First safe live-provider collector returned incomplete metadata despite child exit 0: Vitest's JSON reporter writes a file by default, not stdout. A harmless unit invocation confirmed that format; its generated artifact was moved into ignored review evidence. Collector corrected to capture default output in memory, save only fixed counts/timing formats, then repeated successfully. No failed provider diagnostics, credentials or full run tokens were printed or persisted by the collector.
+- One option-switch browser setup initially raced analysis rendering; corrected with a visible-slider wait before the actual failing regression. Expected refusal and RED tests are verification, not unexpected operations. Read-only exploratory rg Windows-glob and Get-Date unsupported-parameter diagnostics were corrected without writes; bounded diagnosis replaced the superseded two-failure stop.
+
+At `2026-10-05T22:32:31.186Z`, authenticated read-only localhost `/api/live/prs` returned #1/#2 conflicting at seed heads, and #4 conflict-free but BLOCKED with passing checks at its published head. This confirms the new readiness behavior was loaded. Localhost PID 32000 remained running and was not killed/restarted. Exact runtime SHA has no self-attestation endpoint: matching source/served artifacts and new behavior support an inference, not cryptographic proof of an entire process image. Browser production builds were fresh and tied to checkout bytes; old manual Land state is never used as current readiness evidence.
+
+### Updated a–j assessment and limits
+
+The earlier complete matrix remains the independently formed review. These real checks update its verification limits, not its canonical policy scope:
+
+| Attack | Final assessment | Evidence and test / remaining limit |
+| --- | --- | --- |
+| a. Outside demo/*, main/default/base/fork/odd refs | PASS in supported scope | `src/core/scope.ts:16`, `src/server/guard.ts:60,66`; scope/guard regressions named in original matrix. No live unauthorized branch mutation attempted. |
+| b. Head or base races | Head PASS; literal simultaneous both-ref policy FAIL | `guard.ts:73`, `github/land.ts:140`; guard and atomic-head-race tests. Actual parents are signed H/B. No atomic base precondition; no test proves post-final-read base movement refused. Canonical spec accepts this race. |
+| c. Force/no expected old head | PASS for Land | `github/land.ts:140,142`; `land.test.ts:106,159,277`; actual demo writes and branch comparisons. Operator resets are separately authorized leased rewrites, not app Land. |
+| d. Different checked tree/ordinary replay/expiry/wrong scope | PASS with stated limitations | Actual two #1 Lands' tree/parents match signed checked evidence; actual replay 409 and signature-byte tamper 403. Signature/scope/expiry, tree/CAS and runner tests in original matrix. No consumed nonce: intentional restoration to H can permit reuse while valid; tested replay was before reset. Local transient write-and-restore limit remains. Real protected Sandbox smoke passed one owned fixture; not general proof. |
+| e. Uncertain reply or stale UI implies current success | PASS within tested paths | `github/land.ts:148`, deadline tests, live two confirmed Lands, `ui/Land.tsx:110`, `Desk.tsx:101,250,283`. Browser `desk.spec.ts:406,471,596,734` covers UNKNOWN/pending, option changes and historical notices. Independent caller/browser reload uncertainty still needs reconciliation; tab interlock is not durable authority. |
+| f. Browser widens login/repo allowlists | PASS | Fixed env/session scope and original regressions; localhost harness uses only YearningAsian/merge-desk. No allowlist or App permissions widened. |
+| g. Secret exposure | PASS by source inspection; dedicated live canary unverified | Original source/tests remain; all new harness output is selected metadata, source-only reviewer inputs exclude env/auth/private data. No credential-canary/transport audit test. |
+| h. Forged/edited/duplicate/concurrent record | Scoped App writer races/tamper PASS; complete anti-rollback policy FAIL | Actual #1/#2/#3 App ownership/seal/scope verified, exactly one authentic comment each; same #2 comment changed on Discard. Writer/parser/concurrency/retention tests and new `record-writer.test.ts:23`. An authorized editor's whole older same-PR valid seal remains L1; no anti-rollback anchor/test, no live edit attempted. |
+| i. Daily admission/caps/timeouts | Daily app admission FAIL/deferred; existing execution limits preserved | No daily cap/accounting test. Land/record deadlines, configured Sandbox/test lifetime limits and actual owned-fixture smoke passed. Land itself allocates no Gemini/Sandbox; hosted decision writes remain refused. Slice 6 must add fail-closed usage admission before production. |
+| j. Workflow files | Canonical merge-delta PASS; whole-PR policy FAIL | `guard.ts:82`, `guard.test.ts:117`; no whole-PR changed-files test. Actions/CODEOWNERS additional hardening remains low L3; do not claim it blocked. |
+
+### Readiness and deployment boundary
+
+Historical challengepost lock and substantive approved October 4 `devpost/{scope,prd,spec}.md` commits support actual Devpost Learn Skill Pack use. They do not certify every invocation or an initially empty folder; adding documents later would not prove earlier use. Earliest commit/repository creation remain within September 22–October 26, 2026. Existing planning-template/workspace-skill disclosure is preserved; the final incorporated-work and material-attribution inventory is incomplete.
+
+Real end-to-end demo Land and clean intended-stack CI installation now have evidence; final reviewed-head/main CI remains a separate check. Public repository, complete implementation source/lockfile/instructions and detectable MIT license are present. README now distinguishes verified local functionality from disabled production and explains installation, fixed login/repo scope, test ports and operator resets. Recorded public replay/assets, authorized final materials/API terms, completed English submission copy, and a public English YouTube/Vimeo demonstration under three minutes remain gaps. Pitch/submission draft are still unfinished; no provenance or compliance claim was fabricated.
+
+Fresh read-only production health at `2026-10-05T22:33:01.303Z` reports ok:true and github/gemini/sandbox/recordings all false. `/demo`, `/judge`, `/api/stats` remain absent on the published placeholder. Plan free public recorded testing without keys or login through **October 30, 2026, 4:00 p.m. Central**; maintain availability and verify it covers the features accurately described. Supply dedicated testing credentials only if necessary, without widening live allowlists or sharing owner credentials. Submission deadline: **October 26, 2026, 4:00 p.m. Central**. Official rules: https://learn-ai-basics.devpost.com/rules .
+
+GitHub deployment records showed previous main pushes automatically produced Production deployments. To honor the separate production gate, `e54f9b3` adds only `"main": false` to existing `vercel.json` git.deploymentEnabled; demo/** remains false and unspecified preview branches retain their existing provider behavior. Official reference: https://vercel.com/docs/project-configuration/git-configuration . No deployment command, platform setting, ruleset or App permission was changed. Read-only Vercel connector lookup was unavailable for the current scope (403); no reauthentication or setup was attempted. Confirm the merged main receives no Production deployment, and keep this guard until the learner's separate go.
+
+`probe.yml` SHA-256 remains `48E3B2A27DB383BA740450ED564EBA1B1850A483148D8A156588B18ADF8BD125`, untracked/unstaged/untouched. Its permissions block, own-production-URL verification and separate named-file commit remain reserved for slice 6. Full final CI, merge and closure status evidence follow only after actual confirmation.
+
+### Fresh separate-family follow-up and explicit dispositions
+
+Final follow-up reviewed exact `1e42b067701f36d456147eeedc213a404ff39400`, actual **claude-sonnet-5-5**, fresh isolated one-turn source-only invocation. It included 141 named files, README and operator guide, the complete final code/config/doc diff and the prior independently formed Sonnet findings. Earlier Codex reports/PLAN/private environment or profile data stayed excluded. HEAD and clean affected sources were rechecked afterward. Input SHA-256 `1efd6e9bf64e03231b9643479c77a4176a8deb8065d8f2e841de6aeca8475f1c`; reviewed diff `cfd8e45134ad14104270d9cbdf2148c691effa2fec1e68bbb15f8766405d086c`; raw output `695a539b7addf27dd1aa197831ea80818dd9ad04560fb4c1eb59a959a72a1d9e`. Original report and source manifest: `slice5-final-claude-sonnet-r2.md` / `slice5-final-claude-sonnet-r2-safe-manifest.json`.
+
+Verdict: **CLEAN ROUND, 0 high / 0 medium / 3 low**, both medium findings closed. Claude ran no tests; builder/root measurements above and actual provider evidence are separate. Root independently rechecked the final ambiguity guards, token-retry boundary, cached-check behavior, opaque lock hint and manual reconciliation instructions against their regression assertions.
+
+Explicit builder dispositions, not inferred learner acceptance:
+
+- Follow-up L1 (low), stale cross-tab/direct-API discarded record has no current-revision note: deferred audit-clarity improvement. Entries retain the run's signed head/base and describe that attempt; they do not move or undo code. In-tab ambiguity interlocks do not claim cross-tab authority. No stale-record route regression currently covers annotation/refusal; proposed test remains unimplemented. Track alongside durable production coordination in slice 6.
+- Follow-up L2 (low), definite 403/422 comment rejection retains a lock: deliberately retain the conservative fail-closed policy. Even this availability case requires the documented operator reconciliation; no automatic release or speculative success was added. No proposed automatic-release regression exists. Track future classification separately from uncertain transport responses, preserving all current guards.
+- Follow-up L3 (low), additional actions/CODEOWNERS protection: deferred defense-in-depth hardening. Current merge-delta suite selection holds changes outside playground, but this does not scan the entire PR or prove preexisting head-side metadata blocked. The narrower explicit workflow guard and whole-PR limit remain as reported in j.
+
+The earlier authorized-editor rollback limit remains open and disclosed, with no anti-rollback anchor and no acceptance claimed for the learner. These low limitations do not negate the clean high/medium review of the supported local demo scope, and no production enablement follows from it. Conditional merging still requires exact final-head CI and current head/base/requirements verification.

@@ -18,7 +18,7 @@ Commits follow the repo's `AGENTS.md`: a status-only claim commit on the matchin
 
 ## Slices
 
-- [ ] **1. The gate holds a merge that drops one side, on a real conflict (laptop, no AI yet)**
+- [x] **1. The gate holds a merge that drops one side, on a real conflict (laptop, no AI yet)**
   Becomes usable: Three real seeded conflicts exist as `[Demo]` pull requests on GitHub, into `demo/base` and never `main`. `npm run gate -- clean --candidate drop-theirs` merges the real branches on your laptop, runs parse, choice-honored and the playground's real `node --test` suite, and prints the step list ending HELD with "theirs: retry on 429, MISSING". `--candidate combined` ends VERIFIED. The Next.js app builds and serves a home page.
   Why now: The unique kernel is the gate, and it is pure code the AI cannot influence (the model proposes, code decides). Proving it first on real git conflicts means the AI, the desk and Land all plug into checks that already work. Scaffold, pinned stack, CI and the seeded conflicts every later slice needs are folded in here rather than being their own steps.
   PRD ref: `prd.md > Features and Behavior > Live run and checks`, `prd.md > Features and Behavior > Intentional drops`, `prd.md > Build Priority` (1, 2)
@@ -122,3 +122,10 @@ Reflection: not started
 Activity mode: not started
 
 ## Revisions
+
+- The clean scenario merges the retry into `demo/base` first and leaves the rename open as the pull request: the scope's held line is "theirs: retry on 429, MISSING", so the retry has to be the base side.
+- The drop scenario uses a third playground file (`src/money.js`), and the held scenario's stale caller lives in a new file (`src/fees.js`): separate files keep the scenarios from interfering, and a caller outside the conflicted file is exactly what only the real tests can catch.
+- Scripts are TypeScript ES modules run with `tsx` (`scripts/*.mts`) instead of `.mjs`: they reuse the tested scope guard and schemas in `src/core`, and tsx compiles plain `.ts` as CommonJS in this package.
+- The `main` protection is two rulesets, applied in slice 1 (learner condition): a ruleset's bypass list applies to all of its rules, so "no force push or deletion" (everyone) and "only admins update" (admin bypass) had to be separate.
+- The choice-honored check merges lines both sides changed at the token level, beyond the spec's rename rule: renames are one case of it, and a line that can't be merged that way fails closed as ambiguous.
+- The run pipeline takes the conflicted paths up front (from the analysis, or the scenario config for `npm run gate`) and still runs the tests after a failed choice-honored check: a proposal touching any other file is refused before anything is written, and a hold shows both pieces of evidence.

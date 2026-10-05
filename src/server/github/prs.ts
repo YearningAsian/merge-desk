@@ -124,8 +124,9 @@ const checkCaches = new WeakMap<
 const checkReadAfter = new WeakMap<Octokit, number>();
 
 // Read public metadata with no App credential or permission expansion. Exact-
-// head snapshots are cached for 10 min, bounded to 100 entries per client. Failed
-// or truncated reads stay UNKNOWN; an empty set never proves required CI passed.
+// head snapshots are cached for up to 10 min, bounded to 100 entries per client.
+// Transient UNKNOWN/pending snapshots refresh after 1 min; rate-limit cooldown
+// still wins. An empty set never proves required CI passed.
 async function headChecks(client: Octokit, repo: string, head: string): Promise<PullChecks> {
   if (!isAllowedRepo(repo)) throw new Error("Repository is not allowed");
   let cache = checkCaches.get(client);
@@ -144,10 +145,13 @@ async function headChecks(client: Octokit, repo: string, head: string): Promise<
       reason:
         "Public check reads are paused after GitHub rate limiting. See GitHub for the latest checks.",
     };
-  const value = readHeadChecks(client, repo, head);
-  cache.set(key, { expires: Date.now() + 600_000, value });
+  const entry = { expires: Date.now() + 600_000, value: readHeadChecks(client, repo, head) };
+  cache.set(key, entry);
   while (cache.size > 100) cache.delete(cache.keys().next().value!);
-  return value;
+  const checks = await entry.value;
+  if (checks.state === "unknown" || checks.state === "pending")
+    entry.expires = Math.min(entry.expires, Date.now() + 60_000);
+  return checks;
 }
 
 async function readHeadChecks(client: Octokit, repo: string, head: string): Promise<PullChecks> {

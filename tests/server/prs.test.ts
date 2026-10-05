@@ -189,6 +189,49 @@ describe("pull request list", () => {
     expect(publicReads.checks.listForRef).toHaveBeenCalledTimes(2);
   });
 
+  it.each(["unknown", "pending"] as const)(
+    "refreshes a transient %s check snapshot on the same head after a minute",
+    async (state) => {
+      const now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+      const listed = pull({ mergeable: true, mergeable_state: "clean" });
+      const app = {
+        pulls: {
+          list: vi.fn().mockResolvedValue({ data: [listed] }),
+          get: vi.fn().mockResolvedValue({ data: listed }),
+        },
+      };
+      const checkRead = vi.fn().mockResolvedValue({
+        data: {
+          total_count: 1,
+          check_runs: [{ name: "CI / web", status: "completed", conclusion: "success" }],
+        },
+      });
+      if (state === "unknown") checkRead.mockRejectedValueOnce(new Error("transient outage"));
+      else
+        checkRead.mockResolvedValueOnce({
+          data: { total_count: 1, check_runs: [{ name: "CI / web", status: "in_progress" }] },
+        });
+      const publicReads = {
+        repos: {
+          getCombinedStatusForRef: vi.fn().mockResolvedValue({
+            data: { total_count: 0, statuses: [] },
+          }),
+        },
+        checks: { listForRef: checkRead },
+      };
+      const read = () =>
+        listPulls(app as unknown as Octokit, REPO, publicReads as unknown as Octokit);
+      expect((await read()).pulls[0]!.readiness!.checks.state).toBe(state);
+      clock.mockReturnValue(now + 30_000);
+      expect((await read()).pulls[0]!.readiness!.checks.state).toBe(state);
+      expect(checkRead).toHaveBeenCalledTimes(1);
+      clock.mockReturnValue(now + 61_000);
+      expect((await read()).pulls[0]!.readiness!.checks.state).toBe("passing");
+      expect(checkRead).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("does not retry a rate-limited public read on another head before reset", async () => {
     let listed = pull({ mergeable: true, mergeable_state: "clean" });
     const app = {

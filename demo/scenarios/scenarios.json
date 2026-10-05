@@ -1,0 +1,54 @@
+{
+  "label": "demo",
+  "base": "demo/base",
+  "scenarios": [
+    {
+      "id": "clean",
+      "title": "[Demo] Rename fetchUser to getUser",
+      "conflicted": ["playground/src/api.js"],
+      "defaultOption": "combine",
+      "theirs": {
+        "branch": "demo/clean/retry",
+        "intent": "retry on 429",
+        "commit": "Retry fetchUser on HTTP 429"
+      },
+      "ours": {
+        "branch": "demo/clean/rename",
+        "intent": "renames fetchUser to getUser",
+        "commit": "Rename fetchUser to getUser, keeping a deprecated alias"
+      }
+    },
+    {
+      "id": "held",
+      "title": "[Demo] Add a minimum charge and late fees",
+      "conflicted": ["playground/src/billing.js"],
+      "defaultOption": "combine",
+      "theirs": {
+        "branch": "demo/held/signature",
+        "intent": "chargeCustomer takes one options object",
+        "commit": "Take one options object in chargeCustomer"
+      },
+      "ours": {
+        "branch": "demo/held/caller",
+        "intent": "adds a minimum charge and late fees",
+        "commit": "Add a minimum charge, receipts and late fees"
+      }
+    },
+    {
+      "id": "drop",
+      "title": "[Demo] Parse price strings in toCents",
+      "conflicted": ["playground/src/money.js"],
+      "defaultOption": "keep_ours",
+      "theirs": {
+        "branch": "demo/drop/fix-a",
+        "intent": "rounds cents with an epsilon nudge",
+        "commit": "Round cents with an epsilon nudge"
+      },
+      "ours": {
+        "branch": "demo/drop/fix-b",
+        "intent": "parses price strings and rounds cents",
+        "commit": "Parse price strings and round cents in toCents"
+      }
+    }
+  ]
+}

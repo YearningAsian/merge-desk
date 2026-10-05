@@ -112,6 +112,15 @@ At scaffolding, requery each package's npm `latest`, exclude prereleases, and in
 
 Use `npx shadcn@4.21.1` during scaffolding, then inspect and commit only the needed generated source. No `latest`/canary/preview versions in manifests, no forced peer resolution, and no automatic major upgrade without compatibility review. Dependabot weekly grouped patch/minor PRs plus required CI can maintain this baseline after the scaffold exists; review majors separately.
 
+## Scaffold check (2026-10-05, build slice 1)
+
+- Every planned pin above was re-queried on npm before installing; none changed. TypeScript 7.0.2 and ESLint 10.12.0 are still npm `latest`, so both holds stay. ESLint 9.39.5 now prints npm's "no longer supported" notice; the hold remains while Next's React, import and JSX accessibility plugin peers exclude ESLint 10.
+- Installed with `npx npm@12.2.0 install`. npm 12 blocks dependency install scripts unless allowed: `esbuild` and `unrs-resolver` postinstall scripts were blocked, and lint, typecheck, tests, build and `tsx` all work without them. Nothing was approved.
+- Only slice 1's packages are installed: `next`, `react`, `react-dom`, `zod`, `diff`, Tailwind, ESLint, Prettier, Vitest and TypeScript. The others join in the slice that first uses them.
+- Added `tsx` **4.23.15** (development) to run the TypeScript scripts (`gate`, `demo:seed`, `demo:reset`).
+- Local development ran on Node 26.3.0; CI and deployment use Node 24 through `.nvmrc` (24.21.0).
+- Passing: `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:playground` and `npm run build` (Turbopack).
+
 ## Checks that remain before calling the stack operational
 
 - Install the pins with normal peer resolution, then lint, typecheck, unit tests and Next production build. Smoke-test the lazy diff component, generated primitives, styling and phone sheet.

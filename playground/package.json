@@ -1,0 +1,9 @@
+{
+  "name": "merge-desk-playground",
+  "private": true,
+  "description": "Demo code under test for Merge Desk's seeded conflicts. No dependencies.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

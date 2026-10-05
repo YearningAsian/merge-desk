@@ -36,7 +36,8 @@ try {
 
 const isSet = (name) => typeof parsed[name] === "string" && parsed[name].trim().length > 0;
 const pemShape = (value) =>
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value) && /-----END [A-Z ]*PRIVATE KEY-----/.test(value);
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value) &&
+  /-----END [A-Z ]*PRIVATE KEY-----/.test(value);
 
 console.log(file);
 let missing = 0;

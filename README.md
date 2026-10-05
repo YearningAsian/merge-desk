@@ -6,7 +6,7 @@ Merge Desk shows a merge conflict as two intentions side by side ("ours renames 
 
 ## Status
 
-Planning. Nothing is deployed or runnable yet. See [PLAN.md](PLAN.md) for the live status board and [devpost/spec.md](devpost/spec.md) for the technical blueprint.
+Building. What runs today: the checks themselves, on a laptop, against three seeded demo conflicts in this repository. There is no web desk, AI call or deployment yet. See [PLAN.md](PLAN.md) for the live status board, [devpost/checklist.md](devpost/checklist.md) for the build order and [devpost/spec.md](devpost/spec.md) for the technical blueprint.
 
 ## How it will work
 
@@ -26,4 +26,25 @@ Verified versions, compatibility holds and dependency responsibilities are in [d
 
 ## Run it
 
-Not runnable yet. Setup instructions land with the scaffold (PLAN row 1.2).
+Requires Node.js 24 or newer and git.
+
+```bash
+npm ci
+npm test                 # unit tests for the checks, the branch guard and the local runner
+npm run test:playground  # the demo code's own test suite
+npm run dev              # http://localhost:3000 (home page and /api/health only, for now)
+```
+
+### Run the gate on a seeded conflict
+
+The `[Demo]` pull requests (label `demo`) are seeded conflicts on `demo/*` branches. They target `demo/base`, never `main`. `npm run gate` merges a pull request's real branches in a temporary folder, writes a hand-written candidate merge (no AI yet), and runs the three checks: it parses, the chosen option was honored, and the real tests pass.
+
+```bash
+git fetch origin "+refs/heads/demo/*:refs/heads/demo/*"
+npm run gate -- clean --candidate drop-theirs   # HELD: theirs: retry on 429, MISSING
+npm run gate -- clean --candidate combined      # VERIFIED
+npm run gate -- held --candidate combined       # HELD: a real test fails
+npm run gate -- drop --candidate keep-ours --option keep_ours   # VERIFIED, theirs dropped as chosen
+```
+
+The local runner is for trusted manual runs on your own machine; it has no network isolation. Nothing is pushed. `npm run demo:reset` (a person runs it, never Merge Desk) rebuilds the demo branches from their `demo-seed/*` tags and can only touch `demo/*` branches.

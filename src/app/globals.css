@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Tokens from docs/design/BRAND.md. Identity colors mark sides and states;
+   the *-text roles are for small text (all >= 4.5:1 on surfaces and washes). */
+@theme {
+  --color-ink: #16181d;
+  --color-surface: #ffffff;
+  --color-bg: #f5f5f3;
+  --color-muted: #646a75;
+  --color-hair: #e3e3df;
+  --color-control-border: #85867e;
+
+  --color-ours: #2f6fed;
+  --color-theirs: #d9711f;
+  --color-ok: #1f8a4c;
+  --color-stop: #c93c3c;
+  --color-wait: #9a7d14;
+
+  --color-ours-text: #2558bd;
+  --color-theirs-text: #a84e0f;
+  --color-ok-text: #176b3a;
+  --color-stop-text: #a83030;
+  --color-wait-text: #78600b;
+
+  --color-ours-wash: #eef3fe;
+  --color-theirs-wash: #fdf2e8;
+  --color-ok-wash: #e8f4ed;
+  --color-stop-wash: #fbeaea;
+  --color-wait-wash: #f8f2dc;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --radius-desk: 8px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
+  }
+}

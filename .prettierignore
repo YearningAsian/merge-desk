@@ -1,0 +1,14 @@
+.next
+node_modules
+coverage
+package-lock.json
+playground
+demo
+tests/fixtures
+devpost
+docs
+.agents
+agent
+.claude
+.github/skills
+*.md

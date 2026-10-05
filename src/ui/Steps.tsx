@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import type { StepState } from "@/core/events";
 import { Badge } from "@/ui/primitives/badge";
+import { Reveal } from "@/ui/primitives/reveal";
 import { cn } from "@/ui/utils";
 
 // A deployment-style step list: every step shows its state as a word, its
@@ -50,7 +51,11 @@ function Step({ step }: { step: StepRow }) {
       <div className="flex items-center gap-2.5">
         <Icon
           aria-hidden
-          className={cn("size-4 shrink-0", look.color, step.state === "running" && "animate-spin")}
+          className={cn(
+            "size-4 shrink-0 transition-colors duration-150",
+            look.color,
+            step.state === "running" && "animate-spin",
+          )}
         />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{step.label}</span>
         <Badge tone={look.tone}>{look.word}</Badge>
@@ -63,7 +68,9 @@ function Step({ step }: { step: StepRow }) {
         </span>
       </div>
       {step.detail ? (
-        <p className="mt-1 pl-[26px] text-[13px] whitespace-pre-line text-muted">{step.detail}</p>
+        <p className="mt-1 pl-[26px] text-[13px] whitespace-pre-line text-muted duration-150 animate-in fade-in-0">
+          {step.detail}
+        </p>
       ) : null}
       {step.log ? (
         <div className="mt-1 pl-[26px]">
@@ -79,11 +86,11 @@ function Step({ step }: { step: StepRow }) {
             />
             Raw log
           </button>
-          {open ? (
+          <Reveal open={open}>
             <pre className="mt-1.5 max-h-72 overflow-auto rounded-[6px] border border-hair bg-surface p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
               {step.log}
             </pre>
-          ) : null}
+          </Reveal>
         </div>
       ) : null}
     </li>

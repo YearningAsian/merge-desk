@@ -54,11 +54,16 @@ export class GeminiClient {
     private readonly deadlineMs = CALL_DEADLINE_MS,
   ) {}
 
-  static fromEnv(env: Record<string, string | undefined> = process.env): GeminiClient {
+  // `model` comes from the browser (Settings), so it must already have been
+  // checked against MODEL_CHOICES; without it the server default is used.
+  static fromEnv(
+    env: Record<string, string | undefined> = process.env,
+    model?: string,
+  ): GeminiClient {
     const ai = new GoogleGenAI({ apiKey: requireEnv("GEMINI_API_KEY", env) });
     return new GeminiClient(
       (params, options) => ai.interactions.create(params, options) as Promise<InteractionLike>,
-      modelId(env),
+      model ?? modelId(env),
     );
   }
 

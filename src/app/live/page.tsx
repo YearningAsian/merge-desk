@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { CODE_ALLOWED_REPOS, integrationStatus, isAllowedLogin } from "@/server/env";
 import { readSession } from "@/server/session";
+import { ForgetSession } from "@/ui/ForgetSession";
 import { LiveDesk } from "@/ui/LiveDesk";
 import { SignIn } from "@/ui/SignIn";
 import { TopBar } from "@/ui/TopBar";
@@ -36,7 +37,10 @@ export default async function LivePage({
       {allowed ? (
         <LiveDesk repo={REPO} />
       ) : (
-        <SignIn repo={REPO} result={configured ? signin : "unavailable"} />
+        <>
+          <ForgetSession />
+          <SignIn repo={REPO} result={configured ? signin : "unavailable"} />
+        </>
       )}
     </div>
   );

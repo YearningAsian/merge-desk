@@ -6,6 +6,7 @@ import type { Option } from "@/core/honor";
 import type { PullSummary } from "@/core/pulls";
 import { Badge } from "@/ui/primitives/badge";
 import { Kbd } from "@/ui/primitives/kbd";
+import { Reveal } from "@/ui/primitives/reveal";
 import { SHORT_LABELS } from "@/ui/resolution";
 import { cn } from "@/ui/utils";
 
@@ -127,7 +128,7 @@ export function PrList({
     const isOpen = pull.number === selected;
     const files = pull.filesBothSides;
     return (
-      <li key={pull.number}>
+      <li key={pull.number} className="duration-200 animate-in fade-in-0">
         <button
           type="button"
           data-pr={pull.number}
@@ -188,7 +189,7 @@ export function PrList({
 
   return (
     <nav ref={root} aria-label="Pull requests" className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         {pulls.length === 0 ? (
           <div className="flex flex-col items-start gap-2 px-4 py-6 text-[13px] text-muted">
             <GitPullRequestArrow aria-hidden className="size-5" />
@@ -225,7 +226,9 @@ export function PrList({
                 Can merge <span className="font-mono">{canMerge.length}</span>
               </button>
             ) : null}
-            {expanded ? <ul>{canMerge.map(row)}</ul> : null}
+            <Reveal open={expanded}>
+              <ul>{canMerge.map(row)}</ul>
+            </Reveal>
           </>
         ) : null}
       </div>

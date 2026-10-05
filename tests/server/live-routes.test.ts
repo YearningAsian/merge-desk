@@ -58,4 +58,19 @@ describe("POST /api/live/analyze", () => {
     );
     expect(response.status).toBe(403);
   });
+
+  it("refuses a model outside the Settings list before calling anyone", async () => {
+    const response = await POST(
+      new Request("http://localhost:3000/api/live/analyze", {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          origin: "http://localhost:3000",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ pr: 1, model: "some-other-model" }),
+      }),
+    );
+    expect(response.status).toBe(400);
+  });
 });

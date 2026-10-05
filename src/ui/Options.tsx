@@ -1,13 +1,14 @@
 "use client";
 
 import { Slider } from "radix-ui";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Option } from "@/core/honor";
 import type { ResolvedOption, SideWork } from "@/core/options";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Kbd } from "@/ui/primitives/kbd";
 import { SCALE, SHORT_LABELS, snap } from "@/ui/resolution";
+import { shortcutTarget } from "@/ui/settings";
 import { cn } from "@/ui/utils";
 
 // Two or three ways to resolve the conflict on one slider: all ours on the
@@ -52,18 +53,18 @@ function Work({ verb, work }: { verb: "Keeps" | "Drops"; work: SideWork }) {
   );
 }
 
-// The chosen option's colors as a bar: one side's color, or both halves.
+// The chosen option's colors as a bar: all blue, half and half, or all
+// orange. The blue share slides when the choice changes, like the thumb.
+const OURS_SHARE: Record<Option, string> = {
+  keep_ours: "w-full",
+  combine: "w-1/2",
+  keep_theirs: "w-0",
+};
+
 function KindBar({ kind }: { kind: Option }) {
   return (
-    <div aria-hidden className="flex h-[3px]">
-      {kind === "combine" ? (
-        <>
-          <span className="flex-1 bg-ours" />
-          <span className="flex-1 bg-theirs" />
-        </>
-      ) : (
-        <span className={cn("flex-1", TONE[kind].fill)} />
-      )}
+    <div aria-hidden className="flex h-[3px] bg-theirs">
+      <span className={cn("bg-ours transition-[width] duration-200 ease-out", OURS_SHARE[kind])} />
     </div>
   );
 }
@@ -82,18 +83,24 @@ function ResolutionSlider({
   const recommended = options.find((option) => option.recommended)?.kind;
   const chosen = options.find((option) => option.kind === value);
 
-  // 1, 2 and 3 pick a position from anywhere on the desk, unless typing.
+  // Left/Right and 1, 2, 3 move the slider from anywhere on the desk, no
+  // click needed, unless someone is typing or a dialog is open. On the thumb
+  // itself the slider handles the arrows.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const at = ["1", "2", "3"].indexOf(event.key);
-      if (at === -1) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
-      const kind = SCALE[at]!;
-      if (!offered.includes(kind)) return;
+      if (!shortcutTarget(event)) return;
+      const onThumb = (event.target as HTMLElement | null)?.closest("[role=slider]");
+      let to: number;
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        if (onThumb) return;
+        to = snap(index + (event.key === "ArrowRight" ? 1 : -1), index, offered);
+      } else {
+        const at = ["1", "2", "3"].indexOf(event.key);
+        if (at === -1 || !offered.includes(SCALE[at]!)) return;
+        to = at;
+      }
       event.preventDefault();
-      onChange(kind);
+      if (to !== index) onChange(SCALE[to]!);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -110,7 +117,8 @@ function ResolutionSlider({
           const to = snap(next ?? index, index, offered);
           if (to !== index) onChange(SCALE[to]!);
         }}
-        className="relative flex h-10 w-full cursor-pointer touch-none items-center select-none"
+        // The thumb glides between stops (Radix positions its wrapper span).
+        className="relative flex h-10 w-full cursor-pointer touch-none items-center select-none [&>span:has(>[role=slider])]:transition-[left] [&>span:has(>[role=slider])]:duration-200 [&>span:has(>[role=slider])]:ease-out"
       >
         <Slider.Track className="relative flex h-1.5 w-full overflow-hidden rounded-full">
           <span className="flex-1 bg-ours" />
@@ -188,12 +196,26 @@ export function Options({
 }) {
   const chosen = options.find((option) => option.kind === value) ?? options[0]!;
   const recommended = options.find((option) => option.recommended);
+  // Which way the choice last moved, so its card slides in from that side.
+  const [previous, setPrevious] = useState(value);
+  const [direction, setDirection] = useState(0);
+  if (previous !== value) {
+    setDirection(Math.sign(SCALE.indexOf(value) - SCALE.indexOf(previous)));
+    setPrevious(value);
+  }
   return (
     <div className="space-y-3">
       <ResolutionSlider options={options} value={chosen.kind} onChange={onChange} />
       <div className="overflow-hidden rounded-desk border border-hair bg-surface">
         <KindBar kind={chosen.kind} />
-        <div className="space-y-2 px-4 py-3">
+        <div
+          key={chosen.kind}
+          className={cn(
+            "space-y-2 px-4 py-3 duration-200 ease-out animate-in fade-in-0",
+            direction > 0 && "slide-in-from-right-2",
+            direction < 0 && "slide-in-from-left-2",
+          )}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-[14px] font-semibold">{chosen.label}</h4>
             {chosen.recommended ? <Badge tone="outline">Recommended</Badge> : null}

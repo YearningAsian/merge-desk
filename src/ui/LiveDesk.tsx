@@ -1,6 +1,7 @@
 "use client";
 
 import { Desk } from "@/ui/Desk";
+import { DeskOverlays } from "@/ui/Overlays";
 import { Providers } from "@/ui/providers";
 import { liveSource } from "@/ui/sources/live";
 
@@ -9,6 +10,7 @@ export function LiveDesk({ repo }: { repo: string }) {
   return (
     <Providers>
       <Desk source={liveSource} repo={repo} />
+      <DeskOverlays />
     </Providers>
   );
 }

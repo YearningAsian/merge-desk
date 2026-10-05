@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { GitMerge } from "lucide-react";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { Option } from "@/core/honor";
 import type { PullSummary } from "@/core/pulls";
 import { useMediaQuery } from "@/ui/hooks/useMediaQuery";
@@ -12,17 +12,27 @@ import { Button } from "@/ui/primitives/button";
 import { Kbd } from "@/ui/primitives/kbd";
 import { Sheet, SheetContent, SheetTitle } from "@/ui/primitives/sheet";
 import { Skeleton } from "@/ui/primitives/skeleton";
+import { loadAnalyses, saveAnalyses } from "@/ui/cache";
+import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource } from "@/ui/sources/types";
-import { analysisKey, deskReducer, initialDesk } from "@/ui/state";
+import { analysisKey, deskReducer, initialDesk, type DeskState } from "@/ui/state";
 
 // The one screen: pull requests on the left, the open one on the right.
 // Below 768 px the list is the home view and the detail opens as a
 // full-height sheet. Opening a conflicting pull request starts its analysis
-// once per exact head and base. The list re-reads every 30 s while the tab
-// is visible, so new commits mark an analysis out of date without a reload.
+// once per exact head and base (unless Settings turns that off). The list
+// re-reads on a timer while the tab is visible (30 s unless Settings says
+// otherwise), so new commits mark an analysis out of date without a reload.
+// Finished analyses come back after a reload of the tab (see ui/cache).
 
 const keyOf = (pull: PullSummary) => analysisKey(pull.number, pull.head.sha, pull.base.sha);
-const REFRESH_MS = 30_000;
+
+// Restored on the client only; the first render shows the list skeleton
+// either way, so the server and browser agree.
+const restore = (): DeskState => ({
+  ...initialDesk,
+  analyses: typeof window === "undefined" ? {} : loadAnalyses(),
+});
 
 // The open pull request lives in the address (?pr=N), so a reload, a
 // bookmark or a link from GitHub lands on it again. Only the number goes in,
@@ -48,13 +58,15 @@ function ListSkeleton() {
 }
 
 export function Desk({ source, repo }: { source: DataSource; repo: string }) {
+  const settings = useSettings();
   const query = useQuery({
     queryKey: [source.mode, repo, "pulls"],
     queryFn: ({ signal }) => source.listPullRequests(signal),
-    refetchInterval: REFRESH_MS,
+    refetchInterval: settings.refreshSeconds ? settings.refreshSeconds * 1000 : false,
     refetchIntervalInBackground: false,
   });
-  const [state, dispatch] = useReducer(deskReducer, initialDesk);
+  const [state, dispatch] = useReducer(deskReducer, undefined, restore);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const wide = useMediaQuery("(min-width: 768px)");
   const running = useRef(new Map<string, AbortController>());
   const lastOpened = useRef<number | null>(null);
@@ -64,6 +76,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     const controllers = running.current;
     return () => controllers.forEach((controller) => controller.abort());
   }, []);
+
+  useEffect(() => saveAnalyses(state.analyses), [state.analyses]);
 
   const pulls = query.data?.pulls ?? [];
   const selected = pulls.find((pull) => pull.number === state.selected) ?? null;
@@ -76,7 +90,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       running.current.set(key, controller);
       dispatch({ type: "analysis/start", key });
       try {
-        for await (const event of source.analyze(pull.number, controller.signal))
+        const model = chosenModel(settings);
+        for await (const event of source.analyze(pull.number, controller.signal, model))
           dispatch({ type: "analysis/event", key, event });
         dispatch({ type: "analysis/error", key, reason: "The analysis ended without a result." });
       } catch (error) {
@@ -90,7 +105,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         if (running.current.get(key) === controller) running.current.delete(key);
       }
     },
-    [source],
+    [source, settings],
   );
 
   const open = (number: number) => {
@@ -100,7 +115,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     const pull = pulls.find((item) => item.number === number);
     if (pull && pull.mergeable === "conflicting" && !pull.fork && !state.analyses[keyOf(pull)]) {
       const earlier = Object.keys(state.analyses).some((key) => key.startsWith(`${number}:`));
-      if (!earlier) void analyze(pull);
+      if (!earlier && settings.autoAnalyze) void analyze(pull);
     }
   };
 
@@ -110,6 +125,28 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     linked.current = true;
     const pr = Number(new URLSearchParams(window.location.search).get("pr"));
     if (query.data.pulls.some((pull) => pull.number === pr)) open(pr);
+  });
+
+  // Desk-wide keys (the list and the slider handle their own): A analyze
+  // again, D details, O open on GitHub, R refresh, comma settings, ? help.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!shortcutTarget(event)) return;
+      const current = selected ? state.analyses[keyOf(selected)] : undefined;
+      const analyzable = selected?.mergeable === "conflicting" && !selected.fork;
+      if (event.key === "?") openOverlay("shortcuts");
+      else if (event.key === ",") openOverlay("settings");
+      else if (event.key === "r") void query.refetch();
+      else if (event.key === "a" && selected && analyzable && current?.status !== "running")
+        void analyze(selected);
+      else if (event.key === "d" && current?.status === "done") setDetailsOpen((value) => !value);
+      else if (event.key === "o" && selected)
+        window.open(selected.url, "_blank", "noopener,noreferrer");
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   });
 
   const chosen = (pull: PullSummary): Option | null => {
@@ -138,6 +175,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         !state.analyses[keyOf(selected)] &&
         Object.keys(state.analyses).some((key) => key.startsWith(`${selected.number}:`))
       }
+      model={chosenModel(settings)}
+      detailsOpen={detailsOpen}
+      onDetailsOpen={setDetailsOpen}
       onAnalyze={() => void analyze(selected)}
       onOption={(option) => dispatch({ type: "option", key: keyOf(selected), option })}
       onRefresh={() => void query.refetch()}
@@ -177,7 +217,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       </div>
 
       {wide ? (
-        <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="relative min-w-0 flex-1 overflow-y-auto">
           {detail ?? (
             <div className="flex h-full flex-col items-start justify-center gap-3 px-8 text-[13px] text-muted">
               <GitMerge aria-hidden className="size-6" />
@@ -220,7 +260,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
             </SheetTitle>
             <div
               data-sheet-scroll
-              className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+              className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]"
             >
               {detail}
             </div>

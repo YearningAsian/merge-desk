@@ -19,11 +19,11 @@ export const liveSource: DataSource = {
     return PullList.parse(await response.json());
   },
 
-  async *analyze(pr, signal) {
+  async *analyze(pr, signal, model) {
     const response = await fetch("/api/live/analyze", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr }),
+      body: JSON.stringify(model ? { pr, model } : { pr }),
       signal,
     });
     if (!response.ok || !response.body) throw await failure(response);

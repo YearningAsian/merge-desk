@@ -6,7 +6,7 @@ import type { PullList } from "@/core/pulls";
 export interface DataSource {
   mode: "live" | "demo";
   listPullRequests(signal?: AbortSignal): Promise<PullList>;
-  analyze(pr: number, signal: AbortSignal): AsyncIterable<AnalyzeEvent>;
+  analyze(pr: number, signal: AbortSignal, model?: string): AsyncIterable<AnalyzeEvent>;
 }
 
 export class SourceError extends Error {

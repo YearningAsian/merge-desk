@@ -21,7 +21,7 @@ const CLEAN = prs.pulls.find((pull) => pull.head.ref === "demo/clean/rename")!.n
 const HELD = prs.pulls.find((pull) => pull.head.ref === "demo/held/caller")!.number;
 const DROP = prs.pulls.find((pull) => pull.head.ref.startsWith("demo/drop/"))!;
 const shot = (page: Page, name: string) =>
-  page.screenshot({ path: `test-results/e2e/screens/${name}.png`, fullPage: true });
+  page.screenshot({ path: `test-results/e2e/screens/${name}.png` });
 
 async function signIn(page: Page) {
   const value = await sealSession("YearningAsian", { env: { SESSION_SECRET: E2E_SESSION_SECRET } });
@@ -47,6 +47,15 @@ async function noHorizontalOverflow(page: Page) {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+}
+
+// The desk is one screen: only its panels scroll, never the page itself
+// (hidden status text must not stretch it).
+async function noPageScroll(page: Page) {
+  const extra = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(extra).toBeLessThanOrEqual(0);
 }
 
 async function noSeriousAxe(page: Page) {
@@ -112,10 +121,11 @@ test("desktop: keyboard to a conflicting pull request, its analysis and options"
   expect((await theirs.boundingBox())!.height).toBe(theirsHeight);
   await ours.getByRole("button", { expanded: true }).click();
 
-  // The slider starts on the recommended option; arrows and 1/2/3 move it.
+  // The slider starts on the recommended option; arrows and 1/2/3 move it
+  // from anywhere on the desk, without clicking the slider first.
   const slider = detail.getByRole("slider", { name: "Resolution" });
   await expect(slider).toHaveAttribute("aria-valuetext", /, recommended$/);
-  await slider.focus();
+  await expect(slider).not.toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(slider).toHaveAttribute("aria-valuetext", "Keep theirs, drop ours");
   await expect(detail.getByText("Drops").first()).toBeVisible();
@@ -127,9 +137,19 @@ test("desktop: keyboard to a conflicting pull request, its analysis and options"
   await noHorizontalOverflow(page);
   await shot(page, "desk-clean-1440");
 
-  await detail.getByRole("button", { name: /playground\/src\/api\.js/ }).click();
-  await expect(detail.getByRole("button", { name: "Theirs vs base" })).toBeVisible();
-  await page.waitForTimeout(600);
+  // The diff is drawn before it opens: the moment the row says expanded,
+  // the code is already there (never an empty box).
+  const fileRow = detail.getByRole("button", { name: /playground\/src\/api\.js/ });
+  await fileRow.click();
+  await expect(fileRow).toHaveAttribute("aria-expanded", "true");
+  const oursDiff = detail.getByRole("region", { name: /ours compared with the merge base/ });
+  expect(await oursDiff.getByText("getUser").count()).toBeGreaterThan(0);
+  await detail.getByRole("button", { name: "Theirs vs base" }).click();
+  await expect(
+    detail.getByRole("region", { name: /theirs compared with the merge base/ }).getByText("429"),
+  ).not.toHaveCount(0);
+  await page.waitForTimeout(300);
+  await noPageScroll(page);
   await shot(page, "desk-clean-diff-1440");
   await noSeriousAxe(page);
 });
@@ -145,6 +165,7 @@ test("phone: the list is home and the detail opens as a full-height sheet", asyn
   await expect(sheet.getByRole("heading", { level: 2 })).toContainText("minimum charge");
   await expect(sheet.getByRole("slider", { name: "Resolution" })).toBeVisible();
   await noHorizontalOverflow(page);
+  await noPageScroll(page);
   // The sheet's own scroll area must not scroll sideways either.
   const sideways = await sheet
     .locator("[data-sheet-scroll]")
@@ -192,6 +213,57 @@ test("a ?pr= link opens that pull request; the slider skips an option not offere
   await expect(detail.getByRole("button", { name: "Copy commands" })).toBeVisible();
   await shot(page, "desk-details-1440");
   await noSeriousAxe(page);
+});
+
+test("settings pick the model; keys open help and details; a reload reuses the analysis", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const bodies: Array<{ pr: number; model?: string }> = [];
+  await page.route("**/api/live/analyze", (route) => {
+    const body = route.request().postDataJSON() as { pr: number; model?: string };
+    bodies.push(body);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/x-ndjson",
+      body: byPr[body.pr]!,
+    });
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  const slider = detail.getByRole("slider", { name: "Resolution" });
+  await expect(slider).toBeVisible();
+  expect(bodies).toEqual([{ pr: CLEAN }]);
+
+  // D shows Details; ? lists the shortcuts; Escape closes the list.
+  await page.keyboard.press("d");
+  await expect(detail.getByRole("button", { name: "Details" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await page.keyboard.press("?");
+  const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(help).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(help).toHaveCount(0);
+
+  // A reload brings the finished analysis back without asking Gemini again.
+  await page.reload();
+  await expect(slider).toBeVisible();
+  expect(bodies).toHaveLength(1);
+
+  // Comma opens Settings; the next analysis asks for the chosen model.
+  await page.keyboard.press(",");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await expect(settings).toBeVisible();
+  await settings.getByRole("radio", { name: /Gemini 3\.8 Flash/ }).click();
+  await noSeriousAxe(page);
+  await shot(page, "settings-1440");
+  await page.keyboard.press("Escape");
+  await detail.getByRole("button", { name: "Analyze with Gemini 3.8 Flash" }).click();
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[1]).toEqual({ pr: CLEAN, model: "gemini-3.8-flash" });
 });
 
 test("an analysis that fails says why and offers to run it again", async ({ page }) => {

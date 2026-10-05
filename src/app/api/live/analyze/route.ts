@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AnalyzeEvent } from "@/core/events";
+import { ModelId } from "@/core/models";
 import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
 import { geminiAnalyst } from "@/server/gemini/analyze";
 import { GeminiClient } from "@/server/gemini/client";
@@ -14,7 +15,8 @@ export const maxDuration = 240;
 
 const REPO = CODE_ALLOWED_REPOS[0];
 const DEADLINE_MS = 210_000;
-const Body = z.object({ pr: z.number().int().positive() });
+// The model is optional and must be one of the Settings choices.
+const Body = z.object({ pr: z.number().int().positive(), model: ModelId.optional() });
 
 const refuse = (status: number, error: string) =>
   Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
   const guard = await guardLive(request, { mutating: true });
   if (!guard.ok) return guard.response;
   const body = Body.safeParse(await request.json().catch(() => null));
-  if (!body.success) return refuse(400, "Send the pull request number.");
+  if (!body.success) return refuse(400, "Send the pull request number (and a known model).");
 
   // A 404 here means the App has no installation on the repository (signing
   // in doesn't install it), not a missing pull request, so it is asked apart.
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
   if (pull.summary.fork) return refuse(409, "Pull requests from forks aren't supported.");
 
   const secret = requireEnv("SESSION_SECRET");
-  const client = GeminiClient.fromEnv();
+  const client = GeminiClient.fromEnv(process.env, body.data.model);
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), DEADLINE_MS);
   request.signal.addEventListener("abort", () => controller.abort(), { once: true });

@@ -53,6 +53,14 @@
     outline-offset: 2px;
   }
 
+  /* Settings > Reduce motion does the same as the system setting. */
+  :root[data-motion="reduce"] *,
+  :root[data-motion="reduce"] *::before,
+  :root[data-motion="reduce"] *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

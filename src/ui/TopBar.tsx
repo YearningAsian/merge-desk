@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/ui/primitives/badge";
+import { OverlayButtons } from "@/ui/Overlays";
 import { Button } from "@/ui/primitives/button";
 
 // The slim bar over every desk view: the product, the repository, and which
@@ -16,6 +17,7 @@ export function TopBar({ repo, login }: { repo: string; login?: string }) {
           <>
             <Badge tone="outline">Live mode</Badge>
             <span className="hidden text-[13px] text-muted sm:inline">@{login}</span>
+            <OverlayButtons />
             <form action="/api/auth/signout" method="post">
               <Button type="submit" variant="ghost" size="sm">
                 Sign out

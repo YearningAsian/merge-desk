@@ -1,48 +1,58 @@
 "use client";
 
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronRight, ExternalLink, RotateCw } from "lucide-react";
 import { useId, useState } from "react";
 import type { Option } from "@/core/honor";
+import { modelLabel } from "@/core/models";
 import type { PullSummary } from "@/core/pulls";
 import { AnalysisView } from "@/ui/Analysis";
 import { DevDetails } from "@/ui/DevDetails";
 import { Options } from "@/ui/Options";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
+import { Kbd } from "@/ui/primitives/kbd";
+import { Reveal } from "@/ui/primitives/reveal";
 import type { AnalysisState } from "@/ui/state";
 import { cn } from "@/ui/utils";
 
-// One pull request, top to bottom: header, Analysis, Options, then Details
-// for developers. Sections can be folded; Details starts folded. Pull
-// requests with nothing to resolve say so plainly instead of empty sections.
+// One pull request, top to bottom: header, Analysis, Options, then the run
+// (once one exists) and Details. Sections fold smoothly; Details starts
+// folded. Pull requests with nothing to resolve say so plainly instead of
+// showing empty sections.
 
-function Section({
+export function Section({
   title,
   aside,
+  open: controlled,
+  onOpenChange,
   defaultOpen = true,
   children,
 }: {
   title: string;
   aside?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [own, setOwn] = useState(defaultOpen);
+  const open = controlled ?? own;
+  const setOpen = onOpenChange ?? setOwn;
   const id = useId();
   return (
     <section className="border-t border-hair pt-3">
-      <h3 className="flex items-center gap-2">
+      <h3 className="flex min-h-7 items-center gap-2">
         <button
           type="button"
           aria-expanded={open}
           aria-controls={id}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => setOpen(!open)}
           className="-ml-1 inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-[13px] font-semibold text-ink hover:bg-ink/[0.05]"
         >
           <ChevronRight
             aria-hidden
             className={cn(
-              "size-4 text-muted transition-transform duration-150",
+              "size-4 text-muted transition-transform duration-200",
               open && "rotate-90",
             )}
           />
@@ -50,16 +60,16 @@ function Section({
         </button>
         {aside}
       </h3>
-      <div id={id} hidden={!open} className="pt-3 pb-5">
-        {children}
-      </div>
+      <Reveal open={open} id={id}>
+        <div className="pt-3 pb-5">{children}</div>
+      </Reveal>
     </section>
   );
 }
 
 function Notice({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-desk border border-hair bg-surface px-4 py-3 text-[13px]">
+    <div className="flex flex-wrap items-center gap-3 rounded-desk border border-hair bg-surface px-4 py-3 text-[13px] duration-150 animate-in fade-in-0">
       <span className="min-w-0 flex-1">{children}</span>
       {action}
     </div>
@@ -71,19 +81,30 @@ export function PrDetail({
   analysis,
   stale,
   titleId,
+  model,
+  detailsOpen,
+  onDetailsOpen,
   onAnalyze,
   onOption,
   onRefresh,
+  run,
 }: {
   pull: PullSummary;
   analysis: AnalysisState | undefined;
   stale: boolean;
   titleId: string;
+  // The model Settings asks for (undefined: the server's default).
+  model: string | undefined;
+  detailsOpen: boolean;
+  onDetailsOpen: (open: boolean) => void;
   onAnalyze: () => void;
   onOption: (option: Option) => void;
   onRefresh: () => void;
+  run?: React.ReactNode;
 }) {
   const branches = { ours: pull.head.ref, theirs: pull.base.ref };
+  const done = analysis?.status === "done" ? analysis : null;
+  const otherModel = done && model && model !== done.analysis.model ? model : null;
   return (
     <article
       aria-labelledby={titleId}
@@ -98,12 +119,12 @@ export function PrDetail({
           <span>by {pull.author}</span>
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <Badge tone="ours">ours</Badge>
-            <span className="truncate font-mono text-ink">{pull.head.ref}</span>
+            <span className="truncate font-mono text-ours-text">{pull.head.ref}</span>
           </span>
           <span>into</span>
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <Badge tone="theirs">theirs</Badge>
-            <span className="truncate font-mono text-ink">{pull.base.ref}</span>
+            <span className="truncate font-mono text-theirs-text">{pull.base.ref}</span>
           </span>
           {pull.demo ? <Badge tone="outline">DEMO</Badge> : null}
           <a
@@ -131,50 +152,52 @@ export function PrDetail({
         >
           GitHub is still working out whether this pull request can merge.
         </Notice>
+      ) : !analysis ? (
+        <Notice
+          action={
+            <Button size="sm" variant="primary" onClick={onAnalyze}>
+              {stale ? "Analyze again" : "Analyze"}
+              <Kbd className="border-white/30 bg-transparent text-white/80">A</Kbd>
+            </Button>
+          }
+        >
+          {stale
+            ? "This pull request changed since its last analysis."
+            : "Not analyzed yet. Nothing is sent to Gemini until you ask."}
+        </Notice>
       ) : (
         <>
-          {stale ? (
-            <div className="mb-4">
-              <Notice
-                action={
-                  <Button size="sm" variant="primary" onClick={onAnalyze}>
-                    Analyze again
-                  </Button>
-                }
-              >
-                This pull request changed since its last analysis.
-              </Notice>
-            </div>
-          ) : null}
           <Section
             title="Analysis"
             aside={
-              analysis?.status === "done" ? (
-                <span className="text-[12px] text-muted">{analysis.analysis.model}</span>
+              done ? (
+                <span className="ml-auto flex min-w-0 items-center gap-1 text-[12px] text-muted">
+                  <span className="truncate" title={done.analysis.model}>
+                    {modelLabel(done.analysis.model)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={onAnalyze}
+                    className="text-muted hover:text-ink"
+                  >
+                    <RotateCw aria-hidden className="size-3.5" />
+                    {otherModel ? `Analyze with ${modelLabel(otherModel)}` : "Analyze again"}
+                  </Button>
+                </span>
               ) : null
             }
           >
-            {stale && !analysis ? (
-              <p className="text-[13px] text-muted">Run a fresh analysis for the new commits.</p>
-            ) : (
-              <AnalysisView state={analysis} branches={branches} onRetry={onAnalyze} />
-            )}
+            <AnalysisView state={analysis} branches={branches} onRetry={onAnalyze} />
           </Section>
-          {analysis?.status === "done" ? (
+          {done ? (
             <>
               <Section title="Options">
-                <Options
-                  options={analysis.analysis.options}
-                  value={analysis.option}
-                  onChange={onOption}
-                />
+                <Options options={done.analysis.options} value={done.option} onChange={onOption} />
               </Section>
-              <Section
-                title="Details"
-                defaultOpen={false}
-                aside={<span className="text-[12px] text-muted">for developers</span>}
-              >
-                <DevDetails analysis={analysis.analysis} steps={analysis.steps} />
+              {run}
+              <Section title="Details" open={detailsOpen} onOpenChange={onDetailsOpen}>
+                <DevDetails analysis={done.analysis} steps={done.steps} />
               </Section>
             </>
           ) : null}

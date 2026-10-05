@@ -1,0 +1,232 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { GitMerge } from "lucide-react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
+import type { Option } from "@/core/honor";
+import type { PullSummary } from "@/core/pulls";
+import { useMediaQuery } from "@/ui/hooks/useMediaQuery";
+import { PrDetail } from "@/ui/PrDetail";
+import { PrList, type RowState } from "@/ui/PrList";
+import { Button } from "@/ui/primitives/button";
+import { Kbd } from "@/ui/primitives/kbd";
+import { Sheet, SheetContent, SheetTitle } from "@/ui/primitives/sheet";
+import { Skeleton } from "@/ui/primitives/skeleton";
+import type { DataSource } from "@/ui/sources/types";
+import { analysisKey, deskReducer, initialDesk } from "@/ui/state";
+
+// The one screen: pull requests on the left, the open one on the right.
+// Below 768 px the list is the home view and the detail opens as a
+// full-height sheet. Opening a conflicting pull request starts its analysis
+// once per exact head and base. The list re-reads every 30 s while the tab
+// is visible, so new commits mark an analysis out of date without a reload.
+
+const keyOf = (pull: PullSummary) => analysisKey(pull.number, pull.head.sha, pull.base.sha);
+const REFRESH_MS = 30_000;
+
+// The open pull request lives in the address (?pr=N), so a reload, a
+// bookmark or a link from GitHub lands on it again. Only the number goes in,
+// and it is only opened if it is in the list.
+function linkTo(pr: number | null) {
+  const url = new URL(window.location.href);
+  if (pr === null) url.searchParams.delete("pr");
+  else url.searchParams.set("pr", String(pr));
+  window.history.replaceState(window.history.state, "", url);
+}
+
+function ListSkeleton() {
+  return (
+    <div aria-hidden className="space-y-4 px-4 py-4">
+      {[0, 1, 2].map((key) => (
+        <div key={key} className="space-y-2">
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-3 w-3/5" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Desk({ source, repo }: { source: DataSource; repo: string }) {
+  const query = useQuery({
+    queryKey: [source.mode, repo, "pulls"],
+    queryFn: ({ signal }) => source.listPullRequests(signal),
+    refetchInterval: REFRESH_MS,
+    refetchIntervalInBackground: false,
+  });
+  const [state, dispatch] = useReducer(deskReducer, initialDesk);
+  const wide = useMediaQuery("(min-width: 768px)");
+  const running = useRef(new Map<string, AbortController>());
+  const lastOpened = useRef<number | null>(null);
+  const linked = useRef(false);
+
+  useEffect(() => {
+    const controllers = running.current;
+    return () => controllers.forEach((controller) => controller.abort());
+  }, []);
+
+  const pulls = query.data?.pulls ?? [];
+  const selected = pulls.find((pull) => pull.number === state.selected) ?? null;
+
+  const analyze = useCallback(
+    async (pull: PullSummary) => {
+      const key = keyOf(pull);
+      running.current.get(key)?.abort();
+      const controller = new AbortController();
+      running.current.set(key, controller);
+      dispatch({ type: "analysis/start", key });
+      try {
+        for await (const event of source.analyze(pull.number, controller.signal))
+          dispatch({ type: "analysis/event", key, event });
+        dispatch({ type: "analysis/error", key, reason: "The analysis ended without a result." });
+      } catch (error) {
+        if (!controller.signal.aborted)
+          dispatch({
+            type: "analysis/error",
+            key,
+            reason: error instanceof Error ? error.message : "The analysis failed.",
+          });
+      } finally {
+        if (running.current.get(key) === controller) running.current.delete(key);
+      }
+    },
+    [source],
+  );
+
+  const open = (number: number) => {
+    lastOpened.current = number;
+    linkTo(number);
+    dispatch({ type: "select", pr: number });
+    const pull = pulls.find((item) => item.number === number);
+    if (pull && pull.mergeable === "conflicting" && !pull.fork && !state.analyses[keyOf(pull)]) {
+      const earlier = Object.keys(state.analyses).some((key) => key.startsWith(`${number}:`));
+      if (!earlier) void analyze(pull);
+    }
+  };
+
+  // Once, when the first list arrives: open the pull request in the address.
+  useEffect(() => {
+    if (linked.current || !query.data) return;
+    linked.current = true;
+    const pr = Number(new URLSearchParams(window.location.search).get("pr"));
+    if (query.data.pulls.some((pull) => pull.number === pr)) open(pr);
+  });
+
+  const chosen = (pull: PullSummary): Option | null => {
+    const analysis = state.analyses[keyOf(pull)];
+    return analysis?.status === "done" ? analysis.option : null;
+  };
+
+  const rowState = (pull: PullSummary): RowState => {
+    if (pull.mergeable === "mergeable") return "mergeable";
+    if (pull.mergeable === "checking") return "checking";
+    const analysis = state.analyses[keyOf(pull)];
+    if (!analysis) return "needs";
+    return analysis.status === "running"
+      ? "running"
+      : analysis.status === "done"
+        ? "analyzed"
+        : "failed";
+  };
+
+  const detail = selected ? (
+    <PrDetail
+      pull={selected}
+      titleId={`pr-title-${selected.number}`}
+      analysis={state.analyses[keyOf(selected)]}
+      stale={
+        !state.analyses[keyOf(selected)] &&
+        Object.keys(state.analyses).some((key) => key.startsWith(`${selected.number}:`))
+      }
+      onAnalyze={() => void analyze(selected)}
+      onOption={(option) => dispatch({ type: "option", key: keyOf(selected), option })}
+      onRefresh={() => void query.refetch()}
+    />
+  ) : null;
+
+  return (
+    <main
+      id="main"
+      tabIndex={-1}
+      aria-label="Merge Desk"
+      className="flex min-h-0 flex-1 outline-none"
+    >
+      <div className="flex w-full min-w-0 flex-col border-hair bg-surface md:w-[360px] md:shrink-0 md:border-r">
+        {query.isPending ? (
+          <ListSkeleton />
+        ) : query.isError ? (
+          <div role="alert" className="space-y-3 px-4 py-5 text-[13px]">
+            <p className="font-semibold">Couldn&apos;t load pull requests.</p>
+            <p className="text-muted">{query.error.message}</p>
+            <Button size="sm" onClick={() => void query.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <PrList
+            pulls={pulls}
+            selected={state.selected}
+            rowState={rowState}
+            chosen={chosen}
+            updatedAt={query.dataUpdatedAt}
+            refreshing={query.isFetching}
+            onRefresh={() => void query.refetch()}
+            onOpen={open}
+          />
+        )}
+      </div>
+
+      {wide ? (
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          {detail ?? (
+            <div className="flex h-full flex-col items-start justify-center gap-3 px-8 text-[13px] text-muted">
+              <GitMerge aria-hidden className="size-6" />
+              <p className="max-w-sm">
+                Open a pull request to see what each side meant and how the conflict could be
+                resolved.
+              </p>
+              <p className="flex items-center gap-1.5">
+                <Kbd>J</Kbd>
+                <Kbd>K</Kbd> to move, <Kbd>Enter</Kbd> to open
+              </p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Sheet
+          open={selected !== null}
+          onOpenChange={(isOpen) => {
+            if (isOpen) return;
+            linkTo(null);
+            dispatch({ type: "select", pr: null });
+          }}
+        >
+          <SheetContent
+            aria-describedby={undefined}
+            backLabel="Pull requests"
+            backName="Back to pull requests"
+            onCloseAutoFocus={(event) => {
+              // Back to the row that opened it, not the top of the page.
+              event.preventDefault();
+              document
+                .querySelector<HTMLButtonElement>(`[data-pr="${lastOpened.current}"]`)
+                ?.focus();
+            }}
+          >
+            <SheetTitle asChild>
+              <span className="sr-only">
+                {selected ? `Pull request #${selected.number}` : "Pull request"}
+              </span>
+            </SheetTitle>
+            <div
+              data-sheet-scroll
+              className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+            >
+              {detail}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+    </main>
+  );
+}

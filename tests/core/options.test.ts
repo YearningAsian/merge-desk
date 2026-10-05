@@ -22,7 +22,12 @@ const model = (overrides: Partial<ModelAnalysis["options"][number]>[] = []) =>
   [
     { kind: "combine", summary: "getUser with the retry", recommended: true, reason: "Both fit." },
     { kind: "keep_ours", summary: "getUser, no retry", recommended: false, reason: "" },
-    { kind: "keep_theirs", summary: "fetchUser with retry", recommended: false, reason: "" },
+    {
+      kind: "keep_theirs",
+      summary: "fetchUser with retry",
+      recommended: false,
+      reason: "Pick it if callers still use fetchUser.",
+    },
   ].map((option, i) => ({ ...option, ...overrides[i] })) as ModelAnalysis["options"];
 
 describe("resolveOptions", () => {
@@ -41,7 +46,9 @@ describe("resolveOptions", () => {
     });
     // Only commits that touched a conflicted file count as dropped work.
     expect(keepTheirs!.drops!.commits.map((c) => c.sha[0])).toEqual(["a"]);
+    // Every option keeps its own reason; an empty one shows nothing.
     expect(combine!.reason).toBe("Both fit.");
+    expect(keepTheirs!.reason).toBe("Pick it if callers still use fetchUser.");
     expect(keepOurs!.reason).toBeNull();
   });
 

@@ -1,0 +1,68 @@
+{
+  "repo": "YearningAsian/merge-desk",
+  "pulls": [
+    {
+      "number": 3,
+      "title": "[Demo] Parse price strings in toCents",
+      "author": "YearningAsian",
+      "url": "https://github.com/YearningAsian/merge-desk/pull/3",
+      "draft": false,
+      "head": {
+        "ref": "demo/drop/fix-b",
+        "sha": "d32055264f2be740c52c32093f766dce73438942",
+        "repo": "YearningAsian/merge-desk"
+      },
+      "base": {
+        "ref": "demo/base",
+        "sha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+      },
+      "demo": true,
+      "mergeable": "conflicting",
+      "fork": false,
+      "filesBothSides": ["playground/src/money.js"],
+      "updatedAt": "2026-10-05T07:11:07Z"
+    },
+    {
+      "number": 2,
+      "title": "[Demo] Add a minimum charge and late fees",
+      "author": "YearningAsian",
+      "url": "https://github.com/YearningAsian/merge-desk/pull/2",
+      "draft": false,
+      "head": {
+        "ref": "demo/held/caller",
+        "sha": "999e936f3866bf011ffa6d36af9c98760f97789a",
+        "repo": "YearningAsian/merge-desk"
+      },
+      "base": {
+        "ref": "demo/base",
+        "sha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+      },
+      "demo": true,
+      "mergeable": "conflicting",
+      "fork": false,
+      "filesBothSides": ["playground/src/billing.js"],
+      "updatedAt": "2026-10-05T07:11:00Z"
+    },
+    {
+      "number": 1,
+      "title": "[Demo] Rename fetchUser to getUser",
+      "author": "YearningAsian",
+      "url": "https://github.com/YearningAsian/merge-desk/pull/1",
+      "draft": false,
+      "head": {
+        "ref": "demo/clean/rename",
+        "sha": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+        "repo": "YearningAsian/merge-desk"
+      },
+      "base": {
+        "ref": "demo/base",
+        "sha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+      },
+      "demo": true,
+      "mergeable": "conflicting",
+      "fork": false,
+      "filesBothSides": ["playground/src/api.js"],
+      "updatedAt": "2026-10-05T07:10:53Z"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* Tokens from docs/design/BRAND.md. Identity colors mark sides and states;
    the *-text roles are for small text (all >= 4.5:1 on surfaces and washes). */

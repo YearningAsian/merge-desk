@@ -63,7 +63,7 @@ export function analyzePrompt(input: Parameters<Analyst>[0]): string {
     "   - keep_ours: keep ours inside the conflicts and drop theirs.",
     "   - keep_theirs: keep theirs inside the conflicts and drop ours.",
     "   Recommend combine when both changes can live together. When both sides change the same behavior in different ways, recommend keeping one side (the newer or more complete one) and say why.",
-    "   Exactly one option has recommended true and a one-sentence reason. The others have an empty reason.",
+    "   Exactly one option has recommended true. Every option has a one-sentence reason: for the recommended one, why it is the best choice; for the others, when a reviewer would pick it instead.",
     "   summary: one line on what the code does after that option.",
     input.retry
       ? `Your previous answer was rejected (${input.retry.reason}). Follow the schema and the rules exactly.`

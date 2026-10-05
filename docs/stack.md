@@ -24,7 +24,7 @@ This is a **planned dependency baseline**. There is no application scaffold or l
 |---|---|---|---|
 | `tailwindcss` | 4.3.3 | [Registry](https://registry.npmjs.org/tailwindcss/4.3.3) | CSS-first design tokens, density, responsive layouts |
 | `@tailwindcss/postcss` | 4.3.3 | [Registry](https://registry.npmjs.org/@tailwindcss%2Fpostcss/4.3.3) | Matching Tailwind PostCSS integration |
-| `shadcn` | 4.21.1 (CLI) | [Registry](https://registry.npmjs.org/shadcn/4.21.1) | Generates owned component source; development tool |
+| `shadcn` | 4.21.2 (CLI, patch over the planned 4.21.1; rechecked 2026-10-05) | [Registry](https://registry.npmjs.org/shadcn/4.21.2) | Generates owned component source; development tool. Used as `shadcn view` to copy the new-york-v4 sources into `src/ui/primitives`, because `init` would rewrite the BRAND tokens in `globals.css` |
 | `radix-ui` | 1.6.7 | [Registry](https://registry.npmjs.org/radix-ui/1.6.7) | Accessible primitives under the copied components |
 | `lucide-react` | 1.52.0 | [Registry](https://registry.npmjs.org/lucide-react/1.52.0) | Named, tree-shaken SVG icons |
 | `clsx` | 2.1.1 | [Registry](https://registry.npmjs.org/clsx/2.1.1) | Conditional classes |

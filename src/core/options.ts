@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Option, Side } from "./honor";
 
 // Resolution options. The model names the kinds of option, a one-line
-// summary each and which one it recommends; what each option keeps and drops
+// summary and a reason each, and which one it recommends; what each option keeps and drops
 // (commits, files, authors) is worked out here from git's data, never taken
 // from the model. Anything that doesn't fit the rules is rejected, so a
 // malformed answer can't reach the screen.
@@ -53,7 +53,7 @@ export const ModelAnalysis = z.object({
           .string()
           .max(300)
           .describe(
-            "For the recommended option: one sentence a reviewer would accept. Empty for the others.",
+            "One sentence a reviewer would accept: for the recommended option, why it is the best choice; for the others, when to pick it instead.",
           ),
       }),
     )
@@ -142,7 +142,9 @@ export function resolveOptions(
       label: OPTION_LABELS[option.kind],
       summary: option.summary.trim(),
       recommended: option.recommended,
-      reason: option.recommended ? option.reason.trim() : null,
+      // Required for the recommended option (checked above); the others show
+      // theirs when the model gave one.
+      reason: option.reason.trim() || null,
       keeps:
         option.kind === "combine"
           ? [work.ours, work.theirs]

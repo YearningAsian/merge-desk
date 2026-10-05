@@ -74,7 +74,7 @@
 | 0.2 | Scope approved through the event's skill pack (`1-start`, `2-scope`) | `devpost/scope.md`, `devpost/scope.html` | A | ✅ | Approved 2026-10-04 |
 | 0.3 | Brand direction | `docs/design/BRAND.md` | A | ✅ | |
 | 0.4 | H-rows listed and assigned | below | A | ✅ | |
-| 0.5 | PRD approved (`3-prd`) | `devpost/prd.md`, `devpost/prd.html` | A | ⬜ | Event Stage One needs it in the repo |
+| 0.5 | PRD approved (`3-prd`) | `devpost/prd.md`, `devpost/prd.html` | A | ✅ | Approved 2026-10-04 with changes: demo mode (recorded real runs, public) + live mode (learner only); recoverable drops now; never a fake pass; build priority held → verified → chosen drop → options → rest |
 | 0.6 | Spec approved (`4-spec`) | `devpost/spec.md`, `devpost/spec.html` | A | ⬜ | Gates all code (`5-build` builds from it) |
 
 ### Phase 1: Scaffold

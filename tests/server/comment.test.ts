@@ -89,7 +89,7 @@ describe("upsertRecord", () => {
   it("folds a duplicate record (another instance) into the oldest, deleting nothing", async () => {
     const own = (id: number, entries: RecordEntry[]): Stored => ({
       id,
-      body: renderRecord(entries, { deskUrl: null, seal }),
+      body: renderRecord(entries, { deskUrl: null, seal, scope: "YearningAsian/merge-desk#2" }),
       performed_via_github_app: { id: APP_ID },
     });
     const { octokit, comments, records } = thread([
@@ -104,7 +104,11 @@ describe("upsertRecord", () => {
 
   it("notices an update lost to a concurrent writer and applies it again", async () => {
     let clobbered = false;
-    const original = renderRecord([entry("first")], { deskUrl: null, seal });
+    const original = renderRecord([entry("first")], {
+      deskUrl: null,
+      seal,
+      scope: "YearningAsian/merge-desk#2",
+    });
     const { octokit } = thread(
       [{ id: 1, body: original, performed_via_github_app: { id: APP_ID } }],
       {
@@ -123,10 +127,11 @@ describe("upsertRecord", () => {
   });
 
   it("ignores a record edited outside Merge Desk and starts a new one, without overwriting it", async () => {
-    const edited = renderRecord([entry("first")], { deskUrl: null, seal }).replace(
-      '"who":"YearningAsian"',
-      '"who":"someone-else"',
-    );
+    const edited = renderRecord([entry("first")], {
+      deskUrl: null,
+      seal,
+      scope: "YearningAsian/merge-desk#2",
+    }).replace('"who":"YearningAsian"', '"who":"someone-else"');
     const { octokit, comments } = thread([
       { id: 1, body: edited, performed_via_github_app: { id: APP_ID } },
     ]);
@@ -137,7 +142,11 @@ describe("upsertRecord", () => {
   });
 
   it("never treats someone else's comment with the marker as the record", async () => {
-    const forged = renderRecord([entry("forged")], { deskUrl: null, seal });
+    const forged = renderRecord([entry("forged")], {
+      deskUrl: null,
+      seal,
+      scope: "YearningAsian/merge-desk#2",
+    });
     const { octokit } = thread([{ id: 1, body: forged, performed_via_github_app: null }]);
     const read = await readRecord(octokit, { repo: input("x").repo, pr: 2, appId: APP_ID, seal });
     expect(read).toEqual({ ok: true, entries: [], note: null });

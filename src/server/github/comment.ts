@@ -52,7 +52,7 @@ async function listOwn(
     )
     .sort((a, b) => a.id - b.id)
     .map((comment) => {
-      const parsed = parseRecord(comment.body ?? "", seal);
+      const parsed = parseRecord(comment.body ?? "", seal, `${repo}#${pr}`);
       return { id: comment.id, entries: parsed.ok ? parsed.entries : null };
     });
 }
@@ -109,6 +109,7 @@ export function upsertRecord(
       const body = renderRecord(entries, {
         deskUrl: input.deskUrl,
         seal: input.seal,
+        scope: `${input.repo}#${input.pr}`,
         note: valid.length < own.length ? EDITED_NOTE : null,
       });
       if (valid[0]) {

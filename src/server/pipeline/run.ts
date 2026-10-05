@@ -234,6 +234,28 @@ export function signRun(record: RunRecord, signer: RunSigner): string {
   return sign(runScope(RunRecord.parse(record), signer.user), record, signer);
 }
 
+// Land accepts signed runs up to 4,000,000 characters. A run whose signed
+// form would be larger is signed as not landable, with that reason, so its
+// refusal later says why instead of failing on size.
+export const MAX_LANDABLE_TOKEN = 3_800_000;
+export function signLandableRun(
+  record: RunRecord,
+  signer: RunSigner,
+  max = MAX_LANDABLE_TOKEN,
+): string {
+  const token = signRun(record, signer);
+  if (token.length <= max) return token;
+  return signRun(
+    {
+      ...record,
+      tree: null,
+      changes: null,
+      changesNote: "the change is too large to land from Merge Desk",
+    },
+    signer,
+  );
+}
+
 export function verifyRun(
   token: string,
   expected: { user: string; repo: string; pr: number },

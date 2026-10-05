@@ -5,6 +5,7 @@ import { appIdentity, installationOctokit, splitRepo } from "@/server/github/app
 import { upsertRecord } from "@/server/github/comment";
 import { LandError, landMerge } from "@/server/github/land";
 import { readPull } from "@/server/github/prs";
+import { withDeadline } from "@/server/deadline";
 import { checkLand } from "@/server/guard";
 import { verifyRun } from "@/server/pipeline/run";
 import { recordSeal } from "@/server/sign";
@@ -22,6 +23,8 @@ const answer = (status: number, outcome: Outcome, body: Record<string, unknown>)
   Response.json({ outcome, ...body }, { status, headers: { "cache-control": "no-store" } });
 const refused = (status: number, reason: string) => answer(status, "REFUSED", { reason });
 
+// Budget for the optional work after the branch moved (maxDuration is 60 s).
+const AFTER_LAND_MS = 15_000;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Lands a verified run on the pull request's own branch, then records it.
@@ -99,41 +102,52 @@ export async function POST(request: Request) {
   }
 
   // The branch moved. Ask GitHub what it now thinks (it may still be working
-  // it out) and record the decision; neither can undo the Land.
-  let mergeable: "mergeable" | "conflicting" | "checking" = "checking";
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      const after = await readPull(octokit, REPO, pr);
-      if (after.summary.mergeable !== "checking") {
-        mergeable = after.summary.mergeable;
+  // it out) and record the decision. Neither can undo the Land, and both get
+  // a time budget, so the LANDED answer always arrives before the function's
+  // limit (a timeout here must never read as UNKNOWN).
+  const afterLand = async () => {
+    let mergeable: "mergeable" | "conflicting" | "checking" = "checking";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const after = await readPull(octokit, REPO, pr);
+        if (after.summary.mergeable !== "checking") {
+          mergeable = after.summary.mergeable;
+          break;
+        }
+      } catch {
         break;
       }
-    } catch {
-      break;
+      await pause(1_000);
     }
-    await pause(1_000);
-  }
-
-  let record: { ok: boolean; reason?: string };
-  try {
-    const app = await appIdentity();
-    const result = await upsertRecord(octokit, {
-      repo: REPO,
-      pr,
-      appId: app.id,
-      deskUrl: deskLink(request, pr),
-      seal: recordSeal(requireEnv("SESSION_SECRET")),
-      entry: entryFor(run, {
-        action: run.drops ? "dropped" : "landed",
-        who: guard.login,
-        refs,
-        commit,
-      }),
-    });
-    record = result.ok ? { ok: true } : { ok: false, reason: result.reason };
-  } catch {
-    record = { ok: false, reason: "GitHub didn't accept the record update." };
-  }
+    let record: { ok: boolean; reason?: string };
+    try {
+      const app = await appIdentity();
+      const result = await upsertRecord(octokit, {
+        repo: REPO,
+        pr,
+        appId: app.id,
+        deskUrl: deskLink(request, pr),
+        seal: recordSeal(requireEnv("SESSION_SECRET")),
+        entry: entryFor(run, {
+          action: run.drops ? "dropped" : "landed",
+          who: guard.login,
+          refs,
+          commit,
+        }),
+      });
+      record = result.ok ? { ok: true } : { ok: false, reason: result.reason };
+    } catch {
+      record = { ok: false, reason: "GitHub didn't accept the record update." };
+    }
+    return { mergeable, record };
+  };
+  const { mergeable, record } = await withDeadline(afterLand(), AFTER_LAND_MS, {
+    mergeable: "checking" as const,
+    record: {
+      ok: false,
+      reason: "the record update took too long; it may still appear on the pull request",
+    },
+  });
 
   return answer(200, "LANDED", { commit, branch: refs.head, mergeable, record });
 }

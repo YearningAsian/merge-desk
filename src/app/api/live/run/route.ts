@@ -9,7 +9,7 @@ import { geminiProposer } from "@/server/gemini/propose";
 import { installationOctokit } from "@/server/github/app";
 import { readPull } from "@/server/github/prs";
 import { verifyAnalysis } from "@/server/pipeline/analyze";
-import { runPipeline, signRun } from "@/server/pipeline/run";
+import { runPipeline, signLandableRun } from "@/server/pipeline/run";
 import { liveRunner } from "@/server/runner";
 import type { AppliedProposal } from "@/server/runner/types";
 import { guardLive } from "@/server/session";
@@ -19,8 +19,6 @@ export const maxDuration = 240;
 
 const REPO = CODE_ALLOWED_REPOS[0];
 const DEADLINE_MS = 210_000;
-// Land accepts signed runs up to 4,000,000 characters; stay well inside it.
-const MAX_LANDABLE_TOKEN = 3_800_000;
 
 // The browser sends back the analysis this server signed, the option chosen
 // on it, and optionally a one-line steer and a model from the Settings list.
@@ -159,18 +157,7 @@ export async function POST(request: Request) {
             steer: body.data.steer || null,
             finishedAt: new Date().toISOString(),
           };
-          let token = signRun(record, { user: guard.login, secret });
-          if (token.length > MAX_LANDABLE_TOKEN)
-            token = signRun(
-              {
-                ...record,
-                tree: null,
-                changes: null,
-                changesNote: "the change is too large to land from Merge Desk",
-              },
-              { user: guard.login, secret },
-            );
-          send({ ...event, token });
+          send({ ...event, token: signLandableRun(record, { user: guard.login, secret }) });
         }
         if (!ended) stop(`Stopped after ${DEADLINE_MS / 1000} s. Nothing was pushed.`);
       } catch {

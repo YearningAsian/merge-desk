@@ -39,8 +39,9 @@ const entry = (patch: Partial<RecordEntry> = {}): RecordEntry => ({
   ...patch,
 });
 
+const SCOPE = "YearningAsian/merge-desk#3";
 const render = (entries: RecordEntry[], deskUrl: string | null = null) =>
-  renderRecord(entries, { deskUrl, seal });
+  renderRecord(entries, { deskUrl, seal, scope: SCOPE });
 
 describe("decision record", () => {
   it("renders a readable table and reads the same entries back", () => {
@@ -54,14 +55,14 @@ describe("decision record", () => {
     expect(body).toContain("Dropped `ccccccc`");
     expect(body).toContain("Ours parses strings &#124; and validates them");
     expect(body).toContain("[Open in Merge Desk](https://desk.example/live?pr=3)");
-    expect(parseRecord(body, seal)).toEqual({ ok: true, entries });
+    expect(parseRecord(body, seal, SCOPE)).toEqual({ ok: true, entries });
   });
 
   it("can't be closed early by text inside it", () => {
     const body = render([entry()]);
     // Exactly two comment closers: the marker's and the data block's.
     expect(body.match(/-->/g)).toHaveLength(2);
-    const parsed = parseRecord(body, seal);
+    const parsed = parseRecord(body, seal, SCOPE);
     expect(parsed.ok && parsed.entries[0]!.dropped!.commits[0]!.subject).toBe(
       "Round cents --> with an epsilon -- nudge",
     );
@@ -78,7 +79,7 @@ describe("decision record", () => {
     ];
     const body = render(entries);
     expect(body.split("<!-- merge-desk:data")).toHaveLength(2);
-    expect(parseRecord(body, seal)).toEqual({ ok: true, entries });
+    expect(parseRecord(body, seal, SCOPE)).toEqual({ ok: true, entries });
   });
 
   // Review round 1, M1: mentions, links, images and raw HTML stay inert.
@@ -108,20 +109,43 @@ describe("decision record", () => {
     const body = render([entry()]);
     const edited = body.replace('"who":"YearningAsian"', '"who":"someone-else"');
     expect(edited).not.toBe(body);
-    expect(parseRecord(edited, seal)).toMatchObject({ ok: false });
+    expect(parseRecord(edited, seal, SCOPE)).toMatchObject({ ok: false });
   });
 
   it("treats a comment without the marker as not ours, and refuses broken or doubled data", () => {
-    expect(parseRecord("Looks good to me", seal)).toEqual({ ok: true, entries: [] });
+    expect(parseRecord("Looks good to me", seal, SCOPE)).toEqual({ ok: true, entries: [] });
     const edited = render([entry()]).replace('"action":"dropped"', '"action":"merged"');
-    expect(parseRecord(edited, seal)).toMatchObject({ ok: false });
-    expect(parseRecord(`${MARKER}\nthe data block was deleted`, seal)).toMatchObject({
+    expect(parseRecord(edited, seal, SCOPE)).toMatchObject({ ok: false });
+    expect(parseRecord(`${MARKER}\nthe data block was deleted`, seal, SCOPE)).toMatchObject({
       ok: false,
     });
     const body = render([entry()]);
     expect(
-      parseRecord(`${body}\n${body.slice(body.indexOf("<!-- merge-desk:data"))}`, seal),
+      parseRecord(`${body}\n${body.slice(body.indexOf("<!-- merge-desk:data"))}`, seal, SCOPE),
     ).toMatchObject({ ok: false });
+  });
+
+  // Review round 2, L1: bare www. and e-mail autolinks can't form either.
+  it("breaks www. and e-mail autolinks", () => {
+    const body = render([
+      entry({
+        reason: "see www.evil.example/phish or mail someone@evil.example",
+        dropped: {
+          ...entry().dropped!,
+          commits: [{ sha: "d".repeat(40), subject: "www.evil.example" }],
+        },
+      }),
+    ]);
+    const visible = body.slice(0, body.indexOf("<!-- merge-desk:data"));
+    expect(visible).not.toMatch(/www\.[a-z]/i);
+    expect(visible).not.toMatch(/@evil/);
+  });
+
+  // Review round 2, L2: a sealed block belongs to one pull request.
+  it("refuses a sealed block moved from another pull request", () => {
+    const body = render([entry()]);
+    expect(parseRecord(body, seal, "YearningAsian/merge-desk#4")).toMatchObject({ ok: false });
+    expect(parseRecord(body, seal, SCOPE)).toMatchObject({ ok: true });
   });
 
   it("records a retried request once", () => {

@@ -48,9 +48,11 @@ export type RecordSeal = {
 
 const Data = z.object({ v: z.literal(1), entries: z.unknown(), mac: z.string().max(200) });
 
-// Entries in schema key order, so the sealed text is the same however they
-// were built or read back.
-const canonical = (entries: RecordEntry[]) => JSON.stringify(Entries.parse(entries));
+// What is sealed: the repository and pull request, then the entries in
+// schema key order (the same however they were built or read back), so a
+// sealed block can't be moved to another pull request.
+const canonical = (scope: string, entries: RecordEntry[]) =>
+  `${scope}\n${JSON.stringify(Entries.parse(entries))}`;
 
 export type ParsedRecord = { ok: true; entries: RecordEntry[] } | { ok: false; reason: string };
 
@@ -58,7 +60,7 @@ export type ParsedRecord = { ok: true; entries: RecordEntry[] } | { ok: false; r
 // simply not ours. One with the marker is accepted only with exactly one
 // data block, at the very end, whose seal checks out; anything else was
 // changed outside Merge Desk and is refused, never trusted or overwritten.
-export function parseRecord(body: string, seal: RecordSeal): ParsedRecord {
+export function parseRecord(body: string, seal: RecordSeal, scope: string): ParsedRecord {
   if (!body.includes(MARKER)) return { ok: true, entries: [] };
   const edited = {
     ok: false as const,
@@ -71,7 +73,7 @@ export function parseRecord(body: string, seal: RecordSeal): ParsedRecord {
   try {
     const data = Data.parse(JSON.parse(body.slice(start + DATA_OPEN.length, end)));
     const entries = Entries.parse(data.entries);
-    return seal.check(canonical(entries), data.mac) ? { ok: true, entries } : edited;
+    return seal.check(canonical(scope, entries), data.mac) ? { ok: true, entries } : edited;
   } catch {
     return edited;
   }
@@ -93,8 +95,9 @@ const WORDS: Record<RecordAction, string> = {
 
 // Text from commits, branches, authors and the model, made inert for a
 // GitHub comment: every character that could start markup, a mention, a
-// link, an issue reference, a code span or a comment is written as an HTML
-// entity (shown as itself), and line breaks become spaces.
+// link (including bare www. and e-mail autolinks), an issue reference, a
+// code span or a comment is written as an HTML entity (shown as itself), and
+// line breaks become spaces.
 const ENTITIES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -113,12 +116,13 @@ const ENTITIES: Record<string, string> = {
   "*": "&#42;",
   _: "&#95;",
   "~": "&#126;",
+  ".": "&#46;",
 };
 const cell = (text: string) =>
   text
     .replace(/[\r\n\t]+/g, " ")
     .trim()
-    .replace(/[&<>@[\]()\\`|#:!*_~]/g, (char) => ENTITIES[char]!);
+    .replace(/[&<>@[\]()\\`|#:!*_~.]/g, (char) => ENTITIES[char]!);
 
 const checksText = (checks: RecordEntry["checks"]) =>
   checks.length
@@ -129,7 +133,8 @@ const sha7 = (sha: string) => (/^[0-9a-f]{7,40}$/.test(sha) ? `\`${sha.slice(0, 
 
 export function renderRecord(
   entries: RecordEntry[],
-  options: { deskUrl: string | null; seal: RecordSeal; note?: string | null },
+  // `scope` is "owner/repo#pr", the pull request this record belongs to.
+  options: { deskUrl: string | null; seal: RecordSeal; scope: string; note?: string | null },
 ): string {
   const rows = entries
     .map((entry) =>
@@ -153,7 +158,7 @@ export function renderRecord(
       return `- ${WORDS[entry.action]} by ${cell(entry.who)}: ${dropped.side} (${cell(dropped.branch)}) by ${cell(dropped.authors.join(", ") || "nobody")} in ${cell(dropped.files.join(", "))}: ${commits || "no commits"}. The commits stay in the branch history.`;
     });
   const normalized = Entries.parse(entries);
-  const text = JSON.stringify(normalized);
+  const text = canonical(options.scope, normalized);
   // JSON can't close the hidden block: "--" is written as an escape.
   const data = JSON.stringify({ v: 1, entries: normalized, mac: options.seal.seal(text) }).replace(
     /--/g,

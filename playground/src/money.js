@@ -5,5 +5,5 @@ export function toCents(amount) {
   if (!Number.isFinite(dollars)) {
     throw new TypeError(`Not an amount: ${amount}`);
   }
-  return Math.round(dollars * 100);
+  return Math.round((dollars + Number.EPSILON) * 100);
 }

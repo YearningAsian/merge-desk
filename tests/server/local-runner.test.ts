@@ -1,7 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LocalRunner } from "@/server/runner/local";
 import { candidate, readRepo } from "../helpers/scenarios";
@@ -23,7 +31,7 @@ const git = (...args: string[]) =>
 function commitOverlay(from: string, overlay: string, message: string) {
   git("checkout", "--quiet", "--detach", from);
   cpSync(join(ROOT, overlay), repo, { recursive: true });
-  git("add", "--all");
+  git("add", "--", "playground");
   git(
     "-c",
     "user.name=Test",
@@ -41,7 +49,7 @@ beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), "merge-desk-runner-src-"));
   git("init", "--quiet", "--initial-branch=main");
   cpSync(join(ROOT, "playground"), join(repo, "playground"), { recursive: true });
-  git("add", "--all");
+  git("add", "--", "playground");
   git(
     "-c",
     "user.name=Test",
@@ -57,7 +65,15 @@ beforeAll(() => {
   ours = commitOverlay(base, "demo/scenarios/clean/ours", "Rename fetchUser to getUser");
 }, 60_000);
 
-afterAll(() => rmSync(repo, { recursive: true, force: true }));
+afterAll(() => {
+  const path = resolve(repo);
+  if (
+    !path.startsWith(resolve(tmpdir()) + sep) ||
+    !basename(path).startsWith("merge-desk-runner-src-")
+  )
+    throw new Error("Refusing to remove an unexpected fixture path");
+  rmSync(path, { recursive: true, force: true });
+});
 
 describe("LocalRunner on a real git merge", () => {
   it("prepares the merge: conflicted file with all three versions, diff3 markers and each side's commits", async () => {
@@ -149,6 +165,112 @@ describe("LocalRunner on a real git merge", () => {
       await runner.dispose();
     }
   }, 60_000);
+
+  it("holds when a repository test passes after rewriting the captured candidate", async () => {
+    git("checkout", "--quiet", "--detach", ours);
+    const mutator = "playground/test/integrity.test.js";
+    writeFileSync(
+      join(repo, mutator),
+      `
+import { readFileSync, writeFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+test("rewrites the candidate before importing it", async () => {
+  const path = new URL("../src/api.js", import.meta.url);
+  const original = readFileSync(path, "utf8");
+  writeFileSync(path, original.replace("reviewMustBe42 = 0", "reviewMustBe42 = 42"));
+  const loaded = await import("../src/api.js?modified");
+  assert.equal(loaded.reviewMustBe42, 42);
+});
+`,
+    );
+    git("add", "--", mutator);
+    git(
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "--quiet",
+      "-m",
+      "Test tries to rewrite candidate",
+    );
+    const attackerHead = git("rev-parse", "HEAD");
+    const runner = new LocalRunner({ source: repo });
+    try {
+      const applied = await runner.applyProposal({ head: attackerHead, base: theirs }, [
+        {
+          path: API,
+          content: candidate("clean", "combined", API) + "\nexport const reviewMustBe42 = 0;\n",
+        },
+      ]);
+      expect(applied.changes!.find((change) => change.path === API)!.content).toContain(
+        "reviewMustBe42 = 0",
+      );
+      const result = await runner.runTests(applied.changedFiles);
+      expect(readFileSync(join(runner.workdir!, API), "utf8")).toContain("reviewMustBe42 = 42");
+      expect(result.state).toBe("failed");
+      expect(result.output).toMatch(/integrity|changed.*check/i);
+    } finally {
+      await runner.dispose();
+    }
+  }, 60_000);
+
+  it.each(["worktree", "index", "head", "untracked", "symlink"])(
+    "holds a %s change made after capture, before tests",
+    async (mutation) => {
+      const runner = new LocalRunner({ source: repo });
+      try {
+        const applied = await runner.applyProposal({ head: ours, base: theirs }, [
+          { path: API, content: candidate("clean", "combined", API) },
+        ]);
+        const scratchGit = (...args: string[]) =>
+          execFileSync("git", ["-C", runner.workdir!, ...args], { encoding: "utf8" });
+        const path = join(runner.workdir!, API);
+        if (mutation === "worktree") {
+          scratchGit("update-index", "--assume-unchanged", "--", API);
+          writeFileSync(
+            path,
+            readFileSync(path, "utf8") + "\nexport const changedAfterCapture = true;\n",
+          );
+        } else if (mutation === "index") {
+          const original = readFileSync(path, "utf8");
+          writeFileSync(path, original + "\nexport const stagedOnly = true;\n");
+          scratchGit("add", "--", API);
+          writeFileSync(path, original);
+        } else if (mutation === "head") {
+          scratchGit(
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "Different commit, same tree",
+          );
+        } else if (mutation === "symlink") {
+          symlinkSync(
+            join(repo, "playground"),
+            join(runner.workdir!, "playground", "linked"),
+            "junction",
+          );
+        } else {
+          writeFileSync(
+            join(runner.workdir!, "playground", "untracked.js"),
+            "export const hidden = true;\n",
+          );
+        }
+        const result = await runner.runTests(applied.changedFiles);
+        expect(result.state).toBe("failed");
+        expect(result.output).toMatch(/integrity|changed.*check/i);
+      } finally {
+        await runner.dispose();
+      }
+    },
+    60_000,
+  );
 
   it("reports a syntax error as a failed parse", async () => {
     const runner = new LocalRunner({ source: repo });

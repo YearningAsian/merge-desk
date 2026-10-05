@@ -11,7 +11,6 @@ import { RunCheck } from "./run";
 export const MARKER = "<!-- merge-desk:record -->";
 const DATA_OPEN = "<!-- merge-desk:data";
 const DATA_CLOSE = "-->";
-const MAX_ENTRIES = 40;
 
 export const RecordAction = z.enum(["landed", "dropped", "held", "discarded"]);
 export type RecordAction = z.infer<typeof RecordAction>;
@@ -40,19 +39,21 @@ export const RecordEntry = z.object({
 export type RecordEntry = z.infer<typeof RecordEntry>;
 const Entries = z.array(RecordEntry);
 
-// The server's keyed seal over the entries (server/sign.ts recordSeal).
+// The server's keyed seal over the visible record and entries (server/sign.ts).
 export type RecordSeal = {
   seal: (text: string) => string;
   check: (text: string, mac: string) => boolean;
 };
 
-const Data = z.object({ v: z.literal(1), entries: z.unknown(), mac: z.string().max(200) });
+// Version 1 sealed entries only, so its visible table could have been edited.
+// It is deliberately refused rather than migrated from an untrusted display.
+const Data = z.object({ v: z.literal(2), entries: z.unknown(), mac: z.string().max(200) });
 
-// What is sealed: the repository and pull request, then the entries in
-// schema key order (the same however they were built or read back), so a
-// sealed block can't be moved to another pull request.
-const canonical = (scope: string, entries: RecordEntry[]) =>
-  `${scope}\n${JSON.stringify(Entries.parse(entries))}`;
+// Bind the exact text people see, the repository and pull request, and entries
+// in schema key order. Hidden JSON key order may change without changing data;
+// a visible edit or moving the sealed block to another PR must fail the check.
+const canonical = (scope: string, entries: RecordEntry[], prefix: string) =>
+  JSON.stringify({ v: 2, scope, prefix, entries: Entries.parse(entries) });
 
 export type ParsedRecord = { ok: true; entries: RecordEntry[] } | { ok: false; reason: string };
 
@@ -73,17 +74,20 @@ export function parseRecord(body: string, seal: RecordSeal, scope: string): Pars
   try {
     const data = Data.parse(JSON.parse(body.slice(start + DATA_OPEN.length, end)));
     const entries = Entries.parse(data.entries);
-    return seal.check(canonical(scope, entries), data.mac) ? { ok: true, entries } : edited;
+    return seal.check(canonical(scope, entries, body.slice(0, start)), data.mac)
+      ? { ok: true, entries }
+      : edited;
   } catch {
     return edited;
   }
 }
 
 // Adds an entry unless one with the same id is already there (a retried
-// request records once), keeping the newest entries.
+// request records once). History is never silently removed to fit a comment;
+// the GitHub writer refuses an oversized record before making any update.
 export function addEntry(entries: RecordEntry[], entry: RecordEntry): RecordEntry[] {
   if (entries.some((existing) => existing.id === entry.id)) return entries;
-  return [...entries, entry].slice(-MAX_ENTRIES);
+  return [...entries, entry];
 }
 
 const WORDS: Record<RecordAction, string> = {
@@ -136,7 +140,8 @@ export function renderRecord(
   // `scope` is "owner/repo#pr", the pull request this record belongs to.
   options: { deskUrl: string | null; seal: RecordSeal; scope: string; note?: string | null },
 ): string {
-  const rows = entries
+  const normalized = Entries.parse(entries);
+  const rows = normalized
     .map((entry) =>
       [
         cell(entry.at.replace("T", " ").replace(/\.\d+Z$/, " UTC")),
@@ -148,7 +153,7 @@ export function renderRecord(
       ].join(" | "),
     )
     .map((row) => `| ${row} |`);
-  const drops = entries
+  const drops = normalized
     .filter((entry) => entry.dropped)
     .map((entry) => {
       const dropped = entry.dropped!;
@@ -157,26 +162,26 @@ export function renderRecord(
         .join("; ");
       return `- ${WORDS[entry.action]} by ${cell(entry.who)}: ${dropped.side} (${cell(dropped.branch)}) by ${cell(dropped.authors.join(", ") || "nobody")} in ${cell(dropped.files.join(", "))}: ${commits || "no commits"}. The commits stay in the branch history.`;
     });
-  const normalized = Entries.parse(entries);
-  const text = canonical(options.scope, normalized);
+  const prefix =
+    [
+      MARKER,
+      "### Merge Desk record",
+      "",
+      "Every decision Merge Desk made on this pull request. Merge Desk writes only to this pull request's branch and never deletes commits.",
+      ...(options.note ? ["", `> ${options.note}`] : []),
+      "",
+      "| When | Who | What | Option | Reason shown | Checks |",
+      "|---|---|---|---|---|---|",
+      ...rows,
+      ...(drops.length ? ["", "**Dropped work (recoverable)**", "", ...drops] : []),
+      ...(options.deskUrl ? ["", `[Open in Merge Desk](${options.deskUrl})`] : []),
+      "",
+    ].join("\n") + "\n";
+  const text = canonical(options.scope, normalized, prefix);
   // JSON can't close the hidden block: "--" is written as an escape.
-  const data = JSON.stringify({ v: 1, entries: normalized, mac: options.seal.seal(text) }).replace(
+  const data = JSON.stringify({ v: 2, entries: normalized, mac: options.seal.seal(text) }).replace(
     /--/g,
     "-\\u002d",
   );
-  return [
-    MARKER,
-    "### Merge Desk record",
-    "",
-    "Every decision Merge Desk made on this pull request. Merge Desk writes only to this pull request's branch and never deletes commits.",
-    ...(options.note ? ["", `> ${options.note}`] : []),
-    "",
-    "| When | Who | What | Option | Reason shown | Checks |",
-    "|---|---|---|---|---|---|",
-    ...rows,
-    ...(drops.length ? ["", "**Dropped work (recoverable)**", "", ...drops] : []),
-    ...(options.deskUrl ? ["", `[Open in Merge Desk](${options.deskUrl})`] : []),
-    "",
-    `${DATA_OPEN}\n${data}\n${DATA_CLOSE}`,
-  ].join("\n");
+  return `${prefix}${DATA_OPEN}\n${data}\n${DATA_CLOSE}`;
 }

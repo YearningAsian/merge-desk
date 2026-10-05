@@ -8,13 +8,14 @@ import {
   type RecordSeal,
 } from "@/core/record";
 import { splitRepo } from "./app";
+import { withLocalRecordWriter } from "@/server/record-writer";
 
 // The one Merge Desk record on a pull request: a comment this App wrote (the
 // marker alone proves nothing; anyone can paste it), carrying the marker and
-// a seal that checks out. Updates are serialized per pull request in this
-// process, then read back: success is reported only once the entry is
-// actually stored. A duplicate written by another instance at the same time
-// is folded into the oldest record; a record edited outside Merge Desk is
+// a seal that checks out. The local writer coordinates modules and processes
+// on the same host, then reads back: success is reported only once the entry
+// is actually stored. Hosted writes refuse until shared coordination exists.
+// Preexisting duplicate records are folded into the oldest; an outside edit is
 // left exactly as it is, and a new one is started below it. Nothing is ever
 // deleted.
 
@@ -31,6 +32,7 @@ const EDITED_NOTE =
 const FOLDED_BODY =
   "This Merge Desk record was written at the same moment as another one, and its entries were moved into the first Merge Desk record on this pull request.";
 const ATTEMPTS = 3;
+const MAX_RECORD_BYTES = 60_000;
 
 async function listOwn(
   octokit: Octokit,
@@ -38,13 +40,16 @@ async function listOwn(
   pr: number,
   appId: number,
   seal: RecordSeal,
+  signal?: AbortSignal,
 ): Promise<Own[]> {
+  signal?.throwIfAborted();
   const { owner, name } = splitRepo(repo);
   const comments = (await octokit.paginate(octokit.issues.listComments, {
     owner,
     repo: name,
     issue_number: pr,
     per_page: 100,
+    request: { signal },
   })) as Comment[];
   return comments
     .filter(
@@ -77,18 +82,6 @@ export async function readRecord(
   };
 }
 
-// One writer per pull request at a time within this process.
-const queues = new Map<string, Promise<unknown>>();
-function serial<T>(key: string, work: () => Promise<T>): Promise<T> {
-  const previous = queues.get(key) ?? Promise.resolve();
-  const next = previous.then(work, work);
-  queues.set(
-    key,
-    next.catch(() => undefined),
-  );
-  return next;
-}
-
 export function upsertRecord(
   octokit: Octokit,
   input: {
@@ -98,12 +91,20 @@ export function upsertRecord(
     entry: RecordEntry;
     deskUrl: string | null;
     seal: RecordSeal;
+    signal?: AbortSignal;
   },
 ): Promise<{ ok: true; entries: RecordEntry[] } | { ok: false; reason: string }> {
   const { owner, name } = splitRepo(input.repo);
-  return serial(`${input.repo}#${input.pr}`, async () => {
+  return withLocalRecordWriter(`${input.repo}#${input.pr}`, async (lease) => {
     for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-      const own = await listOwn(octokit, input.repo, input.pr, input.appId, input.seal);
+      const own = await listOwn(
+        octokit,
+        input.repo,
+        input.pr,
+        input.appId,
+        input.seal,
+        input.signal,
+      );
       const valid = own.filter((record) => record.entries);
       const entries = addEntry(union(valid), input.entry);
       const body = renderRecord(entries, {
@@ -112,25 +113,52 @@ export function upsertRecord(
         scope: `${input.repo}#${input.pr}`,
         note: valid.length < own.length ? EDITED_NOTE : null,
       });
+      if (Buffer.byteLength(body, "utf8") > MAX_RECORD_BYTES)
+        return {
+          ok: false as const,
+          reason:
+            "The decision record is full. Existing history was preserved; this decision was not recorded.",
+        };
+      input.signal?.throwIfAborted();
       if (valid[0]) {
-        await octokit.issues.updateComment({ owner, repo: name, comment_id: valid[0].id, body });
-        for (const extra of valid.slice(1))
+        lease.dispatched();
+        await octokit.issues.updateComment({
+          owner,
+          repo: name,
+          comment_id: valid[0].id,
+          body,
+          request: { signal: input.signal },
+        });
+        for (const extra of valid.slice(1)) {
+          input.signal?.throwIfAborted();
+          lease.dispatched();
           await octokit.issues.updateComment({
             owner,
             repo: name,
             comment_id: extra.id,
             body: FOLDED_BODY,
+            request: { signal: input.signal },
           });
+        }
       } else {
-        await octokit.issues.createComment({ owner, repo: name, issue_number: input.pr, body });
+        lease.dispatched();
+        await octokit.issues.createComment({
+          owner,
+          repo: name,
+          issue_number: input.pr,
+          body,
+          request: { signal: input.signal },
+        });
       }
 
       // Read back: exactly one valid record, holding this entry.
-      const after = (await listOwn(octokit, input.repo, input.pr, input.appId, input.seal)).filter(
-        (record) => record.entries,
-      );
-      if (after.length === 1 && after[0]!.entries!.some((entry) => entry.id === input.entry.id))
+      const after = (
+        await listOwn(octokit, input.repo, input.pr, input.appId, input.seal, input.signal)
+      ).filter((record) => record.entries);
+      if (after.length === 1 && after[0]!.entries!.some((entry) => entry.id === input.entry.id)) {
+        lease.confirmed();
         return { ok: true as const, entries: after[0]!.entries! };
+      }
     }
     return {
       ok: false as const,

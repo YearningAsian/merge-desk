@@ -1,6 +1,9 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
+import { rmdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
 import type { Octokit } from "@octokit/rest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MARKER, renderRecord, type RecordEntry, type RecordSeal } from "@/core/record";
 import { readRecord, upsertRecord } from "@/server/github/comment";
 
@@ -69,6 +72,151 @@ const input = (id: string) => ({
 });
 
 describe("upsertRecord", () => {
+  it("blocks later writers after an ambiguous dispatched PATCH can still apply remotely", async () => {
+    const repo = `YearningAsian/review-${randomUUID()}`;
+    const scope = `${repo}#2`;
+    const original = renderRecord([entry("original")], { deskUrl: null, seal, scope });
+    const { octokit, comments } = thread([
+      { id: 1, body: original, performed_via_github_app: { id: APP_ID } },
+    ]);
+    let lateBody: string | undefined;
+    vi.spyOn(octokit.issues, "updateComment").mockImplementationOnce(async (value) => {
+      lateBody = value!.body!;
+      throw new Error("Connection closed after dispatch; remote write still pending");
+    });
+    try {
+      await expect(upsertRecord(octokit, { ...input("A"), repo })).rejects.toThrow();
+      const next = await upsertRecord(octokit, { ...input("B"), repo });
+      expect(next.ok).toBe(false);
+      comments[0]!.body = lateBody!; // The first PATCH finally completes remotely.
+      const saved = await readRecord(octokit, { repo, pr: 2, appId: APP_ID, seal });
+      expect(saved.entries.map((value) => value.id)).toEqual(["original", "A"]);
+    } finally {
+      // This is a fake provider. Only after its pending operation is resolved
+      // may this test reconcile its own unique lock; production never auto-unlocks.
+      if (lateBody) comments[0]!.body = lateBody;
+      const root = resolve(join(tmpdir(), "merge-desk-record-locks"));
+      const lock = resolve(root, createHash("sha256").update(scope).digest("hex"));
+      if (!lock.startsWith(root + sep)) throw new Error("Unexpected fixture lock path");
+      if (lateBody) await rmdir(lock).catch(() => undefined);
+    }
+  });
+  it("does not allow separate module instances to build stale replacement bodies", async () => {
+    vi.resetModules();
+    const first = await import("@/server/github/comment");
+    vi.resetModules();
+    const second = await import("@/server/github/comment");
+    const { octokit, records } = thread();
+    const list = octokit.paginate.bind(octokit);
+    let release!: () => void;
+    let began!: () => void;
+    const started = new Promise<void>((resolve) => (began = resolve));
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let reads = 0;
+    octokit.paginate = (async (...args: Parameters<Octokit["paginate"]>) => {
+      reads += 1;
+      if (reads === 1) {
+        began();
+        await held;
+      }
+      return list(...args);
+    }) as Octokit["paginate"];
+    const a = first.upsertRecord(octokit, { ...input("instance-A"), pr: 40004 });
+    await started;
+    const b = second.upsertRecord(octokit, { ...input("instance-B"), pr: 40004 });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(reads).toBe(1);
+    } finally {
+      release();
+      await Promise.all([a, b]);
+    }
+    expect(records()).toHaveLength(1);
+    expect((await a).ok && (await b).ok).toBe(true);
+    const saved = await readRecord(octokit, {
+      repo: input("x").repo,
+      pr: 40004,
+      appId: APP_ID,
+      seal,
+    });
+    expect(saved.entries.map((entry) => entry.id).sort()).toEqual(["instance-A", "instance-B"]);
+  });
+
+  it("does not initiate a queued comment mutation after its caller aborts", async () => {
+    const { octokit } = thread();
+    const list = octokit.paginate.bind(octokit);
+    let release!: () => void;
+    let began!: () => void;
+    const started = new Promise<void>((resolve) => {
+      began = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    octokit.paginate = (async (...args: Parameters<Octokit["paginate"]>) => {
+      if (++reads === 1) {
+        began();
+        await held;
+      }
+      return list(...args);
+    }) as Octokit["paginate"];
+    const create = vi.spyOn(octokit.issues, "createComment");
+    const a = upsertRecord(octokit, { ...input("first"), pr: 40005 });
+    await started;
+    const controller = new AbortController();
+    const b = upsertRecord(octokit, {
+      ...input("cancelled"),
+      pr: 40005,
+      signal: controller.signal,
+    });
+    const refused = expect(b).rejects.toThrow();
+    controller.abort();
+    release();
+    expect((await a).ok).toBe(true);
+    await refused;
+    expect(create).toHaveBeenCalledTimes(1);
+    const saved = await readRecord(octokit, {
+      repo: input("x").repo,
+      pr: 40005,
+      appId: APP_ID,
+      seal,
+    });
+    expect(saved.entries.map((entry) => entry.id)).toEqual(["first"]);
+  });
+
+  it("refuses distributed production writes before any GitHub call", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { octokit, comments } = thread();
+    const reads = vi.spyOn(octokit, "paginate");
+    try {
+      expect(await upsertRecord(octokit, input("production"))).toMatchObject({ ok: false });
+      expect(reads).not.toHaveBeenCalled();
+      expect(comments).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses an oversized record without discarding history or sending a write", async () => {
+    const history = Array.from({ length: 200 }, (_, i) => ({
+      ...entry(`history-${i}`),
+      reason: "a".repeat(300),
+    }));
+    const body = renderRecord(history, {
+      deskUrl: null,
+      seal,
+      scope: "YearningAsian/merge-desk#2",
+    });
+    const { octokit, comments } = thread([
+      { id: 1, body, performed_via_github_app: { id: APP_ID } },
+    ]);
+    const update = vi.spyOn(octokit.issues, "updateComment");
+    const result = await upsertRecord(octokit, input("next"));
+    expect(result).toMatchObject({ ok: false });
+    expect(update).not.toHaveBeenCalled();
+    expect(comments[0]!.body).toBe(body);
+  });
   // Review round 1, H1: two writers at once (a hold recorded automatically
   // and a quick discard, or two tabs).
   it("two concurrent updates on an empty thread leave one comment holding both", async () => {

@@ -112,6 +112,53 @@ describe("decision record", () => {
     expect(parseRecord(edited, seal, SCOPE)).toMatchObject({ ok: false });
   });
 
+  // Review round 4, M3: readers see the table, link and note, not hidden JSON.
+  it.each([
+    ["Who", "| YearningAsian |", "| someone-else |"],
+    ["What", "| Dropped `ccccccc` |", "| Landed `eeeeeee` |"],
+    ["desk URL", "https://desk.example/live?pr=3", "https://evil.example/live?pr=3"],
+    ["note", "> The ref update was confirmed.", "> The ref update was refused."],
+    ["prefix whitespace", "### Merge Desk record", "### Merge Desk record "],
+  ])("refuses an edit to the visible %s with untouched sealed entries", (_field, from, to) => {
+    const body = renderRecord([entry()], {
+      deskUrl: "https://desk.example/live?pr=3",
+      note: "The ref update was confirmed.",
+      seal,
+      scope: SCOPE,
+    });
+    const start = body.indexOf("<!-- merge-desk:data");
+    const edited = body.slice(0, start).replace(from, to) + body.slice(start);
+    expect(edited).not.toBe(body);
+    expect(parseRecord(edited, seal, SCOPE)).toMatchObject({ ok: false });
+  });
+
+  it("accepts reordered hidden JSON when the visible prefix and entries are unchanged", () => {
+    const entries = [entry()];
+    const body = render(entries, "https://desk.example/live?pr=3");
+    const reordered = body.replace(/<!-- merge-desk:data\n([\s\S]*?)\n-->$/, (_block, raw) => {
+      const data = JSON.parse(raw) as { v: number; entries: RecordEntry[]; mac: string };
+      return `<!-- merge-desk:data\n${JSON.stringify({
+        mac: data.mac,
+        entries: data.entries.map((item) => Object.fromEntries(Object.entries(item).reverse())),
+        v: data.v,
+      }).replace(/--/g, "-\\u002d")}\n-->`;
+    });
+    expect(reordered).not.toBe(body);
+    expect(parseRecord(reordered, seal, SCOPE)).toEqual({ ok: true, entries });
+  });
+
+  it("refuses legacy entries-only seals instead of trusting an unsealed visible record", () => {
+    const entries = [entry({ dropped: null })];
+    const body = render(entries);
+    const prefix = body.slice(0, body.indexOf("<!-- merge-desk:data"));
+    const legacy = `${prefix}<!-- merge-desk:data\n${JSON.stringify({
+      v: 1,
+      entries,
+      mac: seal.seal(`${SCOPE}\n${JSON.stringify(entries)}`),
+    })}\n-->`;
+    expect(parseRecord(legacy, seal, SCOPE)).toMatchObject({ ok: false });
+  });
+
   it("treats a comment without the marker as not ours, and refuses broken or doubled data", () => {
     expect(parseRecord("Looks good to me", seal, SCOPE)).toEqual({ ok: true, entries: [] });
     const edited = render([entry()]).replace('"action":"dropped"', '"action":"merged"');
@@ -152,5 +199,31 @@ describe("decision record", () => {
     const once = addEntry([], entry());
     expect(addEntry(once, entry())).toHaveLength(1);
     expect(addEntry(once, entry({ id: "run-3:held" }))).toHaveLength(2);
+  });
+
+  // Review round 4, M4: subsequent decisions must not erase dropped-work recovery.
+  it("retains earlier decisions and dropped-work details after more than forty entries", () => {
+    const dropped = entry({
+      id: "original-drop",
+      dropped: {
+        ...entry().dropped!,
+        branch: "demo/history-to-keep",
+        commits: [{ sha: "f".repeat(40), subject: "Original contribution" }],
+      },
+    });
+    let entries = [dropped];
+    for (let index = 1; index <= 40; index++) {
+      entries = addEntry(
+        entries,
+        entry({ id: `later-${index}:held`, action: "held", commit: null, dropped: null }),
+      );
+    }
+    expect(entries).toHaveLength(41);
+    expect(entries[0]).toEqual(dropped);
+    const body = render(entries);
+    expect(body).toContain("demo/history-to-keep");
+    expect(body).toContain("Original contribution");
+    const parsed = parseRecord(body, seal, SCOPE);
+    expect(parsed.ok && parsed.entries[0]).toEqual(dropped);
   });
 });

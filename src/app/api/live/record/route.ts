@@ -8,6 +8,8 @@ import { verifyRun } from "@/server/pipeline/run";
 import { recordSeal } from "@/server/sign";
 import { deskLink, entryFor } from "@/server/record";
 import { guardLive } from "@/server/session";
+import { decisionWriterReason } from "@/server/record-writer";
+import { withDeadline } from "@/server/deadline";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -46,8 +48,26 @@ const Body = z.object({
 });
 
 export async function POST(request: Request) {
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, request.signal]);
+  try {
+    return await withDeadline(
+      performRecord(request, signal),
+      25_000,
+      json(503, {
+        error: "The record update was not confirmed before the request deadline.",
+      }),
+    );
+  } finally {
+    controller.abort();
+  }
+}
+
+async function performRecord(request: Request, signal: AbortSignal) {
   const guard = await guardLive(request, { mutating: true });
   if (!guard.ok) return guard.response;
+  const writerReason = decisionWriterReason(request);
+  if (writerReason) return json(503, { error: writerReason });
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return json(400, { error: "Send the signed run and what to record." });
   const { pr, token, action } = body.data;
@@ -66,15 +86,20 @@ export async function POST(request: Request) {
     return json(409, { error: "Only a held run can be recorded as held." });
 
   try {
+    signal.throwIfAborted();
     const octokit = await installationOctokit(REPO, { pull_requests: "write" });
+    signal.throwIfAborted();
     const pull = await readPull(octokit, REPO, pr);
+    signal.throwIfAborted();
     const app = await appIdentity();
+    signal.throwIfAborted();
     const result = await upsertRecord(octokit, {
       repo: REPO,
       pr,
       appId: app.id,
       deskUrl: deskLink(request, pr),
       seal: recordSeal(requireEnv("SESSION_SECRET")),
+      signal,
       entry: entryFor(run, {
         action,
         who: guard.login,
@@ -83,6 +108,8 @@ export async function POST(request: Request) {
     });
     return result.ok ? json(200, { entries: result.entries }) : json(409, { error: result.reason });
   } catch {
-    return json(503, { error: "GitHub didn't accept the record update." });
+    return json(503, {
+      error: "The record update wasn't confirmed. Check the pull request before trying again.",
+    });
   }
 }

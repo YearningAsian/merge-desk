@@ -1,5 +1,6 @@
 import { Writable } from "node:stream";
-import { Sandbox } from "@vercel/sandbox";
+import { posix } from "node:path";
+import { Sandbox, type SandboxUser } from "@vercel/sandbox";
 import type {
   AppliedProposal,
   ParseResult,
@@ -13,14 +14,16 @@ import {
   RUN_LIMIT_MS,
   assertRepoPath,
   assertRevisions,
+  captureWorkspaceIntegrity,
   commitProposal,
   describeMerge,
   git,
   mergeIntoHead,
   parseFiles,
-  runSuite,
+  runCheckedSuite,
   type ExecResult,
   type Shell,
+  type WorkspaceIntegrity,
 } from "./workspace";
 
 // Runs merges in a Vercel Sandbox: a fresh microVM per boot that clones the
@@ -32,6 +35,34 @@ import {
 export const SANDBOX_IMAGE = "vercel/sandbox/node:24";
 export const SANDBOX_TIMEOUT_MS = 120_000;
 export const SANDBOX_TAGS = { app: "merge-desk" };
+
+// Trusted server code checks every source/Git entry and every ancestor. A
+// read-only file owned by the test UID is insufficient: it could chmod it, or
+// replace the checkout through a writable parent. No repository tool executes.
+const VERIFY_READ_ONLY = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const root = path.resolve(process.argv[1]);
+let entries = 0;
+function check(full) {
+  if (++entries > 50000) throw new Error("Protected source manifest is too large");
+  const stat = fs.lstatSync(full);
+  if (stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory()) || stat.uid !== 0 || stat.gid !== 0 || (stat.mode & 0o222))
+    throw new Error("Source protection could not be established");
+  if (stat.isDirectory()) for (const name of fs.readdirSync(full)) check(path.join(full, name));
+}
+check(root);
+let parent = path.dirname(root);
+for (;;) {
+  const stat = fs.lstatSync(parent);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== 0 || stat.gid !== 0 || (stat.mode & 0o022))
+    throw new Error("The source parent is replaceable by the test user");
+  const next = path.dirname(parent);
+  if (next === parent) break;
+  parent = next;
+}
+process.stdout.write("protected");
+`;
 
 export type Timing = { label: string; ms: number };
 
@@ -50,6 +81,8 @@ export class SandboxRunner implements Runner {
   private booted: string | null = null; // "head..base" of the current copy
   private networkDenied = false;
   private candidateRan = false;
+  private integrity: WorkspaceIntegrity | null = null;
+  private protectedSource = false;
 
   constructor(private readonly options: { repoUrl: string; signal?: AbortSignal }) {}
 
@@ -78,45 +111,62 @@ export class SandboxRunner implements Runner {
     return path ? `${root}/${assertRepoPath(path)}` : root;
   }
 
+  private async execute(
+    command: string,
+    args: string[],
+    options: { cwd?: string; timeoutMs?: number } = {},
+    context: Sandbox | SandboxUser = this.current(),
+    sudo = this.protectedSource,
+  ): Promise<ExecResult> {
+    const limit = options.timeoutMs ?? RUN_LIMIT_MS;
+    let stdout = "";
+    let output = "";
+    const started = Date.now();
+    try {
+      const finished = await context.runCommand({
+        cmd: command,
+        args,
+        cwd: this.at(options.cwd),
+        timeoutMs: limit,
+        signal: this.options.signal,
+        sudo,
+        // A fixed system PATH and cleared Node preload settings keep trusted
+        // helpers and the test command independent of repository tooling.
+        env: {
+          PATH: "/usr/local/bin:/usr/bin:/bin",
+          NODE_OPTIONS: "",
+          NODE_PATH: "",
+          ...("homeDir" in context ? { HOME: context.homeDir, TMPDIR: context.homeDir } : {}),
+        },
+        stdout: sink((text) => {
+          stdout += text;
+          output += text;
+        }),
+        stderr: sink((text) => (output += text)),
+      });
+      const timedOut = Date.now() - started >= limit;
+      // The SDK reports a missing exit code as 0 on this path. Read the raw
+      // value it received instead, so a killed command can never look like
+      // a pass; if that shape ever changes, this fails closed (no exit code).
+      const raw = (finished as unknown as { cmd?: { exitCode?: unknown } }).cmd?.exitCode;
+      return {
+        code: timedOut || typeof raw !== "number" ? null : raw,
+        stdout,
+        output,
+        timedOut,
+      };
+    } catch (error) {
+      return {
+        code: null,
+        stdout,
+        output: `${output}\n${error instanceof Error ? error.message : String(error)}`,
+        timedOut: Date.now() - started >= limit,
+      };
+    }
+  }
+
   private readonly shell: Shell = {
-    exec: async (command, args, options = {}): Promise<ExecResult> => {
-      const limit = options.timeoutMs ?? RUN_LIMIT_MS;
-      let stdout = "";
-      let output = "";
-      const started = Date.now();
-      try {
-        const finished = await this.current().runCommand({
-          cmd: command,
-          args,
-          cwd: this.at(options.cwd),
-          timeoutMs: limit,
-          signal: this.options.signal,
-          stdout: sink((text) => {
-            stdout += text;
-            output += text;
-          }),
-          stderr: sink((text) => (output += text)),
-        });
-        const timedOut = Date.now() - started >= limit;
-        // The SDK reports a missing exit code as 0 on this path. Read the raw
-        // value it received instead, so a killed command can never look like
-        // a pass; if that shape ever changes, this fails closed (no exit code).
-        const raw = (finished as unknown as { cmd?: { exitCode?: unknown } }).cmd?.exitCode;
-        return {
-          code: timedOut || typeof raw !== "number" ? null : raw,
-          stdout,
-          output,
-          timedOut,
-        };
-      } catch (error) {
-        return {
-          code: null,
-          stdout,
-          output: `${output}\n${error instanceof Error ? error.message : String(error)}`,
-          timedOut: Date.now() - started >= limit,
-        };
-      }
-    },
+    exec: (command, args, options) => this.execute(command, args, options),
     readText: async (path) => {
       const buffer = await this.current().readFileToBuffer({
         path: this.at(path),
@@ -174,9 +224,16 @@ export class SandboxRunner implements Runner {
 
   async applyProposal(revisions: Revisions, files: ProposedFile[]): Promise<AppliedProposal> {
     await this.boot(revisions);
-    return this.timed("merge and write proposal", async () =>
-      commitProposal(this.shell, revisions, await mergeIntoHead(this.shell, revisions), files),
-    );
+    return this.timed("merge and write proposal", async () => {
+      const applied = await commitProposal(
+        this.shell,
+        revisions,
+        await mergeIntoHead(this.shell, revisions),
+        files,
+      );
+      this.integrity = await captureWorkspaceIntegrity(this.shell, applied.tree);
+      return applied;
+    });
   }
 
   parseCheck(paths: string[]): Promise<ParseResult[]> {
@@ -193,7 +250,55 @@ export class SandboxRunner implements Runner {
         durationMs: 0,
       };
     this.candidateRan = true;
-    return this.timed("tests", () => runSuite(this.shell, changedFiles));
+    try {
+      const candidate = await this.timed("protect test source", () => this.protectSource());
+      return this.timed("tests", () =>
+        runCheckedSuite(this.shell, candidate, changedFiles, this.integrity),
+      );
+    } catch (error) {
+      return {
+        state: "not_run",
+        suite: "tests",
+        exitCode: null,
+        output: `Refusing to run candidate code: source protection failed. ${error instanceof Error ? error.message : "Unknown setup result"}`,
+        durationMs: 0,
+      };
+    }
+  }
+
+  private async protectSource(): Promise<Shell> {
+    const requireZero = async (command: string, args: string[]) => {
+      const result = await this.execute(command, args, {}, this.current(), true);
+      if (result.code !== 0 || result.timedOut)
+        throw new Error(`Trusted ${command} setup did not complete`);
+      return result;
+    };
+    const owner = await this.execute("id", ["-u"], {}, this.current(), false);
+    if (owner.code !== 0 || !/^\d+$/.test(owner.stdout.trim()))
+      throw new Error("Default user identity is uncertain");
+    const user = await this.current().createUser("merge-desk-tests", {
+      signal: this.options.signal,
+    });
+    const identity = await this.execute("id", ["-u"], {}, user, false);
+    const uid = identity.stdout.trim();
+    if (identity.code !== 0 || !/^[1-9]\d*$/.test(uid) || uid === owner.stdout.trim())
+      throw new Error("Tests require a separate non-root user");
+    const sudo = await this.execute("sudo", ["-n", "-l"], {}, user, false);
+    if (sudo.code !== 1 || sudo.timedOut)
+      throw new Error("The test user's sudo denial is uncertain");
+
+    const root = this.at();
+    await requireZero("chown", ["--recursive", "root:root", "--", root]);
+    await requireZero("chmod", ["--recursive", "a-w", "--", root]);
+    await requireZero("chown", ["root:root", "--", posix.dirname(root)]);
+    await requireZero("chmod", ["go-w", "--", posix.dirname(root)]);
+    const verified = await requireZero("node", ["-e", VERIFY_READ_ONLY, root]);
+    if (verified.stdout !== "protected") throw new Error("Source protection evidence is missing");
+    this.protectedSource = true;
+    return {
+      ...this.shell,
+      exec: (command, args, options) => this.execute(command, args, options, user, false),
+    };
   }
 
   // Evidence for the live smoke test: true when an outbound request from
@@ -216,6 +321,8 @@ export class SandboxRunner implements Runner {
     this.booted = null;
     this.networkDenied = false;
     this.candidateRan = false;
+    this.integrity = null;
+    this.protectedSource = false;
     if (!sandbox) return;
     try {
       await this.timed("stop sandbox", () => sandbox.stop());

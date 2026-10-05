@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { Octokit } from "@octokit/rest";
+import { z } from "zod";
 import { OPTION_LABELS } from "@/core/options";
 import type { RunRecord } from "@/core/run";
 import { splitRepo } from "./app";
@@ -6,9 +8,9 @@ import { splitRepo } from "./app";
 // Land: write the checked merge to the pull request's own branch. The tree
 // is rebuilt on GitHub from the signed changes and must have exactly the id
 // of the tree that was checked, or nothing moves. The merge commit's parents
-// are [head, base], and the branch moves only as a fast-forward (force:
-// false), so a push after the run is refused by GitHub itself. Never the
-// base branch, never a force push. Call only after server/guard checkLand.
+// are [head, base]. GitHub atomically requires that the branch still points
+// to the signed head, then moves it as a fast-forward (force:false). Never
+// the base branch, never a force push. Call only after server/guard checkLand.
 
 export class LandError extends Error {
   constructor(
@@ -20,7 +22,30 @@ export class LandError extends Error {
   }
 }
 
-const statusOf = (error: unknown) => (error as { status?: number }).status;
+const statusOf = (error: unknown) =>
+  error && typeof error === "object" ? (error as { status?: number }).status : undefined;
+
+const UpdateRefsResponse = z
+  .object({ updateRefs: z.object({ clientMutationId: z.string() }).strict() })
+  .strict();
+
+const UPDATE_REFS = `mutation Land($input: UpdateRefsInput!) {
+  updateRefs(input: $input) { clientMutationId }
+}`;
+
+const unconfirmed = () =>
+  new LandError(
+    "GitHub didn't confirm the branch update. Check the pull request before trying again.",
+    "UNKNOWN",
+  );
+
+function beforeUpdate(signal?: AbortSignal) {
+  try {
+    signal?.throwIfAborted();
+  } catch {
+    throw new LandError("Land stopped before the branch update. Nothing was pushed.", "REFUSED");
+  }
+}
 
 export function landMessage(
   record: RunRecord,
@@ -42,11 +67,14 @@ export async function landMerge(
   octokit: Octokit,
   input: {
     repo: string;
+    repositoryId: string;
     record: RunRecord;
     refs: { head: string; base: string };
     author: { name: string; email: string };
     committer: { name: string; email: string };
     login: string;
+    signal?: AbortSignal;
+    onRefUpdate?: () => void;
   },
 ): Promise<{ commit: string }> {
   const { owner, name } = splitRepo(input.repo);
@@ -54,11 +82,15 @@ export async function landMerge(
   if (!record.changes || !record.tree)
     throw new LandError("This run has no merge that can land. Nothing was pushed.", "REFUSED");
 
+  const request = { signal: input.signal };
+  beforeUpdate(input.signal);
   const head = await octokit.git.getCommit({
     owner,
     repo: name,
     commit_sha: record.revisions.head,
+    request,
   });
+  beforeUpdate(input.signal);
   const tree = await octokit.git.createTree({
     owner,
     repo: name,
@@ -73,6 +105,7 @@ export async function landMerge(
             content: change.content,
           },
     ),
+    request,
   });
   if (tree.data.sha !== record.tree)
     throw new LandError(
@@ -81,6 +114,7 @@ export async function landMerge(
     );
 
   const date = new Date().toISOString();
+  beforeUpdate(input.signal);
   const commit = await octokit.git.createCommit({
     owner,
     repo: name,
@@ -89,29 +123,37 @@ export async function landMerge(
     parents: [record.revisions.head, record.revisions.base],
     author: { ...input.author, date },
     committer: { ...input.committer, date },
+    request,
   });
 
+  const clientMutationId = randomUUID();
+  beforeUpdate(input.signal);
   try {
-    await octokit.git.updateRef({
-      owner,
-      repo: name,
-      ref: `heads/${input.refs.head}`,
-      sha: commit.data.sha,
-      force: false,
+    input.onRefUpdate?.();
+    const result = await octokit.graphql(UPDATE_REFS, {
+      input: {
+        repositoryId: input.repositoryId,
+        clientMutationId,
+        refUpdates: [
+          {
+            name: `refs/heads/${input.refs.head}`,
+            beforeOid: record.revisions.head,
+            afterOid: commit.data.sha,
+            force: false,
+          },
+        ],
+      },
+      request,
     });
+    const response = UpdateRefsResponse.safeParse(result);
+    if (!response.success || response.data.updateRefs.clientMutationId !== clientMutationId)
+      throw unconfirmed();
   } catch (error) {
-    const message = String((error as { message?: string }).message ?? "");
-    if (statusOf(error) === 422 && /fast.?forward/i.test(message))
-      throw new LandError(
-        "Someone pushed to the branch after the run. Nothing was pushed; run it again.",
-        "REFUSED",
-      );
     if (statusOf(error) === 422 || statusOf(error) === 403 || statusOf(error) === 404)
-      throw new LandError(`GitHub refused the update: ${message.slice(0, 200)}`, "REFUSED");
-    throw new LandError(
-      "GitHub didn't confirm the branch update. Check the pull request before trying again.",
-      "UNKNOWN",
-    );
+      throw new LandError("GitHub refused the branch update. Nothing was pushed.", "REFUSED");
+    // GraphQL errors can carry partial data. Without an unambiguous matching
+    // result, neither their wording nor a network error confirms the outcome.
+    throw unconfirmed();
   }
   return { commit: commit.data.sha };
 }

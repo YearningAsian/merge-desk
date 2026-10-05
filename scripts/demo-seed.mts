@@ -131,9 +131,11 @@ if (!values.yes) {
   process.exit(0);
 }
 
-for (const write of plan) git("branch", write.branch, write.sha);
-for (const [tag, sha] of tags) git("tag", tag, sha);
-console.log("\nLocal branches and tags created.");
+if (!seeded) {
+  for (const write of plan) git("branch", write.branch, write.sha);
+  for (const [tag, sha] of tags) git("tag", tag, sha);
+  console.log("\nLocal branches and tags created.");
+}
 if (!values.push) process.exit(0);
 
 for (const write of plan) pushBranch(write.branch, write.sha, { expectCurrent: null });

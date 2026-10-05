@@ -75,7 +75,7 @@
 | 0.3 | Brand direction | `docs/design/BRAND.md` | A | ✅ | |
 | 0.4 | H-rows listed and assigned | below | A | ✅ | |
 | 0.5 | PRD approved (`3-prd`) | `devpost/prd.md`, `devpost/prd.html` | A | ✅ | Approved 2026-10-04 with changes: demo mode (recorded real runs, public) + live mode (learner only); recoverable drops now; never a fake pass; build priority held → verified → chosen drop → options → rest |
-| 0.6 | Spec approved (`4-spec`) | `devpost/spec.md`, `devpost/spec.html` | A | ⬜ | Gates all code (`5-build` builds from it) |
+| 0.6 | Spec approved (`4-spec`) | `devpost/spec.md`, `devpost/spec.html` | A | ✅ | Approved 2026-10-04: one repo, demo PRs into `demo/base`, Vercel Sandbox runner + local fallback, GitHub App (contents + PRs only), Gemini 3.8 Flash |
 
 ### Phase 1: Scaffold
 
@@ -141,8 +141,9 @@
 |---|---|---|---|
 | H1 | Register on Devpost for Build With AI: Basics | A | 5.4 |
 | H2 | Gemini API key into `.env.local` and Vercel env | A | 1.6 |
-| H3 | Fine-grained GitHub token scoped to the demo repo only (contents, pull requests: read/write; checks, actions: read) | A | 1.6 |
-| H4 | Vercel project linked to this repo | A | 2.6 |
+| H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), installed on `merge-desk` only; App ID, Client ID, client secret in `.env.local` ✅; private key ⬜ | A | 1.6 |
+| H4 | Vercel project linked to this repo; env vars added; production callback URL added to the GitHub App | A | 2.6 |
+| H6 | Delete the unused empty `merge-desk-playground` repo (needs `delete_repo` scope or GitHub Settings) | A | none |
 | H5 | Final submit click on every portal | A | being judged |
 
 ---

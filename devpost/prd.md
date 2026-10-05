@@ -15,7 +15,7 @@ Source: `scope.md > The Core Loop`, `scope.md > What "Working" Looks Like`.
 1. **Open Merge Desk** on a computer. One screen: the repository's open pull requests on the left, conflicting ones first.
 2. **Select a conflicting pull request.** The right side shows an **analysis of both sides**: what each side meant, in one line, with the commits, files and authors behind it one click away.
 3. **See the options before anything happens.** Two or three ways to resolve it (for example *combine both*, *keep the newer side and drop the older one*), one marked **Recommended** with the reason. Each option says exactly what will be kept, what will be dropped, and whose work that is.
-4. **Choose an option.** If it drops work, an inline confirmation shows what will be lost; confirm with Cmd/Ctrl+Enter on desktop or hold-to-confirm on phone.
+4. **Choose an option.** A slider runs from *keep ours* (blue) through *combine* to *keep theirs* (orange) and starts on Recommended, so the common path is one click to run. If it drops work, an inline confirmation shows what will be lost; confirm with Cmd/Ctrl+Enter on desktop or hold-to-confirm on phone.
 5. **Watch the agent work**, as a plain step list with states (queued, running, passed, failed): read both sides, write the merge on a scratch copy, describe what it did, then the checks (it parses, your choice was honored, the tests pass). Raw logs stay collapsed under each step.
 6. **One of two endings:**
    - **Verified:** a result card says what the merge did in plain words, with the diff. **Land** writes it to the pull request's own branch, and the pull request shows as mergeable on GitHub.
@@ -27,7 +27,7 @@ Source: `scope.md > The Core Loop`, `scope.md > What "Working" Looks Like`.
 **One main screen, no page changes for the core flow.** (Learner: "The pc layout is the main selling point.")
 
 - **Left: Pull request list.** Fixed-width column. Conflicting pull requests first, then the rest collapsed under "Can merge".
-- **Right: Pull request detail**, top to bottom: header (title, number, branches, state), **Analysis** (ours and theirs side by side), **Options**, **Run** (live steps and checks), **Result** (what the merge did, diff, Land). Sections are minimized but clickable to expand; the section that needs attention is open.
+- **Right: Pull request detail**, top to bottom: header (title, number, branches, state), **Analysis** (ours and theirs side by side), **Options**, **Run** (live steps and checks), **Result** (what the merge did, diff, Land), then **Details** for developers, folded (the exact commits everything is bound to, step timings and logs, commands that recreate the conflict locally). Sections are minimized but clickable to expand; the section that needs attention is open.
 - **Phone:** the same order and pieces, adapted: the list is the home view; selecting a pull request opens the detail as a full-height sheet; diffs are shown one column at a time; actions sit at the bottom within thumb reach. The phone is for **watching and deciding** (pick an option, confirm, land, discard), not editing code.
 
 ## Look and Feel
@@ -61,7 +61,7 @@ Source: `scope.md > The Unique Kernel`.
 ### Resolution options
 
 - [ ] Two or three options are shown before anything runs, such as *combine both*, *keep ours and drop theirs*, *keep theirs and drop ours* (including "drop the older build" when one side is clearly older).
-- [ ] Exactly one option is marked **Recommended**, with a one-sentence reason.
+- [ ] Exactly one option is marked **Recommended**, with a one-sentence reason; every other option has a one-sentence reason too (when someone would pick it instead).
 - [ ] Each option states what will be kept, what will be dropped (commits, files) and whose work is affected, before it is chosen.
 
 ### Intentional drops

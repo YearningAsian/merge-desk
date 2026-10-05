@@ -32,8 +32,16 @@ Single source for the site, stills, poster, thumbnail and video. Aligned with th
 | `--ok` | #1f8a4c | VERIFIED, LANDED |
 | `--stop` | #c93c3c | HELD, REFUSED |
 | `--wait` | #9a7d14 | VERIFYING, UNKNOWN |
+| `--ours-text` | #2558bd | current-branch small text on neutral surfaces or blue wash |
+| `--theirs-text` | #a84e0f | incoming-branch small text on neutral surfaces or orange wash |
+| `--ok-text` | #176b3a | VERIFIED, LANDED small text on neutral surfaces or green wash |
+| `--wait-text` | #78600b | VERIFYING, UNKNOWN small text on neutral surfaces or amber wash |
+| `--stop-text` | #a83030 | HELD, REFUSED small text on neutral surfaces or red wash (`--stop` on its wash is 4.3:1) |
+| `--control-border` | #85867e | boundaries needed to identify active inputs |
 
 Blue and orange identify the two sides; every side and status also carries its word, never color alone. Diffs use GitHub-style green/red line washes. No gradients, blur or translucency behind code.
+
+Keep identity colors for markers and washes; use the darker text roles for small labels. Text needs at least 4.5:1 against its actual background, including badge and diff washes. The five text variants pass on `--surface` and `--bg`; verify rendered combinations before shipping. `--hair` is a decorative divider, not the sole input boundary or focus cue. Required control boundaries and focus cues need at least 3:1 against adjacent colors. Use a visible 2 px `--ink` focus outline with an offset on these light surfaces, including buttons after any CSS reset. [Text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 
 ## Type
 
@@ -50,6 +58,8 @@ State changes only, 150 ms or less. Honor `prefers-reduced-motion`; keep the cod
 ## UI foundations
 
 Use owned shadcn/ui components with Radix primitives for accessible sheets, tabs, collapsible sections and tooltips; Lucide for consistent icons; Pierre Diffs for the read-only code view. Apply these tokens to the components instead of adopting a library's default visual identity. Keyboard focus, labels and status announcements remain visible and useful. Versions and responsibilities live in [../stack.md](../stack.md).
+
+Each product view has a named main landmark and a keyboard-visible skip link. Status badges use a dark text role on a quiet wash; icon strokes remain consistent and their actions carry names.
 
 ## Generation prompt tokens
 

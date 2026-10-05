@@ -9,6 +9,7 @@
 :root {
   --bg: #f5f5f3; --surface: #fff; --ink: #16181d; --muted: #646a75; --hair: #e3e3df; --hair-strong: #c9c9c3;
   --ours: #2f6fed; --theirs: #d9711f; --ok: #1f8a4c; --stop: #c93c3c; --wait: #9a7d14;
+  --ours-text: #2558bd; --theirs-text: #a84e0f; --ok-text: #176b3a; --wait-text: #78600b; --stop-text: #a83030; --control-border: #85867e;
   --ours-wash: #eef3fe; --theirs-wash: #fdf2e8; --ok-wash: #e8f4ed; --stop-wash: #fbeaea; --wait-wash: #f8f2dc;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
@@ -17,13 +18,16 @@
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
-:focus-visible { outline: 2px solid var(--ours); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+.skip-link { position: fixed; top: 12px; left: 12px; z-index: 10; padding: 10px 14px; background: var(--ink); color: #fff; border-radius: 6px; transform: translateY(-200%); }
+.skip-link:focus { transform: none; }
 .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
 header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--hair); margin-bottom: 24px; }
 .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 h1 { font: 700 34px/1.1 var(--sans); letter-spacing: -.02em; margin: 6px 0 4px; }
 .sub { color: var(--muted); margin: 0; max-width: 68ch; }
-.pill { font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px; border: 1px solid currentColor; color: var(--wait); background: var(--wait-wash); }
+.pill { font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px; border: 1px solid currentColor; color: var(--wait-text); background: var(--wait-wash); }
+.pill.ok { color: var(--ok-text); background: var(--ok-wash); }
 h2 { font: 650 19px/1.25 var(--sans); letter-spacing: -.01em; margin: 0 0 12px; }
 h3 { font: 600 14px/1.3 var(--sans); margin: 0 0 4px; }
 section { margin-bottom: 28px; }
@@ -35,8 +39,12 @@ code { font: 13px var(--mono); background: #f0f0ec; border: 1px solid var(--hair
 @media (max-width: 860px) { .plain { grid-template-columns: 1fr; } }
 .plain .card p { margin: 0; font-size: 14px; }
 .plain .k { font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; display: block; }
-.k.demo { color: var(--wait); } .k.live { color: var(--ok); } .k.ai { color: var(--ours); }
+.k.demo { color: var(--wait-text); } .k.live { color: var(--ok-text); } .k.ai { color: var(--ours-text); }
 svg.dia { width: 100%; height: auto; display: block; }
+.dia text[fill="#2f6fed"] { fill: var(--ours-text); }
+.dia text[fill="#d9711f"] { fill: var(--theirs-text); }
+.dia text[fill="#1f8a4c"] { fill: var(--ok-text); }
+.dia text[fill="#9a7d14"] { fill: var(--wait-text); }
 .mobile-alt { display: none; gap: 10px; }
 .mobile-alt .card { padding: 12px 14px; }
 .mobile-alt p { margin: 0; font-size: 14px; }
@@ -51,6 +59,7 @@ svg.dia { width: 100%; height: auto; display: block; }
 .steps { list-style: none; margin: 0; padding: 8px; border-right: 1px solid var(--hair); background: #fafaf8; }
 @media (max-width: 760px) { .steps { border-right: 0; border-bottom: 1px solid var(--hair); display: flex; overflow-x: auto; gap: 4px; } }
 .steps button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; width: 100%; padding: 8px 10px; border-radius: 7px; font-size: 14px; color: var(--muted); }
+.steps button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 @media (max-width: 760px) { .steps button { grid-template-columns: 24px auto; white-space: nowrap; } }
 .steps button span { font: 600 12px/24px var(--mono); text-align: center; border-radius: 50%; background: var(--hair); color: var(--ink); height: 24px; }
 .steps button:hover { background: #f0f0ec; color: var(--ink); }
@@ -74,7 +83,7 @@ svg.dia { width: 100%; height: auto; display: block; }
 .land li.guard { border-color: var(--stop); }
 .land li.guard.nofork::after { content: "refuses otherwise"; }
 .land li.guard.noci::after { content: "holds otherwise"; }
-.land li.guard::after { content: "refuses if moved"; display: table; margin-top: 10px; font: 600 10px/1 var(--mono); color: var(--stop); background: var(--stop-wash); padding: 4px 6px; border-radius: 4px; }
+.land li.guard::after { content: "refuses if moved"; display: table; margin-top: 10px; font: 600 10px/1 var(--mono); color: var(--stop-text); background: var(--stop-wash); padding: 4px 6px; border-radius: 4px; }
 .landbtn { margin-top: 14px; display: inline-grid; gap: 2px; padding: 10px 14px; border-radius: 8px; background: var(--ink); color: #fff; }
 .landbtn b { font-size: 14px; } .landbtn small { color: #c9c9c3; font-size: 12px; }
 /* components */
@@ -100,7 +109,7 @@ th { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05e
 .stack-table th:first-child { width: 23%; } .stack-table th:nth-child(2) { width: 20%; }
 .stack-table caption { text-align: left; color: var(--muted); padding-bottom: 12px; font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-.warn { color: var(--stop); font-weight: 600; }
+.warn { color: var(--stop-text); font-weight: 600; }
 /* github app */
 .settings { display: grid; grid-template-columns: 220px 1fr; gap: 0; font-size: 14px; }
 @media (max-width: 640px) { .settings { grid-template-columns: 1fr; } }
@@ -115,21 +124,22 @@ th { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05e
 .twocol ul, .twocol ol { margin: 0; padding-left: 18px; font-size: 14px; }
 .twocol li { margin: 6px 0; }
 .tag { font: 600 11px/1 var(--mono); padding: 4px 7px; border-radius: 5px; vertical-align: 2px; margin-right: 6px; }
-.tag.q { color: var(--wait); background: var(--wait-wash); }
-.tag.ok { color: var(--ok); background: var(--ok-wash); }
+.tag.q { color: var(--wait-text); background: var(--wait-wash); }
+.tag.ok { color: var(--ok-text); background: var(--ok-wash); }
 footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair); padding-top: 16px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap">
+<a class="skip-link" href="#spec-main">Skip to spec</a>
+<main class="wrap" id="spec-main" tabindex="-1" aria-labelledby="doc-title">
   <header>
     <div>
       <div class="eyebrow">Devpost Learn · 4-spec</div>
-      <h1>Merge Desk</h1>
+      <h1 id="doc-title">Merge Desk</h1>
       <p class="sub">The blueprint: Next.js on Vercel, no database. Demo mode replays real recordings; live mode runs each merge in a throwaway sandbox where git, a line-by-line check and your tests decide. The AI only proposes.</p>
     </div>
-    <span class="pill" role="status" style="color:#1f8a4c;background:#e8f4ed">scope approved · stack reviewed</span>
+    <span class="pill ok" role="status">scope approved · stack reviewed</span>
   </header>
 
   <section aria-labelledby="plain-h">
@@ -351,6 +361,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair)
     <p class="muted">Implements the PRD's Screens and Layout, Look and Feel, Phone and States and Boundaries.</p>
     <div class="comps">
       <details open><summary>Accessible interaction foundations<span class="ref">shadcn + Radix</span></summary><div class="body"><p>Owned Button, Badge, Sheet, Accordion/Collapsible, RadioGroup, Tooltip, Skeleton, Textarea/Field and Kbd source, styled to system fonts and compact semantic tokens. Drops, holds and important errors stay inline. Icons always have understandable labels; statuses keep their words.</p><div class="files">ui/primitives/ · globals.css · components.json</div></div></details>
+      <details><summary>Contrast and navigation semantics<span class="ref">BRAND + WCAG</span></summary><div class="body"><p>Keep branch/status marker colors, with darker small-text roles: <code>ours-text #2558bd</code>, <code>theirs-text #a84e0f</code>, <code>ok-text #176b3a</code> and <code>wait-text #78600b</code>. Text meets 4.5:1 on its actual background; required control boundaries and focus cues meet 3:1. Decorative hairlines are not the sole control cue. Preserve visible focus after CSS resets, with a named main landmark and keyboard-visible skip link in each view.</p><div class="files">globals.css · layout.tsx · ui/primitives/</div></div></details>
       <details open><summary>Readable code review<span class="ref">Pierre Diffs</span></summary><div class="body"><p>Lazy read-only <code>FileDiff</code>/<code>PatchDiff</code>: split desktop, unified phone, line numbers, selectable code and wrap/scroll controls. Theme the Shadow DOM through documented options. Local languages/themes; plain-code loading/error fallback. Skip experimental conflict/editor/token APIs.</p><div class="files">ui/DiffView.tsx</div></div></details>
       <details><summary>Fetched data and honest run state<span class="ref">TanStack Query + reducer</span></summary><div class="body"><p>Query caches PR data and refreshes on focus. A typed reducer handles local sections and validated stream events. Cache keys separate mode/repo/PR/revision; Reset clears replay state. Head or base changes invalidate analysis. Mutations explicitly disable retry; never optimistically show Verified or Landed.</p><div class="files">ui/providers.tsx · ui/state.ts · ui/hooks/usePullRequests.ts</div></div></details>
       <details><summary>Phone and keyboard behavior<span class="ref">native + Radix Sheet</span></summary><div class="body"><p>Full-height named dialog, focus trap, visible close, Escape and focus return. Use <code>100dvh</code>, native scrolling and safe-area padding for bottom actions. Hold confirmation cancels on release/leave/blur and has a deliberate keyboard alternative. Shortcuts ignore editable fields; step updates have a polite live region.</p><div class="files">ui/Sheet.tsx · ui/HoldToConfirm.tsx · ui/PrList.tsx</div></div></details>
@@ -399,7 +410,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair)
   </section>
 
   <footer>Companion to <code>devpost/spec.md</code>, which is canonical. Previous: <code>prd.html</code>. Next: <code>5-build</code>.</footer>
-</div>
+</main>
 <script>
 (function () {
   var tabs = Array.prototype.slice.call(document.querySelectorAll('#stepper [role="tab"]'));

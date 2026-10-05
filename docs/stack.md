@@ -42,6 +42,8 @@ Keep Pierre behind `DiffView`: lazy-loaded client code, stable `FileDiff`/`Patch
 
 The UX completion criteria are keyboard navigation without stealing input focus, sheet focus trapping/return, inline recoverable drop confirmation, readable collapsed logs, honest loading/error/stale states, phone safe areas/touch targets, and state-only transitions of at most 150 ms with reduced motion. A pointer hold has a deliberate keyboard alternative. No notification pop-up stacks or essential icon-only states.
 
+The explicit Firecrawl/Taste follow-up used the local [Firecrawl skill](../.github/skills/firecrawl-web-scraping/SKILL.md) to produce temporary clean Markdown from the HTML, with scripts/styles removed and tables retained. Python performed the extraction; no Firecrawl service was available or called. The remote [Taste redesign audit skill](https://raw.githubusercontent.com/Leonxlnx/taste-skill/main/skills/redesign-skill/SKILL.md) informed focused contrast, keyboard-focus and landmark corrections. Its font swaps, decorative effects and longer motion yield to the approved product design. No new runtime dependency or skill installation was needed. [BRAND.md](design/BRAND.md) defines darker text roles and contrast requirements; check actual rendered backgrounds during the scaffold's Playwright/axe and manual review.
+
 ## Backend and integrations
 
 | Component/package | Exact baseline | Evidence | Role |

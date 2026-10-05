@@ -36,7 +36,7 @@ const STATE: Record<
   analyzed: { word: "Options ready", tone: "neutral" },
   failed: { word: "Analysis failed", tone: "wait" },
   checking: { word: "Checking", tone: "wait" },
-  mergeable: { word: "Can merge", tone: "outline" },
+  mergeable: { word: "No conflicts", tone: "outline" },
   "run-running": { word: "Running checks", tone: "wait" },
   held: { word: "HELD", tone: "stop" },
   verified: { word: "VERIFIED", tone: "ok" },
@@ -212,7 +212,8 @@ export function PrList({
           </div>
         ) : needs.length === 0 ? (
           <p className="border-b border-hair px-4 py-3 text-[13px] text-muted">
-            No conflicts. Every open pull request can merge.
+            No file conflicts reported. Open a pull request to review its checks and merge
+            readiness.
           </p>
         ) : (
           <>
@@ -238,7 +239,7 @@ export function PrList({
                     expanded && "rotate-90",
                   )}
                 />
-                Can merge <span className="font-mono">{canMerge.length}</span>
+                No file conflicts <span className="font-mono">{canMerge.length}</span>
               </button>
             ) : null}
             <Reveal open={expanded}>

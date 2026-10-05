@@ -4,14 +4,13 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { SESSION_COOKIE, sealSession } from "@/server/session";
 import { E2E_SESSION_SECRET } from "../../playwright.config";
+import type { PullList } from "@/core/pulls";
 
 // The desk on desktop and phone, with live API answers replayed from real
 // recorded data. Screenshots go to test-results/e2e/screens for review.
 
 const FIXTURES = join(process.cwd(), "tests", "e2e", "fixtures");
-const prs = JSON.parse(readFileSync(join(FIXTURES, "prs.json"), "utf8")) as {
-  pulls: Array<{ number: number; head: { ref: string } }>;
-};
+const prs = JSON.parse(readFileSync(join(FIXTURES, "prs.json"), "utf8")) as PullList;
 const stream = (scenario: string) =>
   readFileSync(join(FIXTURES, `analyze-${scenario}.ndjson`), "utf8");
 // The recorded analyses carry no signature; the replayed one gets a stand-in
@@ -460,11 +459,145 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
     "href",
     `https://github.com/YearningAsian/merge-desk/commit/${"e".repeat(40)}`,
   );
-  await expect(done.getByText("GitHub says the pull request can merge now.")).toBeVisible();
+  await expect(done.getByText("Historical Land result", { exact: true })).toBeVisible();
   await expect(done.getByText("Recorded on the pull request.")).toBeVisible();
   await expect(detail.getByText("Nothing has been pushed.")).toHaveCount(0);
   await shot(page, "landed-1440");
   await noSeriousAxe(page);
+});
+
+test("no file conflicts is separate from blocked merge readiness, with current checks and a GitHub action", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const clean = prs.pulls.find((pull) => pull.number === CLEAN)!;
+  const head = "a".repeat(40);
+  const base = "b".repeat(40);
+  await page.route("**/api/live/prs", (route) =>
+    route.fulfill({
+      json: {
+        repo: prs.repo,
+        pulls: [
+          {
+            ...clean,
+            number: 4,
+            title: "Land: guarded merge commit and decision record (slice 5)",
+            url: "https://github.com/YearningAsian/merge-desk/pull/4",
+            head: { ...clean.head, ref: "feat/land", sha: head },
+            base: { ref: "main", sha: base },
+            mergeable: "mergeable",
+            readiness: {
+              state: "blocked",
+              githubState: "blocked",
+              checkedHead: head,
+              reasons: [
+                "GitHub reports BLOCKED. Required reviews, checks or branch rules may apply; the exact rule and your merge permission were not verified here.",
+              ],
+              checks: {
+                state: "passing",
+                observedAt: "2026-10-05T21:00:00Z",
+                items: [
+                  {
+                    name: "CI / web",
+                    state: "passing",
+                    url: "https://github.com/YearningAsian/merge-desk/actions/runs/1",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/live?pr=4");
+  const detail = page.getByRole("article");
+  await expect(detail.getByText("File conflicts: None", { exact: true })).toBeVisible();
+  await expect(detail.getByText("Merge readiness: BLOCKED", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("link", { name: "CI / web" })).toBeVisible();
+  await expect(detail.getByRole("link", { name: `Head ${head.slice(0, 7)}` })).toHaveAttribute(
+    "href",
+    `https://github.com/${prs.repo}/commit/${head}`,
+  );
+  await expect(detail.getByRole("link", { name: `Base ${base.slice(0, 7)}` })).toHaveAttribute(
+    "href",
+    `https://github.com/${prs.repo}/commit/${base}`,
+  );
+  await expect(detail.getByRole("link", { name: "Review and merge on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/YearningAsian/merge-desk/pull/4",
+  );
+  await expect(
+    detail.getByText("Nothing needs resolving. This pull request can merge as it is."),
+  ).toHaveCount(0);
+  await expect(page.getByText("Every open pull request can merge.", { exact: false })).toHaveCount(
+    0,
+  );
+  await noHorizontalOverflow(page);
+  await noSeriousAxe(page);
+});
+
+test("Land history survives a changed head or base and never supplies the current conflict notice", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  let current = structuredClone(prs);
+  const commit = "e".repeat(40);
+  await page.route("**/api/live/prs", (route) => route.fulfill({ json: current }));
+  await page.route("**/api/live/land", (route) => {
+    current = {
+      ...current,
+      pulls: current.pulls.map((pull) =>
+        pull.number === CLEAN
+          ? { ...pull, head: { ...pull.head, sha: commit }, mergeable: "checking" }
+          : pull,
+      ),
+    };
+    return route.fulfill({
+      json: {
+        outcome: "LANDED",
+        commit,
+        branch: "demo/clean/rename",
+        mergeable: "conflicting",
+        record: { ok: true },
+      },
+    });
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await detail
+    .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+    .click();
+  await expect(detail.getByText("Historical Land result", { exact: true })).toBeVisible();
+  await expect(detail.getByText("File conflicts: Checking", { exact: true })).toBeVisible();
+  await expect(detail.getByText("the base probably moved", { exact: false })).toHaveCount(0);
+  current = {
+    ...current,
+    pulls: current.pulls.map((pull) =>
+      pull.number === CLEAN
+        ? {
+            ...pull,
+            head: { ...pull.head, sha: "f".repeat(40) },
+            base: { ...pull.base, sha: "c".repeat(40) },
+            mergeable: "mergeable",
+          }
+        : pull,
+    ),
+  };
+  await page.getByRole("button", { name: "Refresh pull requests" }).click();
+  await expect(detail.getByRole("group", { name: "Land: LANDED" })).toBeVisible();
+  await expect(
+    detail.getByText("The current head differs from the Land commit and the checked head.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    detail.getByText("The base differs from the checked base.", { exact: true }),
+  ).toBeVisible();
+  await expect(detail.getByText("Merge readiness: UNKNOWN", { exact: true })).toBeVisible();
 });
 
 test("a hold is recorded on the pull request as it happens", async ({ page }) => {

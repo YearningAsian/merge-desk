@@ -8,6 +8,7 @@ import { AnalysisView } from "@/ui/Analysis";
 import { DevDetails } from "@/ui/DevDetails";
 import { Options } from "@/ui/Options";
 import { Section } from "@/ui/Section";
+import { PrStatus } from "@/ui/PrStatus";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Kbd } from "@/ui/primitives/kbd";
@@ -29,6 +30,7 @@ function Notice({ children, action }: { children: React.ReactNode; action?: Reac
 
 export function PrDetail({
   pull,
+  repo,
   analysis,
   stale,
   titleId,
@@ -44,6 +46,7 @@ export function PrDetail({
   record,
 }: {
   pull: PullSummary;
+  repo: string;
   analysis: AnalysisState | undefined;
   stale: boolean;
   titleId: string;
@@ -56,7 +59,7 @@ export function PrDetail({
   onRefresh: () => void;
   run?: React.ReactNode;
   runLog?: string | null;
-  // Shown on top while the branch head is the commit Merge Desk landed.
+  // A labelled historical result, distinct from the latest GitHub snapshot.
   landed?: React.ReactNode;
   record?: React.ReactNode;
 }) {
@@ -96,11 +99,12 @@ export function PrDetail({
         </div>
       </header>
 
+      <PrStatus pull={pull} repo={repo} />
       {landed ? <div className="mb-4">{landed}</div> : null}
       {pull.fork ? (
         <Notice>Pull requests from forks aren&apos;t supported yet. Nothing was run.</Notice>
       ) : pull.mergeable === "mergeable" ? (
-        <Notice>Nothing needs resolving. This pull request can merge as it is.</Notice>
+        <Notice>Nothing needs conflict resolution. Review checks and merge readiness above.</Notice>
       ) : pull.mergeable === "checking" ? (
         <Notice
           action={
@@ -109,7 +113,7 @@ export function PrDetail({
             </Button>
           }
         >
-          GitHub is still working out whether this pull request can merge.
+          GitHub is still computing file-conflict status.
         </Notice>
       ) : !analysis ? (
         <Notice

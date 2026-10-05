@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, GitCommitHorizontal, LoaderCircle } from "lucide-react";
 import { OPTION_LABELS } from "@/core/options";
 import type { RecordEntry } from "@/core/record";
+import type { PullSummary } from "@/core/pulls";
+import type { Option } from "@/core/honor";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Section } from "@/ui/Section";
@@ -14,13 +16,14 @@ import { cn } from "@/ui/utils";
 // a VERIFIED result; its outcome is LANDED only when GitHub confirmed the
 // branch moved, UNKNOWN when it didn't say, REFUSED when nothing moved.
 
-export type LandState = { status: "landing" } | LandOutcome;
+export type LandState = { status: "landing" } | (LandOutcome & { context: LandContext });
 
-const MERGEABLE: Record<"mergeable" | "conflicting" | "checking", string> = {
-  mergeable: "GitHub says the pull request can merge now.",
-  checking: "GitHub is still working out whether it can merge; the list will update.",
-  conflicting:
-    "GitHub still reports a conflict: the base probably moved after the run. Analyze and run again.",
+export type LandContext = {
+  runKey: string;
+  option: Option;
+  head: string;
+  base: string;
+  at: string;
 };
 
 export function LandAction({
@@ -62,10 +65,14 @@ export function LandResult({
   outcome,
   repo,
   pullUrl,
+  current,
+  context,
 }: {
   outcome: LandOutcome;
   repo: string;
   pullUrl: string;
+  current: PullSummary;
+  context: LandContext;
 }) {
   const tone =
     outcome.outcome === "LANDED" ? "ok" : outcome.outcome === "UNKNOWN" ? "wait" : "stop";
@@ -81,6 +88,7 @@ export function LandResult({
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">Historical Land result</span>
         <Badge tone={tone} className="px-2 text-[12px] leading-[20px]">
           {outcome.outcome}
         </Badge>
@@ -96,9 +104,30 @@ export function LandResult({
           </a>
         ) : null}
       </div>
+      <p className="text-[12px] text-muted">
+        Attempt {new Date(context.at).toLocaleString()}: checked head{" "}
+        <code>{context.head.slice(0, 7)}</code>, base <code>{context.base.slice(0, 7)}</code>. Run{" "}
+        option: {OPTION_LABELS[context.option]}.
+      </p>
       {outcome.outcome === "LANDED" ? (
         <>
-          <p className="text-ink">{MERGEABLE[outcome.mergeable]}</p>
+          <p className="text-ink">
+            GitHub confirmed this commit was pushed to the PR branch. This result does not describe
+            current merge readiness.
+          </p>
+          {current.head.sha === outcome.commit ? (
+            <p>The current snapshot has the Land commit as its head.</p>
+          ) : current.head.sha === context.head ? (
+            <p>
+              The current snapshot has not confirmed the Land commit as its head. Refresh to
+              reconcile.
+            </p>
+          ) : (
+            <p>The current head differs from the Land commit and the checked head.</p>
+          )}
+          {current.base.sha !== context.base ? (
+            <p>The base differs from the checked base.</p>
+          ) : null}
           <p className="text-ink/80">
             {outcome.record.ok
               ? "Recorded on the pull request."

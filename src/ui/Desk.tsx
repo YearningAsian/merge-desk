@@ -16,7 +16,7 @@ import { Skeleton } from "@/ui/primitives/skeleton";
 import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource, LandOutcome } from "@/ui/sources/types";
-import { LandAction, LandResult, RecordSection, type LandState } from "@/ui/Land";
+import { LandAction, LandResult, RecordSection, type LandState, type LandContext } from "@/ui/Land";
 import { RunSection } from "@/ui/Run";
 import {
   analysisKey,
@@ -88,9 +88,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   // Land per run; the confirmed landing per pull request (it outlives the
   // analysis, whose head it just moved); whether each hold was recorded.
   const [lands, setLands] = useState<Record<string, LandState>>({});
-  const [landed, setLanded] = useState<Record<number, Extract<LandOutcome, { outcome: "LANDED" }>>>(
-    {},
-  );
+  const [landed, setLanded] = useState<
+    Record<number, { outcome: LandOutcome; context: LandContext }>
+  >({});
   const [recorded, setRecorded] = useState<Record<string, { ok: boolean; reason?: string }>>({});
   // Record updates for one pull request go one at a time from this tab (the
   // server also serializes and reads back), so a quick discard after an
@@ -226,11 +226,18 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
 
   // One deliberate click; never retried. The list and the record refresh
   // afterwards whatever the outcome, since GitHub is the source of truth.
-  const land = async (pull: PullSummary, key: string, token: string) => {
+  const land = async (pull: PullSummary, key: string, token: string, option: Option) => {
+    const context = {
+      runKey: key,
+      option,
+      head: pull.head.sha,
+      base: pull.base.sha,
+      at: new Date().toISOString(),
+    };
     setLands((map) => ({ ...map, [key]: { status: "landing" } }));
     const outcome = await source.land(pull.number, token);
-    setLands((map) => ({ ...map, [key]: outcome }));
-    if (outcome.outcome === "LANDED") setLanded((map) => ({ ...map, [pull.number]: outcome }));
+    setLands((map) => ({ ...map, [key]: { ...outcome, context } }));
+    setLanded((map) => ({ ...map, [pull.number]: { outcome, context } }));
     void queryClient.invalidateQueries({ queryKey: [source.mode, repo, "pulls"] });
     void queryClient.invalidateQueries({ queryKey: [source.mode, "record", pull.number] });
   };
@@ -344,6 +351,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   const detail = selected ? (
     <PrDetail
       pull={selected}
+      repo={repo}
       titleId={`pr-title-${selected.number}`}
       analysis={state.analyses[keyOf(selected)]}
       stale={
@@ -403,11 +411,18 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
                         selected,
                         runKey(keyOf(selected), selectedDone.option),
                         selectedRun.result.token!,
+                        selectedDone.option,
                       )
                     }
                   />
                   {selectedLand && "outcome" in selectedLand ? (
-                    <LandResult outcome={selectedLand} repo={repo} pullUrl={selected.url} />
+                    <LandResult
+                      outcome={selectedLand}
+                      repo={repo}
+                      pullUrl={selected.url}
+                      current={selected}
+                      context={selectedLand.context}
+                    />
                   ) : null}
                 </>
               ) : null
@@ -425,8 +440,14 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         ) : null
       }
       landed={
-        landed[selected.number] && landed[selected.number]!.commit === selected.head.sha ? (
-          <LandResult outcome={landed[selected.number]!} repo={repo} pullUrl={selected.url} />
+        landed[selected.number] && (!selectedLand || selected.mergeable !== "conflicting") ? (
+          <LandResult
+            outcome={landed[selected.number]!.outcome}
+            repo={repo}
+            pullUrl={selected.url}
+            current={selected}
+            context={landed[selected.number]!.context}
+          />
         ) : null
       }
       record={

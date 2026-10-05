@@ -56,7 +56,8 @@ export async function installationOctokit(
 }
 
 // The App's own identity: its id (to recognise its own comments) and its bot
-// account (the committer of a landed merge). Read once with the App's key.
+// account (the committer of a landed merge). App metadata uses its JWT;
+// the public bot profile uses a separate client without that credential.
 export type AppIdentity = { id: number; slug: string; botName: string; botEmail: string };
 let identity: Promise<AppIdentity> | null = null;
 
@@ -67,7 +68,7 @@ export function appIdentity(env: Env = process.env): Promise<AppIdentity> {
     const { data } = await app.apps.getAuthenticated();
     if (!data?.slug) throw new Error("GitHub didn't say which App this is");
     const botName = `${data.slug}[bot]`;
-    const { data: bot } = await app.users.getByUsername({ username: botName });
+    const { data: bot } = await new Octokit().users.getByUsername({ username: botName });
     return {
       id: data.id,
       slug: data.slug,

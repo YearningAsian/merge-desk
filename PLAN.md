@@ -83,10 +83,10 @@
 
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
-| 1.1 | Repo, `.gitignore`, `.env.example`, README stub | root | A | 🟡 | 0.2 | Repo public; `.env.example` with scaffold |
-| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | 🟡 | 1.1 | Claimed 2026-10-05 for 5-build slice 1: pin recheck + scaffold |
-| 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | Claimed 2026-10-05 for 5-build slice 1: env contract + /api/health (stats and /judge in slice 7) |
-| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | 🟡 | 1.2 | Claimed 2026-10-05 for 5-build slice 1: CI on main, Node 24 |
+| 1.1 | Repo, `.gitignore`, `.env.example`, README stub | root | A | ✅ | 0.2 | Done 2026-10-05: `.env.example`, README run instructions, presence-only `scripts/env-check.mjs` |
+| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ✅ | 1.1 | Done 2026-10-05 (1d4cb50): pins rechecked (no changes), Next 16 scaffold, lockfile via npm 12.2.0; format/lint/typecheck/test/build pass; `tsx` added for scripts |
+| 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | 2026-10-05: env contract and `/api/health` (booleans) done; `/api/stats` and `/judge` land in slice 7 |
+| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | 🟡 | 1.2 | 2026-10-05: `ci.yml` (main only, Node 24) committed; green status pending the first run |
 | 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
 | 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this; verify trusted snapshots, Node image, actual quotas and request duration |
 
@@ -94,7 +94,7 @@
 
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
-| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | 🟡 | 1.3 | Claimed 2026-10-05 for 5-build slice 1: honor gate, demo-branch scope guard, seeded demo PRs, main ruleset |
+| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | 🟡 | 1.3 | 2026-10-05: gate core, demo-only scope guard, events and demo schemas done (101 tests); `core/options.ts` (keeps/drops) lands in slice 2 |
 | 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | ⬜ | 1.6 | Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
 | 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | ⬜ | 2.1 | Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
 | 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | ⬜ | 2.3 | shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |
@@ -143,9 +143,9 @@
 |---|---|---|---|
 | H1 | Register on Devpost for Build With AI: Basics | A | 5.4 |
 | H2 | Gemini API key into `.env.local` and Vercel env | A | 1.6 |
-| H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), installed on `merge-desk` only; App ID, Client ID, client secret in `.env.local` ✅; private key ⬜ | A | 1.6 |
+| H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), installed on `merge-desk` only; App ID, Client ID, client secret in `.env.local` ✅; private key ⏳ being rotated by A (2026-10-05); nothing uses it until A confirms | A | 1.6 |
 | H4 | Vercel project linked to this repo; env vars added; production callback URL added to the GitHub App | A | 2.6 |
-| H6 | Delete the unused empty `merge-desk-playground` repo (needs `delete_repo` scope or GitHub Settings) | A | none |
+| H6 | ✅ Unused empty `merge-desk-playground` repo is gone (GitHub reports it does not exist, checked 2026-10-05) | A | none |
 | H5 | Final submit click on every portal | A | being judged |
 
 ---
@@ -181,4 +181,4 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
 - **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic checks, real sandbox tests and current GitHub guards do.
 
-_Last updated: 2026-10-04, stack/UX documentation reviewed; approved sandbox and demo/live architecture synchronized (agent)_
+_Last updated: 2026-10-05, 5-build slice 1 done: gate core, local runner, seeded `[Demo]` PRs #1 to #3 into `demo/base`, `main` rulesets (agent)_

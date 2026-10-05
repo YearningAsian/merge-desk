@@ -77,7 +77,7 @@
 | 0.5 | PRD approved (`3-prd`) | `devpost/prd.md`, `devpost/prd.html` | A | ✅ | Approved 2026-10-04 with changes: demo mode (recorded real runs, public) + live mode (learner only); recoverable drops now; never a fake pass; build priority held → verified → chosen drop → options → rest |
 | 0.6 | Spec approved (`4-spec`) | `devpost/spec.md`, `devpost/spec.html` | A | ✅ | Approved 2026-10-04: one repo, demo PRs into `demo/base`, Vercel Sandbox runner + local fallback, GitHub App (contents + PRs only), Gemini 3.8 Flash |
 | 0.7 | Stack and UI/UX documentation review | `devpost/spec.*`, `docs/stack.md`, `docs/adr/0001-stack.md` | A | ✅ | Completed 2026-10-04: stable pins/peer review, UI libraries, service API and docs sync; HTML/links/JS/hygiene checks passed. Browser rendering and app install/build/integrations remain unverified |
-| 0.8 | Firecrawl workflow and Taste audit follow-up | `devpost/spec.*`, `docs/design/BRAND.md`, `docs/stack.md` | A | 🚧 | Claimed 2026-10-04: clean Markdown intake and focused contrast, focus and landmark audit; Firecrawl service unavailable, remote Taste audit skill read |
+| 0.8 | Firecrawl workflow and Taste audit follow-up | `devpost/spec.*`, `docs/design/BRAND.md`, `docs/stack.md` | A | ✅ | Done 2026-10-05 (afca038): five dark text roles incl. new `--stop-text` (all >= 4.5:1 on surfaces and washes), 3:1 control border, ink focus, skip link and main landmark; HTML balanced, em-dash clean |
 
 ### Phase 1: Scaffold
 

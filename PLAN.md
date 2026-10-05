@@ -39,8 +39,11 @@
 - Must be built with the **Devpost Learn Skill Pack** (`npx skills add challengepost/learn-ai-basics --all -y`) and a SKILL.md coding agent. Its six skills (1-start ... 6-ship) are the required build process; where they conflict with the zero-to-ship kit, the skill pack wins.
 - Public repo with source, assets, instructions **and the planning documents `scope.md`, `prd.md`, `spec.md`** (the pack writes them to `devpost/`), plus an **open source license file** (MIT).
 - Demo video **less than three (3) minutes**, showing the project working end-to-end, on YouTube or Vimeo.
-- Text description of features. The pack requires the learner to write submission copy; the agent may only fix spelling and grammar.
-- "Projects must be newly created during the Submission Period"; disclose any pre-existing code.
+- **Judging Stage One is pass/fail:** the project fits the theme and "was built using the Devpost Learn skill pack, as evidenced by the planning documents in the repository." Missing `scope.md`/`prd.md`/`spec.md` means not judged.
+- Text description: what it does, who it's for, what you learned. **No rule restricts AI-written descriptions or video scripts** (rules and overview re-checked 2026-10-04). The learner has directed the agent to draft them; the skill pack's `6-ship` learner-written guidance is curriculum advice, not an eligibility rule, and is overridden by that instruction.
+- Video: "must not include third party trademarks, or copyrighted music or other material" without permission. Keep third-party logos (including GitHub's) out of frame where possible; no copyrighted music.
+- License "should be detectable and visible at the top of the repository page (in the About section)".
+- "Projects must be newly created during the Submission Period"; AI coding assistants allowed; "must disclose any other pre-existing code or work incorporated" (here: the hackathon kit's planning templates and the workspace agent skills).
 
 ---
 
@@ -49,9 +52,9 @@
 | Criterion (quote the rules) | Surface that answers it | Owner |
 |---|---|---|
 | Design: "a complete, coherent product experience, not just a technical proof of concept" | Desk conflict view: two intents side by side, Beat A held, Beat B lands, one coherent flow | A |
-| Potential Impact: "a credible, specific case for solving a real problem for a real audience" | Hook study + reviewers of agent-written PRs as the audience; the replay eval number | A |
+| Potential Impact: "a credible, specific case for solving a real problem for a real audience, and does the solution actually address that problem based on what's demonstrated" | Hook study + reviewers of agent-written PRs as the audience; the replay eval number | A |
 | Innovation/Idea: "how creative and novel ... does the project differ from existing concepts" | Intent check + CI gate vs AI merge drivers that write output unchecked | A |
-| Presentation: "does the video clearly demonstrate the project working end-to-end" | Under-3-minute video, real UI, Beat A then Beat B | A |
+| Presentation: "does the video clearly demonstrate the project working end-to-end? Does the pitch communicate what problem is solved, who it's for, and why it matters?" | Under-3-minute video, real UI, Beat A then Beat B, problem/audience/why stated | A |
 | Execution: can a judge verify it | `/judge` + public `/api/health` + `/api/stats` + the demo repo's PR history | A |
 
 **Headline number:** "Of N real historical conflict hunks, an unchecked AI resolution dropped an intent in X; Merge Desk held all X." Placeholder until the replay eval (row 2.9) writes it to `docs/FACTS.json`. Never type a number from memory.

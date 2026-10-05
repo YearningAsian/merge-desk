@@ -97,7 +97,7 @@ From `prd.md > Look and Feel`; no new design discovery.
 - **Density:** Linear/Xcode spacing. 13 to 14 px base, about 32 px list rows, 8 px radii, hairline borders. One primary action per view.
 - **Color:** neutral surfaces; **ours blue `#2f6fed`**, **theirs orange `#d9711f`**; status colors ok `#1f8a4c`, stop `#c93c3c`, wait `#9a7d14`. Every status also shows its word. Diffs use GitHub-style green/red line washes.
 - **Step list:** Vercel-style rows with state badges (queued, running, passed, failed, not run) and a collapsed raw log.
-- **Motion:** state changes only, 150 ms or less, honoring reduced motion. No typing effects, no sparkle, no blur or translucency anywhere near code.
+- **Motion:** state changes 150 ms or less; expand and collapse 200 ms by growing height (grid rows) with a fade, never a large block appearing at once; the slider thumb glides between stops; a diff is drawn out of sight and revealed whole. Reduced motion (system or Settings) turns it off. No typing effects, no sparkle, no blur or translucency anywhere near code.
 - **Land button** reads **"Land: push merge commit to `<branch>`"** with the line **"Does not merge into main"** (or the pull request's actual base) under it.
 - **Demo pull requests** carry a `DEMO` badge in the list.
 - **Phone:** one column; the detail opens as a full-height sheet; actions pinned at the bottom; hold-to-confirm with a visible progress ring (no haptics on the web).
@@ -317,7 +317,7 @@ merge-desk/
 ## Configuration
 
 Server-only environment variables (`.env.example` lists names with placeholders):
-`GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.5-flash-lite`, `SESSION_SECRET` (32+ random bytes; derive a separate signing key for HMAC), `ALLOWED_LOGINS=YearningAsian`, `ALLOWED_REPOS=YearningAsian/merge-desk`, `RUNNER=sandbox|local`, `DAILY_LIVE_RUN_CAP=30`. Vercel Sandbox authenticates with the deployment's OIDC token (no key). Optional deployment error reporting uses `SENTRY_DSN` and server-only build credentials when enabled. Nothing secret is ever sent to the browser or into a sandbox. The allowlists are also defaults in code, so an empty variable can never widen access. The public deployment always uses the sandbox runner.
+`GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.5-flash-lite`, `SESSION_SECRET` (32+ random bytes; derive a separate signing key for HMAC), `ALLOWED_LOGINS=YearningAsian`, `ALLOWED_REPOS=YearningAsian/merge-desk`, `RUNNER=sandbox|local`, `DAILY_LIVE_RUN_CAP=30`. Vercel Sandbox authenticates with the deployment's OIDC token (no key). Optional deployment error reporting uses `SENTRY_DSN` and server-only build credentials when enabled. Nothing secret is ever sent to the browser or into a sandbox. Browser-side **Settings** (localStorage, per browser, nothing secret): Gemini model from a fixed list in `core/models.ts` that the server checks again (anything else is refused before Google is called), analyze on open, list refresh interval, diff layout and wrap, single-key shortcuts, reduce motion. Finished analyses are kept in `sessionStorage` for reloads of the tab for 55 minutes (inside the 60-minute signature) and cleared on sign-out. The allowlists are also defaults in code, so an empty variable can never widen access. The public deployment always uses the sandbox runner.
 
 ## External Services and Dependencies
 

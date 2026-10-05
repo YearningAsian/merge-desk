@@ -27,7 +27,7 @@ Source: `scope.md > The Core Loop`, `scope.md > What "Working" Looks Like`.
 **One main screen, no page changes for the core flow.** (Learner: "The pc layout is the main selling point.")
 
 - **Left: Pull request list.** Fixed-width column. Conflicting pull requests first, then the rest collapsed under "Can merge".
-- **Right: Pull request detail**, top to bottom: header (title, number, branches, state), **Analysis** (ours and theirs side by side), **Options**, **Run** (live steps and checks), **Result** (what the merge did, diff, Land), then **Details** for developers, folded (the exact commits everything is bound to, step timings and logs, commands that recreate the conflict locally). Sections are minimized but clickable to expand; the section that needs attention is open.
+- **Right: Pull request detail**, top to bottom: header (title, number, branches, state), **Analysis** (ours and theirs side by side), **Options**, **Run** (live steps and checks), **Result** (what the merge did, diff, Land), then **Details**, folded (the exact commits everything is bound to, step timings and logs, commands that recreate the conflict locally). **Settings** (gear, or `,`) chooses the Gemini model and tunes the desk; `?` lists the keyboard shortcuts. Sections are minimized but clickable to expand; the section that needs attention is open.
 - **Phone:** the same order and pieces, adapted: the list is the home view; selecting a pull request opens the detail as a full-height sheet; diffs are shown one column at a time; actions sit at the bottom within thumb reach. The phone is for **watching and deciding** (pick an option, confirm, land, discard), not editing code.
 
 ## Look and Feel

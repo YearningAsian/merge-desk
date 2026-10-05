@@ -53,7 +53,7 @@ System fonts only; no web-font download or build-time font fetch.
 
 ## Motion
 
-State changes only, 150 ms or less. Honor `prefers-reduced-motion`; keep the code view still while someone reads. Check rows move from queued to running and their actual result. No scroll animation, typing effects, sparkle or theatrical status stamps.
+State changes 150 ms or less; opening and closing content 200 ms, growing its height with a short fade so nothing large appears at once and the view above stays put. The resolution slider's thumb glides between stops. Honor `prefers-reduced-motion` and the Settings switch; keep the code view still while someone reads, and reveal a diff only once it is drawn. Check rows move from queued to running and their actual result. No scroll animation, typing effects, sparkle or theatrical status stamps.
 
 ## UI foundations
 

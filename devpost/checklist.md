@@ -1,0 +1,124 @@
+---
+doc: checklist
+status: approved
+---
+
+# Build Checklist
+
+Build mode: fast (chosen 2026-10-05)
+
+Learner conditions for fast mode (2026-10-05):
+- Stop only at the hands-on checks below (after slice 3, after slice 5, final review), after slice 2 to report sandbox timings before any screen is built, whenever a slice fails verification twice, and before any spec change.
+- At each stop: what works, how to try it in under a minute, what was assumed, what is next.
+- Outward actions approved: pushing `demo/*` branches and opening `[Demo]` PRs into `demo/base` only (slice 1); pushing `main` after each slice's verification pass succeeds; production deploy (slice 6). Anything outward not on this list is asked first.
+- Nothing that needs the GitHub App private key runs until the learner confirms the rotated key is in place.
+- If slices 1 to 4 are not working by 2026-10-15 (halfway to the 2026-10-26 deadline), report it and cut from the bottom: slice 8, then slice 7's `/judge` page.
+
+Commits follow the repo's `AGENTS.md`: a status-only claim commit on the matching `PLAN.md` rows before each slice, the slice's code commit, then a status-only done commit. Named paths only. `main` is pushed after each verified slice; slice 5 goes through a pull request and a separate-model review before merge.
+
+## Slices
+
+- [ ] **1. The gate holds a merge that drops one side, on a real conflict (laptop, no AI yet)**
+  Becomes usable: Three real seeded conflicts exist as `[Demo]` pull requests on GitHub, into `demo/base` and never `main`. `npm run gate -- clean --candidate drop-theirs` merges the real branches on your laptop, runs parse, choice-honored and the playground's real `node --test` suite, and prints the step list ending HELD with "theirs: retry on 429, MISSING". `--candidate combined` ends VERIFIED. The Next.js app builds and serves a home page.
+  Why now: The unique kernel is the gate, and it is pure code the AI cannot influence (the model proposes, code decides). Proving it first on real git conflicts means the AI, the desk and Land all plug into checks that already work. Scaffold, pinned stack, CI and the seeded conflicts every later slice needs are folded in here rather than being their own steps.
+  PRD ref: `prd.md > Features and Behavior > Live run and checks`, `prd.md > Features and Behavior > Intentional drops`, `prd.md > Build Priority` (1, 2)
+  Spec ref: `spec.md > Stack`, `spec.md > Components > Choice-honored check`, `spec.md > Components > Run pipeline and runners` (LocalRunner), `spec.md > Components > Demo scenarios inside the repository`, `spec.md > Data Model` (event shape), `spec.md > File Structure`, `spec.md > Configuration`
+  Build: Recheck the planned pins against the npm registry and record any change in `docs/stack.md`. Scaffold Next.js App Router under `src/` with TypeScript, Tailwind tokens from `docs/design/BRAND.md`, ESLint, Prettier and Vitest; exact pins and one `package-lock.json`; `.env.example`; `src/server/env.ts` and `GET /api/health` (booleans only); CI for `main` on Node 24. Add `playground/` (`src/api.js` with `fetchUser`, `src/billing.js`, `node:test` tests, no dependencies). `scripts/demo-seed.mjs` builds `demo/base`, the three scenario branch pairs and `demo-seed/*` tags, pushes them and opens the labelled `[Demo]` pull requests with `gh`; `scripts/demo-reset.mjs` (refuses anything outside `refs/heads/demo/*`, needs `--yes`). Test-first core: `src/core/{events,conflicts,atoms,honor}.ts` with rename detection and fail-closed ambiguity. `src/server/runner/{types,local}.ts`. `scripts/gate.ts` runs prepare, apply candidate, parse, honor and tests on hand-written candidate merges under `tests/fixtures/` and prints the step list.
+  Verify (mechanical): `npm run lint && npm run typecheck && npm test && npm run build` pass; `npm run gate -- clean --candidate drop-theirs` exits non-zero with HELD and the MISSING line; `npm run gate -- clean --candidate combined` exits 0 with VERIFIED and real `node --test` output; `npm run gate -- held --candidate combined` ends HELD on a real failing test; `gh pr list --label demo --json number,baseRefName,mergeable` shows three PRs into `demo/base`, each CONFLICTING; `python scripts/check-em-dash.py` passes.
+  Learner check: Open the three `[Demo]` pull requests on GitHub and confirm each one says it has conflicts and targets `demo/base`. Run `npm run gate -- clean --candidate drop-theirs`, then `--candidate combined`, and compare the two step lists: does HELD versus VERIFIED, and the MISSING line, read the way you would want it on the desk?
+  Commit: `feat(core): choice-honored gate, local runner and seeded demo conflicts (PLAN 1.2, 2.1)`
+
+- [ ] **2. Gemini reads both sides and proposes the merge; a cloud sandbox runs the checks**
+  Becomes usable: `npm run gate -- clean --ai` asks Gemini for each side's one-line intent and two or three options (one Recommended with its reason; what each keeps and drops comes from git, not the model), takes the chosen option, gets Gemini's proposed merge, and runs the same gate inside a Vercel Sandbox with the network switched off before candidate code runs. Every step prints its state and timing. `--runner local` still works without Vercel.
+  Why now: Gemini's Interactions API and Vercel Sandbox are the least familiar services, and the spec's one useful unknown (is a sandbox fast enough to watch?) has to be answered before any screen is designed around its timing. Both plug into the slice 1 gate unchanged.
+  PRD ref: `prd.md > Features and Behavior > Conflict analysis`, `prd.md > Features and Behavior > Resolution options`, `prd.md > Features and Behavior > Live run and checks`, `prd.md > Build Priority` (1 to 4)
+  Spec ref: `spec.md > Components > Conflict analysis`, `spec.md > Components > Resolution options`, `spec.md > Components > Run pipeline and runners`, `spec.md > External Services and Dependencies > Gemini API`, `spec.md > External Services and Dependencies > Vercel Sandbox`, `spec.md > External Services and Dependencies > Spending guards`, `spec.md > Decisions and Open Issues` (one useful unknown)
+  Build: Human first: `npx vercel login`, `npx vercel link` to a new `merge-desk` project, then `npx vercel env pull .env.development.local` (never into `.env.local`, which holds your keys). Agent: `src/server/gemini/{client,analyze,propose}.ts` (Interactions API, `store: false`, Zod-derived JSON schema, 30-second deadline, validated before use); `src/core/options.ts` (keeps, drops, authors and older side from git data); `src/server/sign.ts` (HMAC over user, repo, PR, head/base SHAs, expiry); `src/server/pipeline/{analyze,run}.ts` emitting the shared event stream, with at most two automatic retries and only on malformed output or a parse failure; `src/server/runner/sandbox.ts` (exact-SHA git source, Node 24 image, deny-all before candidate code, 120-second timeout, `stop()` in `finally`); `tests/{llm,runner}.live.test.ts` behind `npm run test:live`.
+  Verify (mechanical): `npm run test:live` passes one schema-valid Gemini call and a sandbox create, merge, deny-all, test and stop round, printing per-step timings (target: tests under 30 seconds, whole run under 2 minutes; if missed, record the evidence and the spec's fallback under Revisions). `npm run gate -- clean --ai --runner sandbox` ends VERIFIED; `npm run gate -- held --ai` ends HELD on a real failing test; `npm run gate -- drop --ai --option <keep-newer>` ends VERIFIED with only the dropped side missing. Unit suite, lint, typecheck and build stay green.
+  Learner check: Run `npm run gate -- clean --ai` and read Gemini's two intents and the options. Do the one-liners say what each branch meant, and is the Recommended reason one you would accept? Note the sandbox timings it prints.
+  Commit: `feat(pipeline): Gemini analysis and proposals with the sandbox runner (PLAN 1.6, 2.3)`
+
+- [ ] **3. Sign in and read a conflict on the desk**
+  Becomes usable: On your laptop, `/live` asks you to sign in with GitHub (only YearningAsian gets in), then lists merge-desk's open pull requests with the conflicting `[Demo]` ones first. Selecting one runs the analysis: both sides' intents side by side (commits, files and authors one click away), the conflicting files as a GitHub-style diff, and the options with one Recommended. A narrow window shows one column with the detail in a full-height sheet.
+  Why now: The analysis screen is the first half of the kernel ("conflicts stop being a black box") and sets the design language every later screen reuses, so your feedback here can still change everything built after it.
+  PRD ref: `prd.md > The Core Journey` (1 to 3), `prd.md > Screens and Layout`, `prd.md > Look and Feel`, `prd.md > Features and Behavior > Pull request list`, `prd.md > Features and Behavior > Conflict analysis`, `prd.md > Features and Behavior > Resolution options`, `prd.md > Features and Behavior > Phone`, `prd.md > States and Boundaries`
+  Spec ref: `spec.md > Look and Feel` (including UI/UX implementation and acceptance), `spec.md > Components > Mode and data source`, `spec.md > Components > Desk layout`, `spec.md > Components > Pull request list`, `spec.md > Components > Sign-in and guards`, `spec.md > External Services and Dependencies > GitHub App`
+  Build: GitHub App sign-in (`/api/auth/{github,callback,signout}`, random state, allowlisted login, iron-session 8-hour cookie); `src/server/github/{app,prs}.ts` (installation token, list with `mergeable_state`, compare); `/api/live/prs`; `/api/live/analyze` (NDJSON stream, signed analysis); `src/ui/sources/{types,live}.ts`, Query provider and typed reducer; shadcn/Radix primitives restyled to BRAND tokens; `Desk`, `PrList` (J/K, Up/Down, Enter, DEMO badge, Checking), `Analysis`, `Options` (RadioGroup), lazy `DiffView` on Pierre with a plain `<pre>` fallback, `Sheet` below 768 px, skip link and named main landmark; first-use, no-conflicts, already-mergeable and unavailable states. Visual pass with the Taste skill inside the approved BRAND direction.
+  Verify (mechanical): lint, typecheck, unit tests (session, allowlist, signing, reducer) and build pass. With a test-sealed session, `/api/live/prs` returns the three demo PRs as conflicting and a non-allowlisted login gets 403; signed out it gets 401. Playwright: signed-out `/live` shows only the sign-in panel; the analysis view renders at 1440 px and 390 px without horizontal overflow; keyboard J/K/Enter moves and opens; axe reports no serious violations.
+  Learner check: Run `npm run dev`, open `http://localhost:3000/live`, sign in, pick the clean `[Demo]` PR and read the analysis and options, then narrow the window to phone width. What did you notice, and what would you change about the look, density or wording before the run screens are built on top of it?
+  Commit: `feat(desk): GitHub sign-in, pull request list and conflict analysis (PLAN 2.2, 2.4)`
+
+- [ ] **4. Choose an option and watch the merge get held or verified**
+  Becomes usable: Choosing an option starts a run whose steps tick live (queued, running, passed, failed, not run), each with its raw log collapsed underneath. Dropping a side asks once, inline, naming whose work is lost (Cmd/Ctrl+Enter or hold to confirm). The held demo PR ends HELD with the failed check, what was tried, its diff and Download patch, then pick a different option, steer and retry, or discard. The clean PR ends VERIFIED with a result card and diff. If the PR's head or base moves, it is marked out of date and needs a fresh run.
+  Why now: This completes the kernel on screen in the PRD's priority order (held, verified, chosen drop) before anything writes to GitHub.
+  PRD ref: `prd.md > The Core Journey` (4 to 6), `prd.md > Features and Behavior > Intentional drops`, `prd.md > Features and Behavior > Live run and checks`, `prd.md > Features and Behavior > Held merges`, `prd.md > States and Boundaries` (Running, Held, Pull request changed), `prd.md > Build Priority` (1 to 3)
+  Spec ref: `spec.md > Components > Drop confirmation`, `spec.md > Components > Run pipeline and runners`, `spec.md > Components > Held merges`, `spec.md > Data Model` (run events, run result), `spec.md > Important Failure Modes`
+  Build: `/api/live/run` (NDJSON stream, revision recheck, signed result, overall request deadline, cancel on disconnect); `RunSteps`, `Result`, `HeldActions` (recommendation recomputed from what failed, steer input, discard), `DropConfirm` and `HoldToConfirm` (800 ms, cancels on release, leave or blur, deliberate keyboard alternative), patch download, stale detection, polite live region for status; mutations never retry and never show an optimistic VERIFIED.
+  Verify (mechanical): lint, typecheck, unit tests (reducer, stream parser, hold timing) and build pass. Driving the run route on the three demo PRs: held ends HELD with the failing test and its exit code shown; clean ends VERIFIED; drop (confirmed) ends VERIFIED with only the dropped side missing. `git ls-remote origin 'refs/heads/demo/*'` is unchanged after every run (nothing pushed). Playwright: drop confirmation cancels, then confirms with Ctrl+Enter; status changes reach the live region.
+  Learner check: On the desk, run the held PR and read why it was held, try steer and retry or pick a different option, then take the clean PR to VERIFIED and the drop PR through its confirmation. Did each ending tell you what happened without opening a log?
+  Commit: `feat(desk): live run steps, held and verified results, chosen drops (PLAN 2.3, 2.4)`
+
+- [ ] **5. Land the verified merge, the PR turns mergeable, and every decision is recorded**
+  Becomes usable: On a VERIFIED result, **Land: push merge commit to `<branch>`** (with "Does not merge into `<base>`" under it) adds a merge commit to the pull request's own branch, only if nobody pushed since the run, and the PR shows as mergeable on GitHub. Land, drop, hold and discard each update one Merge Desk comment on the PR: who, when, the option, the reason shown, the checks, and for drops the kept branch and commit IDs.
+  Why now: Land is the only path that writes code to GitHub, so it comes after the gate is proven on screen, and it gets a separate-model adversarial review before it merges (repo rule 7).
+  PRD ref: `prd.md > The Core Journey` (6, 7), `prd.md > Features and Behavior > Landing a merge`, `prd.md > Features and Behavior > Decision record`, `prd.md > Features and Behavior > Intentional drops` (recoverable drops)
+  Spec ref: `spec.md > Components > Landing`, `spec.md > Components > Decision record`, `spec.md > Components > Repository safeguards`, `spec.md > External Services and Dependencies > GitHub App`
+  Build: On a branch with a pull request. Order is fixed by the learner: the `main` protection rule, the head-moved and base-moved guards and the no-force-push update are built and unit-tested before any real Land, and the first real Land is on a `[Demo]` PR only, with the learner watching. Apply the `main` ruleset with your own `gh` auth (block force pushes and deletion; only admins update). `src/server/guard.ts` (allowlists; refuse fork, default and base branches; refuse `.github/workflows/` changes; head and base recheck); `src/server/github/land.ts` (blobs, tree, merge commit with parents `[head, base]`, ref update with `force: false`, post-Land mergeability read); `src/server/github/comment.ts` and `src/core/record.ts` (single marked comment, upsert); `/api/live/{land,record}`; Land button copy per spec. Adversarial round by a different model with `hackathon-adversarial-review`, saved in `.review/`; fixes applied until a clean round, then merge.
+  Verify (mechanical): unit tests for every guard (fork, `main`, default, base branch, workflow file, moved head, moved base) and for record render and parse. Live round trip: Land the clean demo PR, then `gh pr view <n> --json mergeable,mergeStateStatus` reports MERGEABLE and its branch's newest commit has parents `[old head, base]`; replaying the same signed result is refused; exactly one Merge Desk comment exists with the entry; `gh api repos/YearningAsian/merge-desk/rulesets` lists the `main` ruleset; the review round is clean; `npm run demo:reset -- --yes` restores the demo PR to conflicting.
+  Learner check: Land the clean `[Demo]` PR from the desk, switch to GitHub and confirm it now says it can merge and carries the Merge Desk comment. Then hold and discard on another PR and watch the same comment update.
+  Commit: `feat(land): guarded fast-forward Land and the decision record (PLAN 2.2, 2.3)`
+
+- [ ] **6. Live on the internet and on your phone**
+  Becomes usable: Merge Desk runs at its Vercel production URL. On your phone you sign in, open a conflicting PR in the full-height sheet, hold to confirm, watch the sandbox steps and Land, with actions pinned within thumb reach. `/api/health` reports each integration truthfully, and live work is refused once the daily usage throttle is reached or cannot be counted.
+  Why now: The phone is where live mode has to work for the video, and deployment is where function duration, OIDC and callback settings can surprise us. Doing it after the full journey works locally means any new failure is clearly the deployment.
+  PRD ref: `prd.md > Features and Behavior > Phone`, `prd.md > Features and Behavior > Demo mode and live mode` (live mode), `prd.md > States and Boundaries` (Service unavailable, Permissions)
+  Spec ref: `spec.md > Where It Runs and How Someone Tries It`, `spec.md > Configuration`, `spec.md > External Services and Dependencies > Spending guards`, `spec.md > Components > Engineering support`, `spec.md > Look and Feel` (UI/UX implementation and acceptance: phone sheet)
+  Build: Human: add the env vars in Vercel and the production callback URL to the GitHub App (PLAN H4). Agent: `maxDuration = 240` and the 210-second deadline on live routes; usage throttle from tagged `Sandbox.list` that refuses when accounting fails; `/api/stats`; phone polish (`100dvh`, safe areas, 44 px targets, bottom actions); production deploy; probe workflow variables.
+  Verify (mechanical): production deploy succeeds; `curl <prod>/api/health` returns `ok: true` with `true` only for wired integrations; signed-out `<prod>/api/live/prs` returns 401; a held and a verified run on production finish inside the deadline with timings in the logs; Playwright at 390 px against production shows no horizontal overflow; throttle unit tests refuse at the cap and when listing fails; the daily run cap and the 120-second sandbox timeout are confirmed active on production before the URL is shared.
+  Learner check: On your phone, open the production URL, sign in, run the held demo PR, then land the clean one with hold to confirm. What felt awkward to reach or read on the small screen?
+  Commit: `feat(deploy): production live mode, phone layout and usage throttle (PLAN 2.6)`
+
+- [ ] **7. Demo mode for everyone: recorded real runs, Reset and `/judge`**
+  Becomes usable: Anyone can open `/demo` (or the `/judge` itinerary) without signing in and click through the three demo PRs (clean, held, drop) on the same desk, played back from real live runs with their original timings, under "Demo: recorded from a real run" with Reset. The home page says what Merge Desk is, with Try the demo and Sign in.
+  Why now: Recordings must be captured from live mode, so this can only follow it; it is what judges will actually click.
+  PRD ref: `prd.md > Features and Behavior > Demo mode and live mode`, `prd.md > States and Boundaries` (Demo reset)
+  Spec ref: `spec.md > Components > Mode and data source`, `spec.md > Components > Demo scenarios inside the repository`, `spec.md > Components > Engineering support`, `spec.md > Data Model` (recording file), `spec.md > Where It Runs and How Someone Tries It`
+  Build: `scripts/record.mjs` captures the three scenario runs from live mode into `demo/recordings/{clean,held,drop}.json`; `RecordedSource` with timed playback; `ModeBanner`; Reset; `/demo`, `/judge` and the home page; `npm run recordings:check`; `docs/FACTS.json` measured with provenance and served by `/api/stats`; Playwright and axe journeys on `/demo` for desktop and phone; README run instructions; deploy.
+  Verify (mechanical): `npm run recordings:check` passes; `npm run e2e` passes held, verified, chosen drop and Reset on desktop and phone with no serious axe violations; the `/demo` journey's network log contains only the recording files (no API calls, nothing written); production `/demo` and `/judge` load signed out; `curl <prod>/api/health` reports recordings present.
+  Learner check: In a private window on your phone and laptop, open the production `/judge` page, follow it through all three demo PRs, then press Reset. Would a judge understand what they just watched without you explaining it?
+  Commit: `feat(demo): recorded demo mode, Reset and the judge itinerary (PLAN 2.5, 2.7, 2.8)`
+
+- [ ] **8. Merge Desk resolves a real conflict in its own repository**
+  Becomes usable: A real conflict between two of this build's own feature branches (pull requests into `main`) is analyzed, checked with the app's real unit tests inside the sandbox, and landed by Merge Desk on its own pull request branch, ready for you to merge.
+  Why now: This is the dogfood beat you asked for in the video, and it needs the whole product working on production. It also exercises the last runner path: the trusted dependency snapshot that `npm run test:core` needs.
+  PRD ref: `prd.md > Features and Behavior > Demo mode and live mode` (live mode on a repository you own), `prd.md > Features and Behavior > Landing a merge`
+  Spec ref: `spec.md > Where It Runs and How Someone Tries It` (required submission recording), `spec.md > Components > Run pipeline and runners` (dependency snapshot), `spec.md > Decisions and Open Issues` (dogfood conflict)
+  Build: Trusted dependency snapshot keyed by image, lockfile and install policy (`npm ci --ignore-scripts`). Make two small real changes picked at the core-journey checkpoint, on separate feature branches that edit the same TypeScript file; open both PRs into `main`, merge one so the other conflicts; run Merge Desk live on the conflicting PR on phone and desktop. The dogfood Land waits for the learner's explicit go. The final merge into `main` stays yours.
+  Verify (mechanical): sandbox log shows the snapshot boot and `npm run test:core` output with exit code 0; the feature PR's branch has Merge Desk's merge commit with parents `[head, main]`; `gh pr view <n> --json mergeable` reports MERGEABLE; CI on that PR is green; `git log origin/main` shows no commit authored by the app.
+  Learner check: On your phone, open the conflicting feature PR in live mode, read the intents, run it, Land, then merge it into `main` yourself on GitHub.
+  Commit: `feat(runner): trusted dependency snapshot and the dogfood landing (PLAN 2.5)`
+
+## Hands-on Checkpoints
+
+- [ ] Sandbox timing report: after slice 2, timings reported and a fix agreed before slice 3 if a run is not watchable
+- [ ] Early usable behavior explored: after slice 3, the desk on your laptop (look, density, wording) before the run screens build on it
+- [ ] Core journey on the laptop: after slice 5, held, verified, chosen drop and the first real Land on a demo PR; also pick the two dogfood changes for slice 8
+- [ ] Final kick-the-tires exploration and feedback completed: after slice 8, production on phone and desktop, demo mode signed out and live mode signed in
+
+## Final Review
+
+- [ ] Final review complete: feedback resolved and learner confirms ready to ship
+
+## Code Tour and App Map
+
+- [ ] Learning activity complete: guided route, focused alternative, prior practice connected, or brief recap
+- [ ] Optional edit and transfer reflection addressed: offered/declined/already covered/not applicable as appropriate
+- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+
+Activity and evidence: not started
+Route and stops: not started
+Edit outcome: not started
+Reflection: not started
+Activity mode: not started
+
+## Revisions

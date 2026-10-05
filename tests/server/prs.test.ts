@@ -199,17 +199,15 @@ describe("pull request list", () => {
     };
     const publicReads = {
       repos: {
-        getCombinedStatusForRef: vi
-          .fn()
-          .mockRejectedValue({
-            status: 403,
-            response: {
-              headers: {
-                "x-ratelimit-remaining": "0",
-                "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 3600),
-              },
+        getCombinedStatusForRef: vi.fn().mockRejectedValue({
+          status: 403,
+          response: {
+            headers: {
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 3600),
             },
-          }),
+          },
+        }),
       },
       checks: {
         listForRef: vi.fn().mockResolvedValue({ data: { total_count: 0, check_runs: [] } }),

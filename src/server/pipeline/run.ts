@@ -1,16 +1,20 @@
 import { truncateLog, type RunEvent, type StepId, type StepState } from "@/core/events";
 import { checkChoiceHonored, type Option } from "@/core/honor";
-import type { ProposedFile, Revisions, Runner } from "@/server/runner/types";
+import { MalformedOutputError } from "@/server/errors";
+import type { AppliedProposal, ProposedFile, Revisions, Runner } from "@/server/runner/types";
 
 // The run pipeline: propose, write on a scratch copy, then three checks that
 // the model can't influence. VERIFIED only when every step passed; anything
 // else is HELD and nothing is pushed. The runner is always disposed.
+// Automatic retries: at most two, and only when the model's answer is
+// malformed or the proposal doesn't parse. Anything else waits for the user.
 
 export type Proposal = { files: ProposedFile[]; description: string; source: string };
 export type Proposer = (input: {
   conflictedPaths: string[];
   option: Option;
   steer?: string;
+  retry?: { attempt: number; reason: string };
 }) => Promise<Proposal>;
 
 export type RunInput = {
@@ -22,6 +26,7 @@ export type RunInput = {
   conflictedPaths: string[]; // from the signed analysis (or the demo scenario config)
   checkRevisions?: () => Promise<{ ok: boolean; detail: string }>;
   steer?: string;
+  maxRetries?: number;
   now?: () => number;
 };
 
@@ -67,68 +72,96 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     yield step("revisions", revisionCheck.ok ? "passed" : "failed", revisionCheck.detail);
     if (!revisionCheck.ok) return yield* skipRest("propose");
 
+    const attempts = 1 + (input.maxRetries ?? 2);
+    let retry: { attempt: number; reason: string } | undefined;
+    let proposal: Proposal | undefined;
+    let applied: AppliedProposal | undefined;
+    let parseState: StepState = "not_run";
     yield step("propose", "running");
-    let proposal: Proposal;
-    try {
-      proposal = await input.proposer({
-        conflictedPaths: input.conflictedPaths,
-        option: input.option,
-        steer: input.steer,
-      });
-      const outside = proposal.files.filter((file) => !input.conflictedPaths.includes(file.path));
-      if (outside.length)
-        throw new Error(
-          `Proposal edits files outside the conflict: ${outside.map((file) => file.path).join(", ")}`,
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const retryAs = (reason: string) => {
+        retry = { attempt: attempt + 1, reason };
+        return step(
+          "propose",
+          "running",
+          `Retrying (attempt ${attempt + 1} of ${attempts}): ${reason}`.slice(0, 2_000),
         );
-    } catch (error) {
-      yield step("propose", "failed", error instanceof Error ? error.message : "Proposal failed");
-      return yield* skipRest("write");
-    }
-    description = proposal.description;
-    yield step("propose", "passed", `${proposal.source}: ${proposal.description}`.slice(0, 2_000));
-
-    yield step("write", "running");
-    let applied;
-    try {
-      applied = await input.runner.applyProposal(input.revisions, proposal.files);
-      const expected = applied.conflicted.map((file) => file.path).sort();
-      const written = proposal.files.map((file) => file.path).sort();
-      if (expected.join("\n") !== written.join("\n")) {
-        throw new Error(
-          `Proposal must cover exactly the conflicted files (${expected.join(", ")})`,
-        );
+      };
+      try {
+        proposal = await input.proposer({
+          conflictedPaths: input.conflictedPaths,
+          option: input.option,
+          steer: input.steer,
+          retry,
+        });
+        const outside = proposal.files.filter((file) => !input.conflictedPaths.includes(file.path));
+        if (outside.length)
+          throw new Error(
+            `Proposal edits files outside the conflict: ${outside.map((file) => file.path).join(", ")}`,
+          );
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Proposal failed";
+        if (error instanceof MalformedOutputError && attempt < attempts) {
+          yield retryAs(reason);
+          continue;
+        }
+        yield step("propose", "failed", reason.slice(0, 2_000));
+        return yield* skipRest("write");
       }
-    } catch (error) {
+      description = proposal.description;
+      yield step(
+        "propose",
+        "passed",
+        `${proposal.source}: ${proposal.description}`.slice(0, 2_000),
+      );
+
+      yield step("write", "running");
+      try {
+        applied = await input.runner.applyProposal(input.revisions, proposal.files);
+        const expected = applied.conflicted.map((file) => file.path).sort();
+        const written = proposal.files.map((file) => file.path).sort();
+        if (expected.join("\n") !== written.join("\n")) {
+          throw new Error(
+            `Proposal must cover exactly the conflicted files (${expected.join(", ")})`,
+          );
+        }
+      } catch (error) {
+        yield step(
+          "write",
+          "failed",
+          error instanceof Error ? error.message : "Could not write the merge",
+        );
+        return yield* skipRest("parse");
+      }
+      changedFiles = applied.changedFiles;
+      patch = applied.patch;
       yield step(
         "write",
-        "failed",
-        error instanceof Error ? error.message : "Could not write the merge",
+        "passed",
+        `${applied.changedFiles.length} ${applied.changedFiles.length === 1 ? "file differs" : "files differ"} from the head: ${applied.changedFiles.join(", ")}`.slice(
+          0,
+          2_000,
+        ),
       );
-      return yield* skipRest("parse");
-    }
-    changedFiles = applied.changedFiles;
-    patch = applied.patch;
-    yield step(
-      "write",
-      "passed",
-      `${applied.changedFiles.length} ${applied.changedFiles.length === 1 ? "file differs" : "files differ"} from the head: ${applied.changedFiles.join(", ")}`.slice(
-        0,
-        2_000,
-      ),
-    );
 
-    yield step("parse", "running");
-    const parsed = await input.runner.parseCheck(proposal.files.map((file) => file.path));
-    const parseState: StepState = parsed.some((result) => result.state === "failed")
-      ? "failed"
-      : parsed.every((result) => result.state === "passed") && parsed.length > 0
-        ? "passed"
-        : "not_run";
-    yield step(
-      "parse",
-      parseState,
-      parsed.map((result) => `${result.path}: ${result.detail}`).join("; "),
-    );
+      yield step("parse", "running");
+      const parsed = await input.runner.parseCheck(proposal.files.map((file) => file.path));
+      parseState = parsed.some((result) => result.state === "failed")
+        ? "failed"
+        : parsed.every((result) => result.state === "passed") && parsed.length > 0
+          ? "passed"
+          : "not_run";
+      const parseDetail = parsed.map((result) => `${result.path}: ${result.detail}`).join("; ");
+      yield step("parse", parseState, parseDetail);
+      if (parseState === "failed" && attempt < attempts) {
+        yield step("write", "queued");
+        yield step("parse", "queued");
+        yield retryAs(`it did not parse (${parseDetail})`);
+        continue;
+      }
+      break;
+    }
+    if (!proposal || !applied) return yield* skipRest("write");
 
     yield step("honor", "running");
     const results = new Map(proposal.files.map((file) => [file.path, file.content]));

@@ -44,3 +44,8 @@ agent/
 
 # Devpost Learn: personal learning context stays out of commits
 /devpost/learner-profile.md
+
+# Vercel CLI link and pulled env (vercel link)
+.vercel
+.env*
+!.env.example

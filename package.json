@@ -19,12 +19,15 @@
     "test": "vitest run",
     "test:core": "vitest run",
     "test:playground": "npm test --prefix playground",
+    "test:live": "vitest run --config vitest.live.config.mts",
     "gate": "tsx scripts/gate.mts",
     "demo:seed": "tsx scripts/demo-seed.mts",
     "demo:reset": "tsx scripts/demo-reset.mts",
     "env:check": "node scripts/env-check.mjs"
   },
   "dependencies": {
+    "@google/genai": "2.27.0",
+    "@vercel/sandbox": "3.5.1",
     "diff": "9.0.0",
     "next": "16.3.8",
     "react": "19.3.0",

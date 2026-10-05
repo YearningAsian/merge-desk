@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunEvent } from "@/core/events";
+import { MalformedOutputError } from "@/server/errors";
 import { runPipeline, type Proposer } from "@/server/pipeline/run";
 import type { Runner } from "@/server/runner/types";
 import { candidate, scenarioFile } from "../helpers/scenarios";
@@ -192,5 +193,107 @@ describe("runPipeline", () => {
     expect(final.get("tests")).toBe("not_run");
     expect(result.verdict).toBe("HELD");
     expect(runner.calls).toEqual(["dispose"]);
+  });
+
+  it("retries a malformed model answer at most twice, passing the reason back", async () => {
+    const runner = fakeRunner();
+    const seen: Array<number | undefined> = [];
+    const flaky: Proposer = async (request) => {
+      seen.push(request.retry?.attempt);
+      if (seen.length < 3) throw new MalformedOutputError("not JSON");
+      return propose("combined")(request);
+    };
+    const { result } = await collect(
+      runPipeline({
+        runner,
+        proposer: flaky,
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+      }),
+    );
+    expect(seen).toEqual([undefined, 2, 3]);
+    expect(result.verdict).toBe("VERIFIED");
+
+    let calls = 0;
+    const broken: Proposer = async () => {
+      calls += 1;
+      throw new MalformedOutputError("not JSON");
+    };
+    const held = await collect(
+      runPipeline({
+        runner: fakeRunner(),
+        proposer: broken,
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+      }),
+    );
+    expect(calls).toBe(3);
+    expect(held.result.verdict).toBe("HELD");
+    expect(held.final.get("propose")).toBe("failed");
+  });
+
+  it("retries a proposal that doesn't parse, and holds if it never does", async () => {
+    let parses = 0;
+    const runner = fakeRunner({
+      parseCheck: async (paths) => {
+        parses += 1;
+        return paths.map((path) => ({
+          path,
+          state: parses < 2 ? ("failed" as const) : ("passed" as const),
+          detail: parses < 2 ? "SyntaxError" : "node --check",
+        }));
+      },
+    });
+    const reasons: string[] = [];
+    const proposer: Proposer = async (request) => {
+      if (request.retry) reasons.push(request.retry.reason);
+      return propose("combined")(request);
+    };
+    const { result } = await collect(
+      runPipeline({ runner, proposer, revisions, option: "combine", intents, conflictedPaths }),
+    );
+    expect(result.verdict).toBe("VERIFIED");
+    expect(reasons).toEqual([`it did not parse (${API}: SyntaxError)`]);
+
+    const never = fakeRunner({
+      parseCheck: async (paths) =>
+        paths.map((path) => ({ path, state: "failed" as const, detail: "SyntaxError" })),
+    });
+    const held = await collect(
+      runPipeline({
+        runner: never,
+        proposer: propose("combined"),
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+      }),
+    );
+    expect(never.calls.filter((call) => call === "apply")).toHaveLength(3);
+    expect(never.calls).not.toContain("tests");
+    expect(held.result.verdict).toBe("HELD");
+  });
+
+  it("does not retry a proposal that fails for other reasons", async () => {
+    let calls = 0;
+    const failing: Proposer = async () => {
+      calls += 1;
+      throw new Error("model unavailable");
+    };
+    await collect(
+      runPipeline({
+        runner: fakeRunner(),
+        proposer: failing,
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+      }),
+    );
+    expect(calls).toBe(1);
   });
 });

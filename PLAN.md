@@ -58,7 +58,7 @@
 | Potential Impact: "a credible, specific case for solving a real problem for a real audience, and does the solution actually address that problem based on what's demonstrated" | Hook study + reviewers of agent-written PRs as the audience; the replay eval number | A |
 | Innovation/Idea: "how creative and novel ... does the project differ from existing concepts" | Intent check + CI gate vs AI merge drivers that write output unchecked | A |
 | Presentation: "does the video clearly demonstrate the project working end-to-end? Does the pitch communicate what problem is solved, who it's for, and why it matters?" | Under-3-minute video, real UI, Beat A then Beat B, problem/audience/why stated | A |
-| Execution: can a judge verify it | `/judge` + public `/api/health` + `/api/stats` + the demo repo's PR history | A |
+| Not a judged criterion (Stage Two judges the four above, equally weighted; rechecked 2026-10-05). Still worth it: can a judge verify it | `/judge` + public `/api/health` + `/api/stats` + the demo repo's PR history | A |
 
 **Potential later headline:** "Of N real historical conflict hunks, an unchecked AI resolution dropped an intent in X; Merge Desk held all X." Replay evaluation is deferred by the PRD. Do not use this claim unless row 2.9 is later built and measured into `docs/FACTS.json`. The core demo's proof is actual check output and PR history. Never type a measured number from memory.
 

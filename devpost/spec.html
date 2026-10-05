@@ -196,7 +196,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair)
           <text x="732" y="78" font-size="11" fill="#646a75">GitHub App on merge-desk only</text>
           <text x="732" y="93" font-size="11" fill="#646a75">contents + PRs; no workflows</text>
           <rect x="716" y="168" width="248" height="78" rx="10" fill="#eef3fe" stroke="#2f6fed"/>
-          <text x="732" y="192" font-size="13" font-weight="700" fill="#16181d">Gemini 3.8 Flash</text>
+          <text x="732" y="192" font-size="13" font-weight="700" fill="#16181d">Gemini 3.5 Flash-Lite</text>
           <text x="732" y="210" font-size="11" fill="#646a75">structured JSON, Zod-validated</text>
           <text x="732" y="225" font-size="11" fill="#646a75">proposes only</text>
           <rect x="716" y="300" width="248" height="96" rx="10" fill="#fafaf8" stroke="#16181d"/>
@@ -216,7 +216,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair)
         <div class="card"><h3>Browser</h3><p>Desk UI with LiveSource (calls the API, reads the event stream) or RecordedSource (replays <code>demo/recordings/*.json</code>).</p></div>
         <div class="card"><h3>Next.js on Vercel (holds every secret)</h3><p>Sign-in for YearningAsian only; every live route checks the session and that the repo is merge-desk; pipelines stream steps; Land pushes fast-forward only; one decision record per PR.</p></div>
         <div class="card"><h3>GitHub API</h3><p>GitHub App on merge-desk only: contents and pull requests. No workflows permission.</p></div>
-        <div class="card"><h3>Gemini 3.8 Flash</h3><p>GA Interactions API, structured JSON, Zod-validated, <code>store: false</code>. Proposes only.</p></div>
+        <div class="card"><h3>Gemini 3.5 Flash-Lite</h3><p>GA Interactions API, structured JSON, Zod-validated, <code>store: false</code>. Proposes only.</p></div>
         <div class="card"><h3>Vercel Sandbox, per run</h3><p>Clone, merge, write, parse, tests with the network off. Holds no token. Destroyed after every run.</p></div>
       </div>
       <div class="legend-row"><span>request / data</span><span class="dash">static or no-credential</span></div>
@@ -336,7 +336,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair)
           <tr><td><code>@pierre/diffs</code></td><td class="v">1.5.1</td><td>Read-only highlighted split/unified diffs; stable <code>FileDiff</code>/<code>PatchDiff</code> only</td><td><a href="https://diffs.com/llms-full.txt">Docs</a></td></tr>
           <tr><td>Zod</td><td class="v">4.6.5</td><td>Request, stream, recording and model validation; JSON schema generation</td><td><a href="https://zod.dev">Docs</a></td></tr>
           <tr><td><code>@google/genai</code></td><td class="v">2.27.0</td><td>Official SDK; GA Interactions API with structured JSON and <code>store: false</code></td><td><a href="https://ai.google.dev/gemini-api/docs/interactions-overview">Docs</a></td></tr>
-          <tr><td>Gemini model</td><td class="v"><code>gemini-3.8-flash</code></td><td>Current stable Flash; structured output, no preview/latest alias</td><td><a href="https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash">Docs</a></td></tr>
+          <tr><td>Gemini model</td><td class="v"><code>gemini-3.5-flash-lite</code></td><td>Stable Flash-Lite; structured output, no preview/latest alias. Changed from <code>gemini-3.8-flash</code> on 2026-10-05 (learner decision)</td><td><a href="https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite">Docs</a></td></tr>
           <tr><td><code>@vercel/sandbox</code></td><td class="v">3.5.1</td><td>Ephemeral microVM; Node 24 image, snapshots, network policy, OIDC</td><td><a href="https://vercel.com/docs/sandbox/sdk-reference">Docs</a></td></tr>
           <tr><td><code>@octokit/rest</code> + <code>@octokit/auth-app</code></td><td class="v">22.0.1 + 8.3.1</td><td>GitHub REST calls and repository-scoped installation tokens</td><td><a href="https://github.com/octokit/auth-app.js">Docs</a></td></tr>
           <tr><td><code>iron-session</code></td><td class="v">9.0.1</td><td>Maintained sealed-cookie sessions for the approved database-free sign-in</td><td><a href="https://github.com/vvo/iron-session">Docs</a></td></tr>

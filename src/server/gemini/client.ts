@@ -8,7 +8,10 @@ import { MalformedOutputError } from "@/server/errors";
 // validates the answer, and a 30-second deadline. The answer is data; it is
 // used only after it parses and validates, and it never unlocks a merge.
 
-export const DEFAULT_MODEL = "gemini-3.8-flash";
+// Learner decision 2026-10-05: free on the free plan, 1.5 to 2 s per call and
+// right on all three demo scenarios, while gemini-3.8-flash answered 503
+// "high demand". GEMINI_MODEL overrides it.
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 export const CALL_DEADLINE_MS = 30_000;
 
 type InteractionLike = { status?: string; output_text?: string };

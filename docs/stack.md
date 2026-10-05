@@ -50,7 +50,7 @@ The explicit Firecrawl/Taste follow-up used the local [Firecrawl skill](../.gith
 |---|---|---|---|
 | `zod` | 4.6.5 | [Registry](https://registry.npmjs.org/zod/4.6.5) | Requests, model JSON, streams, signed artifacts and recordings |
 | `@google/genai` | 2.27.0 | [Registry](https://registry.npmjs.org/@google%2Fgenai/2.27.0) | Official Gemini SDK |
-| Gemini model | `gemini-3.8-flash` | [Official stable model](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) | Intent explanations/options and merge proposals |
+| Gemini model | `gemini-3.5-flash-lite` (default since 2026-10-05; `GEMINI_MODEL` overrides) | [Official stable model](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite) | Intent explanations/options and merge proposals. Chosen over `gemini-3.8-flash` (503 "high demand" on the free tier all day), `gemini-3.5-flash` (38 s), `gemini-3.1-flash-lite` (cheaper if paid, but 2 of 4 held-scenario calls timed out and a weaker drop recommendation) |
 | `@vercel/sandbox` | 3.5.1 | [Registry](https://registry.npmjs.org/@vercel%2Fsandbox/3.5.1) | Ephemeral isolated runner |
 | `@octokit/rest` | 22.0.1 | [Registry](https://registry.npmjs.org/@octokit%2Frest/22.0.1) | GitHub REST client |
 | `@octokit/auth-app` | 8.3.1 | [Registry](https://registry.npmjs.org/@octokit%2Fauth-app/8.3.1) | App JWT and installation-token scoping/refresh |

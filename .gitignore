@@ -1,0 +1,39 @@
+# local agent working files (workspace rule: never committed)
+AGENTS.md
+CLAUDE.md
+task_plan.md
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build / deps
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# tests, media scratch, review rounds
+playwright-report/
+test-results/
+docs/video/raw/
+.review/
+
+# agent worktrees and OS cruft
+.claude/
+.cursor/worktrees/
+.DS_Store
+Thumbs.db
+*.swp
+
+# hackathon kit
+.env.local
+.env.*.local
+.claude/worktrees/

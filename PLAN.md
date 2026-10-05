@@ -23,12 +23,15 @@
 
 ## Context
 
+> **Canonical scope:** [`devpost/scope.md`](devpost/scope.md) (approved 2026-10-04 via the event's `2-scope`). Where this section differs, scope wins.
+
 - **The problem:** about 1 in 5 merges in 143 open source projects caused a conflict; in 75.23% of those a developer had to reason about program logic to resolve it, and code associated with a merge conflict was twice as likely to have a bug ([Brindescu, Ahmed, Jensen, Sarma, *Empirical Software Engineering* 2019](https://doi.org/10.1007/s10664-019-09735-4)). Coding agents now open many parallel PRs against the same files, so conflicts arrive faster than reviewers.
 - **The gap:** AI merge drivers already exist, but they write the model's output straight into the file and ask you to review it by hand. Nothing checks that the merged code still does what *each* branch meant to do. A resolution that compiles and quietly drops one side's change looks exactly like a good one.
 - **Our mechanic:** a GitHub gate. Merge Desk proposes a resolution per conflict hunk, verifies it (parses, both sides' intents present, CI green on a resolution branch), and only then unlocks a follow-up PR that makes the original PR mergeable. It never pushes to the base branch.
 - **Beat A (held):** branch `rename` renames `fetchUser` to `getUser`; branch `retry` adds a retry on HTTP 429 inside `fetchUser`. A naive resolution keeps the rename and drops the retry. Merge Desk shows "theirs: retry on 429, MISSING", the intent check fails, the resolution is HELD and nothing is pushed.
-- **Beat B (lands):** the verified resolution (`getUser` with the retry) passes the intent check, CI goes green on `merge-desk/resolve-<pr>`, Merge unlocks, and the original PR turns mergeable.
-- **Who pays:** teams running coding agents at volume (platform and developer-productivity teams), per active repository.
+- **Beat B (lands):** the verified resolution (`getUser` with the retry) passes the live checks (parses, both intents present, tests pass); Land commits it to the PR's own branch and the PR turns mergeable.
+- **Who it's for:** a developer on a small team whose PR just went red because a teammate merged first (scope). First user: the learner, on this repo.
+- **Who pays (hypothesis):** small teams and teams running coding agents, per active repository.
 
 **Tracks we enter:**
 - General: the single judged pool (1st $1,250, 2nd $750, 3rd $500). No sponsor tracks.
@@ -68,9 +71,11 @@
 | # | Row | File(s) | Owner | Status | Notes |
 |---|---|---|---|---|---|
 | 0.1 | Rules, deadlines, portals, criteria read | `PLAN.md` header | A | ✅ | Build With AI: Basics, Devpost, due 2026-10-26 17:00 EDT |
-| 0.2 | Scope approved through the event's skill pack (`1-start`, `2-scope`) | `devpost/scope.md` | A | 🟡 | Shape chosen 2026-10-04 (web desk + GitHub gate); the pack's interview decides final scope |
+| 0.2 | Scope approved through the event's skill pack (`1-start`, `2-scope`) | `devpost/scope.md`, `devpost/scope.html` | A | ✅ | Approved 2026-10-04 |
 | 0.3 | Brand direction | `docs/design/BRAND.md` | A | ✅ | |
 | 0.4 | H-rows listed and assigned | below | A | ✅ | |
+| 0.5 | PRD approved (`3-prd`) | `devpost/prd.md`, `devpost/prd.html` | A | ⬜ | Event Stage One needs it in the repo |
+| 0.6 | Spec approved (`4-spec`) | `devpost/spec.md`, `devpost/spec.html` | A | ⬜ | Gates all code (`5-build` builds from it) |
 
 ### Phase 1: Scaffold
 
@@ -159,7 +164,7 @@ Merge rule: CI green on the merged result, and a clean adversarial round for sid
 | `GET /api/health` | B | judges, probe | `{ ok, at, integrations: Record<string, boolean> }` |
 | `GET /api/stats` | A | `/judge`, writeup | contents of `docs/FACTS.json` |
 | Status vocabulary | B | UI, copy | PROPOSED, HELD, VERIFYING, VERIFIED, LANDED, REFUSED, UNKNOWN. Never "safe", "correct" or "bug-free": say what was verified. |
-| Branch namespace | B | GitHub writes | Only `merge-desk/*` branches are ever created or pushed. Never force-push, never write to a base branch. |
+| GitHub writes | B | Land | Only a merge commit on the PR's own head branch (what GitHub's web conflict editor does) and scratch `merge-desk/*` branches. Never the base branch, never a force-push. Held merges write nothing. |
 
 Contract changes: tell the other lane before committing; mark the commit `⚠️ CONTRACT`.
 

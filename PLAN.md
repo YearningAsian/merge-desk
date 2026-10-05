@@ -88,15 +88,15 @@
 | 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | 2026-10-05: env contract and `/api/health` (booleans) done; `/api/stats` and `/judge` land in slice 7 |
 | 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | ✅ | 1.2 | Green 2026-10-05 on 94e0889 (run 37276584816): format, lint, typecheck, unit + playground tests, build, em dash, gitleaks. Follow-up: Actions v4 use deprecated Node 20 |
 | 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
-| 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this; verify trusted snapshots, Node image, actual quotas and request duration |
+| 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | 🟡 | 1.3, 1.5 | 2026-10-05 claimed for 5-build slice 2: Gemini call + sandbox round trip with timings. GitHub App round trip waits for the rotated key (slice 3) |
 
 ### Phase 2: Build
 
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
-| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | 🟡 | 1.3 | 2026-10-05: gate core, demo-only scope guard, events and demo schemas done (101 tests); `core/options.ts` (keeps/drops) lands in slice 2 |
-| 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | ⬜ | 1.6 | Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
-| 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | ⬜ | 2.1 | Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
+| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | 🟡 | 1.3 | 2026-10-05: gate core, demo-only scope guard, events and demo schemas done (101 tests); `core/options.ts` (keeps/drops) in progress (slice 2) |
+| 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | 🟡 | 1.6 | Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
+| 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | 🟡 | 2.1 | 2026-10-05 slice 2: analyze/run pipelines with Gemini and the sandbox runner; routes in slices 3 to 5. Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
 | 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | ⬜ | 2.3 | shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |
 | 2.5 | **Checkpoint:** Beat A held + Beat B lands twice locally; chosen drop works; capture real recordings | `demo/recordings/**` | both | ⬜ | 2.4 | PRD priority: held → verified → chosen drop → options → rest; validate recording schemas |
 | 2.6 | Deploy to Vercel + env + probe | `.github/workflows/probe.yml` | B | ⬜ | 2.5 | |
@@ -181,4 +181,4 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
 - **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic checks, real sandbox tests and current GitHub guards do.
 
-_Last updated: 2026-10-05, 5-build slice 1 done: gate core, local runner, seeded `[Demo]` PRs #1 to #3 into `demo/base`, `main` rulesets (agent)_
+_Last updated: 2026-10-05, 5-build slice 2 claimed: Gemini analysis/proposals, signing, sandbox runner (agent)_

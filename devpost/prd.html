@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merge Desk: Product Requirements</title>
+<meta name="description" content="Product requirements for Merge Desk. Companion to devpost/prd.md (canonical).">
+<style>
+:root {
+  --bg: #f5f5f3; --surface: #ffffff; --ink: #16181d; --muted: #646a75; --hair: #e3e3df; --hair-strong: #c9c9c3;
+  --ours: #2f6fed; --theirs: #d9711f; --ok: #1f8a4c; --stop: #c93c3c; --wait: #9a7d14;
+  --ours-wash: #eef3fe; --theirs-wash: #fdf2e8; --ok-wash: #e8f4ed; --stop-wash: #fbeaea; --wait-wash: #f8f2dc;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+:focus-visible { outline: 2px solid var(--ours); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--hair); margin-bottom: 24px; }
+.eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 34px/1.1 var(--sans); letter-spacing: -.02em; margin: 6px 0 4px; }
+.sub { color: var(--muted); margin: 0; max-width: 62ch; }
+.pill { font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.draft { color: var(--wait); background: var(--wait-wash); }
+.pill.approved { color: var(--ok); background: var(--ok-wash); }
+.modes { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+@media (max-width: 860px) { .modes { grid-template-columns: 1fr; } }
+.modes .card { border-top: 3px solid var(--hair-strong); }
+.modes .demo { border-top-color: var(--wait); }
+.modes .live { border-top-color: var(--ok); }
+.modes ul { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+.modes li { margin: 5px 0; }
+.shared { margin-top: 12px; font-size: 14px; }
+ol.prio { margin: 0; padding-left: 20px; }
+ol.prio li { margin: 6px 0; font-size: 14px; }
+h2 { font: 650 19px/1.25 var(--sans); letter-spacing: -.01em; margin: 0 0 12px; }
+h3 { font: 600 14px/1.3 var(--sans); margin: 0 0 4px; }
+section { margin-bottom: 28px; }
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 18px; }
+.muted { color: var(--muted); }
+code { font: 13px var(--mono); background: #f0f0ec; border: 1px solid var(--hair); padding: 0 4px; border-radius: 4px; }
+
+/* scope -> prd */
+.expand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .expand { grid-template-columns: 1fr; } }
+.expand .card p { margin: 0; }
+.expand .was { font: 12px/1.4 var(--mono); color: var(--muted); margin-bottom: 8px !important; }
+
+/* wireframe */
+.wire svg { width: 100%; height: auto; display: block; }
+.wire-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .wire-row { grid-template-columns: 1fr; } }
+.legend { display: grid; gap: 10px; }
+.legend div { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 14px; }
+.legend b { font: 600 12px/22px var(--mono); text-align: center; border-radius: 6px; background: var(--ink); color: #fff; height: 22px; }
+
+/* stepper */
+.stepper { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; }
+@media (max-width: 760px) { .stepper { grid-template-columns: 1fr; } }
+.steps { list-style: none; margin: 0; padding: 8px; border-right: 1px solid var(--hair); background: #fafaf8; }
+@media (max-width: 760px) { .steps { border-right: 0; border-bottom: 1px solid var(--hair); display: flex; overflow-x: auto; gap: 4px; } }
+.steps button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; width: 100%; padding: 8px 10px; border-radius: 7px; font-size: 14px; color: var(--muted); }
+@media (max-width: 760px) { .steps button { grid-template-columns: 24px auto; white-space: nowrap; } }
+.steps button span { font: 600 12px/24px var(--mono); text-align: center; border-radius: 50%; background: var(--hair); color: var(--ink); height: 24px; }
+.steps button:hover { background: #f0f0ec; color: var(--ink); }
+.steps button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.steps button[aria-selected="true"] span { background: #fff; }
+.panel { padding: 20px 22px; }
+.panel h3 { font-size: 17px; margin-bottom: 8px; }
+.panel dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 14px; margin: 12px 0 0; }
+@media (max-width: 520px) { .panel dl { grid-template-columns: 1fr; } }
+.panel dt { font: 600 12px/1.6 var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.panel dd { margin: 0; }
+.js .panel[hidden] { display: none; }
+.nav { display: flex; gap: 8px; margin-top: 16px; }
+.nav button { font: 600 13px var(--sans); padding: 7px 12px; border-radius: 7px; border: 1px solid var(--hair-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+.nav button:hover:not(:disabled) { border-color: var(--ink); }
+.nav button:disabled { opacity: .4; cursor: default; }
+.kbd { font: 600 11px var(--mono); border: 1px solid var(--hair-strong); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; background: #fff; }
+
+/* branch diagram */
+.branch svg { width: 100%; max-width: 760px; height: auto; display: block; margin: 0 auto; }
+.branch-cards { display: none; gap: 10px; }
+.branch-cards .card { padding: 12px 14px; }
+.branch-cards p { margin: 0; font-size: 14px; }
+@media (max-width: 640px) { .branch svg { display: none; } .branch-cards { display: grid; } }
+
+/* features */
+.features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 860px) { .features { grid-template-columns: 1fr; } }
+details { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; }
+details[open] { border-color: var(--hair-strong); }
+summary { cursor: pointer; list-style: none; padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-weight: 600; }
+summary::-webkit-details-marker { display: none; }
+summary .n { margin-left: auto; font: 600 11px var(--mono); color: var(--muted); }
+summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; flex: none; }
+details[open] summary::before { transform: rotate(45deg); }
+details .body { padding: 0 14px 14px 31px; }
+details .body p { margin: 0 0 8px; color: var(--muted); }
+ul.ac { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ul.ac li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; font-size: 14px; }
+ul.ac li::before { content: ""; width: 14px; height: 14px; margin-top: 3px; border: 1.5px solid var(--hair-strong); border-radius: 4px; }
+
+/* states */
+.states { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.state { border-left: 3px solid var(--hair-strong); }
+.state.ok { border-left-color: var(--ok); } .state.stop { border-left-color: var(--stop); } .state.wait { border-left-color: var(--wait); }
+.state p { margin: 0; font-size: 14px; color: var(--muted); }
+
+/* now / deferred */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
+.split ul { margin: 0; padding-left: 18px; }
+.split li { margin: 6px 0; font-size: 14px; }
+.tag { font: 600 11px/1 var(--mono); padding: 4px 7px; border-radius: 5px; vertical-align: 2px; margin-right: 6px; }
+.tag.now { color: var(--ok); background: var(--ok-wash); }
+.tag.later { color: var(--wait); background: var(--wait-wash); }
+.oq li { margin: 8px 0; }
+.block { font: 600 11px/1 var(--mono); color: var(--stop); background: var(--stop-wash); padding: 3px 6px; border-radius: 5px; margin-left: 6px; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Devpost Learn · 3-prd</div>
+      <h1>Merge Desk</h1>
+      <p class="sub">A merge you can watch and understand, for a developer whose pull request just went red because a teammate merged first. Desktop is the showpiece; the phone mirrors it for watching and deciding.</p>
+    </div>
+    <span class="pill approved" role="status">prd: approved</span>
+  </header>
+
+  <section aria-labelledby="exp-h">
+    <h2 id="exp-h">What scope said, and what we now know</h2>
+    <div class="expand">
+      <div class="card"><p class="was">scope: "read the two intents side by side"</p><p>An <b>analysis of both sides</b>: one plain line per side, with commits, files and authors one click away.</p></div>
+      <div class="card"><p class="was">scope: "watch the proposed merge"</p><p><b>Options before action</b>: combine both, or drop the older side, with one <b>Recommended</b> and why, and exactly whose work each option keeps or drops.</p></div>
+      <div class="card"><p class="was">scope: "a merge that drops a side is held"</p><p>Unless you <b>chose</b> to drop it. Then it is a recorded decision, checked against your choice, confirmed inline once.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="layout-h">
+    <h2 id="layout-h">One screen, no page changes</h2>
+    <div class="card wire">
+      <div class="wire-row">
+        <svg viewBox="0 0 720 420" role="img" aria-labelledby="wf-t wf-d">
+          <title id="wf-t">Desktop layout wireframe</title>
+          <desc id="wf-d">Left column: pull request list with conflicting pull requests first. Right side, top to bottom: header, analysis with ours and theirs side by side, options with one recommended, run with step states, and result with Land.</desc>
+          <rect x="1" y="1" width="718" height="418" rx="10" fill="#fff" stroke="#c9c9c3"/>
+          <rect x="1" y="1" width="718" height="30" rx="10" fill="#fafaf8" stroke="#c9c9c3"/>
+          <circle cx="20" cy="16" r="5" fill="#e3e3df"/><circle cx="36" cy="16" r="5" fill="#e3e3df"/><circle cx="52" cy="16" r="5" fill="#e3e3df"/>
+          <text x="360" y="20" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#646a75">merge-desk · YearningAsian/merge-desk</text>
+          <!-- list -->
+          <rect x="1" y="31" width="200" height="388" fill="#fafaf8" stroke="#e3e3df"/>
+          <text x="16" y="54" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#646a75">NEEDS RESOLUTION · 2</text>
+          <rect x="10" y="64" width="182" height="46" rx="6" fill="#16181d"/>
+          <text x="20" y="83" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#fff">#12 Add retry on 429</text>
+          <text x="20" y="100" font-family="ui-monospace, monospace" font-size="10" fill="#c9c9c3">retry → main · 1 file</text>
+          <rect x="10" y="116" width="182" height="46" rx="6" fill="#fff" stroke="#e3e3df"/>
+          <text x="20" y="135" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#16181d">#14 Theme tokens</text>
+          <text x="20" y="152" font-family="ui-monospace, monospace" font-size="10" fill="#9a7d14">HELD · 2 files</text>
+          <text x="16" y="190" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="600" fill="#646a75">▸ CAN MERGE · 5</text>
+          <!-- detail header -->
+          <text x="222" y="58" font-family="-apple-system, system-ui, sans-serif" font-size="15" font-weight="700" fill="#16181d">#12 Add retry on 429</text>
+          <text x="222" y="76" font-family="ui-monospace, monospace" font-size="10" fill="#646a75">retry → main · conflicts with #11 rename (merged)</text>
+          <!-- analysis -->
+          <text x="222" y="102" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#646a75">1  ANALYSIS</text>
+          <rect x="222" y="110" width="232" height="54" rx="6" fill="#eef3fe" stroke="#2f6fed"/>
+          <text x="232" y="128" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#2f6fed">OURS</text>
+          <text x="232" y="148" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#16181d">renames fetchUser → getUser</text>
+          <rect x="466" y="110" width="232" height="54" rx="6" fill="#fdf2e8" stroke="#d9711f"/>
+          <text x="476" y="128" font-family="ui-monospace, monospace" font-size="10" font-weight="700" fill="#b45a17">THEIRS</text>
+          <text x="476" y="148" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#16181d">retries fetchUser on HTTP 429</text>
+          <!-- options -->
+          <text x="222" y="188" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#646a75">2  OPTIONS</text>
+          <rect x="222" y="196" width="476" height="30" rx="6" fill="#fff" stroke="#16181d" stroke-width="1.5"/>
+          <text x="232" y="215" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#16181d">Combine both</text>
+          <rect x="318" y="204" width="84" height="15" rx="4" fill="#e8f4ed"/><text x="360" y="215" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" font-weight="700" fill="#1f8a4c">RECOMMENDED</text>
+          <rect x="222" y="230" width="476" height="24" rx="6" fill="#fff" stroke="#e3e3df"/>
+          <text x="232" y="246" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#646a75">Keep ours, drop theirs (2 commits by a teammate)</text>
+          <!-- run -->
+          <text x="222" y="280" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#646a75">3  RUN</text>
+          <g font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#16181d">
+            <circle cx="230" cy="296" r="4" fill="#1f8a4c"/><text x="240" y="300">Read both sides</text><text x="690" y="300" text-anchor="end" font-family="ui-monospace, monospace" font-size="10" fill="#1f8a4c">passed</text>
+            <circle cx="230" cy="316" r="4" fill="#1f8a4c"/><text x="240" y="320">Write merge on scratch copy</text><text x="690" y="320" text-anchor="end" font-family="ui-monospace, monospace" font-size="10" fill="#1f8a4c">passed</text>
+            <circle cx="230" cy="336" r="4" fill="#1f8a4c"/><text x="240" y="340">Choice honored: both intents present</text><text x="690" y="340" text-anchor="end" font-family="ui-monospace, monospace" font-size="10" fill="#1f8a4c">passed</text>
+            <circle cx="230" cy="356" r="4" fill="#9a7d14"/><text x="240" y="360">Run the tests</text><text x="690" y="360" text-anchor="end" font-family="ui-monospace, monospace" font-size="10" fill="#9a7d14">running</text>
+          </g>
+          <!-- result -->
+          <text x="222" y="390" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#646a75">4  RESULT</text>
+          <rect x="598" y="378" width="100" height="28" rx="6" fill="#e3e3df"/>
+          <text x="648" y="396" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#646a75">Land</text>
+        </svg>
+        <div class="legend">
+          <div><b>L</b><span><strong>Pull request list.</strong> Conflicting first with branches, file count and state; "Can merge" collapsed. <span class="kbd">J</span>/<span class="kbd">K</span> to move, <span class="kbd">Enter</span> to open.</span></div>
+          <div><b>1</b><span><strong>Analysis.</strong> One line per side; commits, files and authors expand.</span></div>
+          <div><b>2</b><span><strong>Options.</strong> One Recommended with a reason; each says what is kept, dropped, and whose work.</span></div>
+          <div><b>3</b><span><strong>Run.</strong> Steps with queued, running, passed, failed; raw logs collapsed.</span></div>
+          <div><b>4</b><span><strong>Result.</strong> What the merge did, the diff, one primary action: Land. Disabled until every check passes.</span></div>
+          <p class="muted" style="margin:4px 0 0;font-size:14px">Phone: same order in one column; the detail opens as a full-height sheet. Watch and decide; no code editing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="journey-h">
+    <h2 id="journey-h">The core journey</h2>
+    <div class="card stepper" id="stepper">
+      <ol class="steps" role="tablist" aria-label="Journey steps">
+        <li><button role="tab" aria-selected="true" aria-controls="p1" id="t1"><span>1</span>Open Merge Desk</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p2" id="t2"><span>2</span>Select the conflict</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p3" id="t3"><span>3</span>See the options</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p4" id="t4"><span>4</span>Choose and confirm</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p5" id="t5"><span>5</span>Watch the agent</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p6" id="t6"><span>6</span>Verified or held</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p7" id="t7"><span>7</span>Recorded</button></li>
+      </ol>
+      <div>
+        <div class="panel" role="tabpanel" id="p1" aria-labelledby="t1"><h3>1. Open Merge Desk</h3><p>On a computer, one screen: the repository's open pull requests on the left, conflicting ones first.</p><dl><dt>You see</dt><dd>Rows with title, number, author, branches, conflicting-file count and state.</dd><dt>Done when</dt><dd>Conflicting pull requests are listed first; "Can merge" is collapsed below.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p2" aria-labelledby="t2"><h3>2. Select the conflict</h3><p>The right side shows the analysis of both sides.</p><dl><dt>You see</dt><dd>One plain line per side ("ours renames <code>fetchUser</code>", "theirs retries on 429"); commits, files and authors expand.</dd><dt>Done when</dt><dd>Both intents are readable without opening a diff.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p3" aria-labelledby="t3"><h3>3. See the options before anything happens</h3><p>Two or three ways to resolve it, one Recommended with a reason.</p><dl><dt>You see</dt><dd>Combine both; keep ours and drop theirs; keep theirs and drop ours ("drop the older build" when one side is clearly older). Each says what is kept, dropped, and whose work.</dd><dt>Done when</dt><dd>Exactly one option is Recommended and every option lists its consequences.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p4" aria-labelledby="t4"><h3>4. Choose, and confirm drops inline</h3><p>Dropping work asks once, inline, no pop-up.</p><dl><dt>You see</dt><dd>"Drops 2 commits in 1 file by [teammate]." Confirm with <span class="kbd">Cmd</span>/<span class="kbd">Ctrl</span>+<span class="kbd">Enter</span>, or hold-to-confirm on phone.</dd><dt>Done when</dt><dd>Someone else's work is named in the confirmation; it is asked once.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p5" aria-labelledby="t5"><h3>5. Watch the agent work</h3><p>A plain step list; the real branch is never touched during the run.</p><dl><dt>Steps</dt><dd>Read both sides · write the merge on a scratch copy · describe what it did · it parses · your choice was honored · the tests pass.</dd><dt>Done when</dt><dd>Every step shows queued, running, passed or failed; logs open with one click; two automatic retries, then it waits.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p6" aria-labelledby="t6"><h3>6. Verified, or held</h3><p>Verified: Land writes the merge to the pull request's own branch and GitHub shows it can merge. Held: nothing changed.</p><dl><dt>Held shows</dt><dd>Which check failed, what the agent tried, the diff it produced.</dd><dt>Then</dt><dd>Pick a different option (recommendation updated) · steer and retry · discard.</dd></dl></div>
+        <div class="panel" role="tabpanel" id="p7" aria-labelledby="t7"><h3>7. Recorded</h3><p>The row updates and the decision is kept on the pull request, in Merge Desk and on GitHub.</p><dl><dt>Record</dt><dd>Who, when, the option, the reason shown at the time, check results, and for drops exactly what was dropped (commits, files, authors).</dd><dt>Done when</dt><dd>Anyone opening the pull request later can see why it was resolved that way.</dd></dl></div>
+        <div class="panel nav" id="navrow" style="padding-top:0" hidden><button type="button" id="prev">Previous</button><button type="button" id="next">Next</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="branch-h">
+    <h2 id="branch-h">After the run</h2>
+    <div class="card branch">
+      <svg viewBox="0 0 760 210" role="img" aria-labelledby="br-t br-d">
+        <title id="br-t">Verified or held</title>
+        <desc id="br-d">Checks run against your choice. If all pass, the result is verified and Land writes to the pull request branch, which becomes mergeable. If any fail, the merge is held, nothing changes, and you pick another option, steer and retry, or discard.</desc>
+        <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16181d"/></marker></defs>
+        <g font-family="-apple-system, system-ui, sans-serif">
+          <rect x="270" y="10" width="220" height="50" rx="8" fill="#f8f2dc" stroke="#9a7d14"/>
+          <text x="380" y="31" text-anchor="middle" font-size="13" font-weight="600" fill="#16181d">Checks, against your choice</text>
+          <text x="380" y="49" text-anchor="middle" font-size="11" fill="#646a75">parses · choice honored · tests</text>
+          <path d="M330 60 C330 90 160 80 160 108" stroke="#16181d" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+          <path d="M430 60 C430 90 600 80 600 108" stroke="#16181d" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+          <text x="108" y="92" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#1f8a4c">all pass</text>
+          <text x="652" y="92" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#c93c3c">any fail</text>
+          <rect x="40" y="110" width="240" height="88" rx="8" fill="#e8f4ed" stroke="#1f8a4c"/>
+          <text x="160" y="134" text-anchor="middle" font-size="13" font-weight="700" fill="#1f8a4c">VERIFIED</text>
+          <text x="160" y="154" text-anchor="middle" font-size="11" fill="#16181d">what it did + diff, then Land</text>
+          <text x="160" y="172" text-anchor="middle" font-size="11" fill="#16181d">writes to the pull request's branch</text>
+          <text x="160" y="189" text-anchor="middle" font-size="11" fill="#646a75">GitHub: can merge</text>
+          <rect x="480" y="110" width="240" height="88" rx="8" fill="#fbeaea" stroke="#c93c3c"/>
+          <text x="600" y="134" text-anchor="middle" font-size="13" font-weight="700" fill="#c93c3c">HELD</text>
+          <text x="600" y="154" text-anchor="middle" font-size="11" fill="#16181d">nothing changed on the real branch</text>
+          <text x="600" y="172" text-anchor="middle" font-size="11" fill="#16181d">failed check · what it tried · its diff</text>
+          <text x="600" y="189" text-anchor="middle" font-size="11" fill="#646a75">other option · steer and retry · discard</text>
+        </g>
+      </svg>
+      <div class="branch-cards">
+        <div class="card state wait"><h3>Checks, against your choice</h3><p>It parses · your choice was honored · the tests pass.</p></div>
+        <div class="card state ok"><h3>All pass: VERIFIED</h3><p>What it did and the diff, then Land. Writes to the pull request's branch; GitHub shows it can merge.</p></div>
+        <div class="card state stop"><h3>Any fail: HELD</h3><p>Nothing changed on the real branch. Shows the failed check, what it tried and its diff. Pick another option, steer and retry, or discard.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="feat-h">
+    <h2 id="feat-h">Features and checks</h2>
+    <div class="features">
+      <details open><summary>Pull request list<span class="n">4 checks</span></summary><div class="body"><ul class="ac"><li>Conflicting first: title, number, author, branches, conflicting files, state.</li><li>Pull requests that can merge are grouped below, collapsed.</li><li>Selecting a row opens its detail on the right, same screen.</li><li>Up/Down or J/K moves; Enter opens.</li></ul></div></details>
+      <details open><summary>Conflict analysis<span class="n">3 checks</span></summary><div class="body"><ul class="ac"><li>One plain-language line per side.</li><li>Expanding a side shows commits, files and authors.</li><li>Conflicting files open a GitHub-style diff, side by side on desktop.</li></ul></div></details>
+      <details><summary>Resolution options<span class="n">3 checks</span></summary><div class="body"><ul class="ac"><li>Two or three options before anything runs.</li><li>Exactly one Recommended, with a one-sentence reason.</li><li>Each states what is kept, dropped, and whose work.</li></ul></div></details>
+      <details><summary>Intentional drops<span class="n">5 checks</span></summary><div class="body"><p>Recorded as a decision, not a failure.</p><ul class="ac"><li>Inline confirmation names commits, files and whose work.</li><li>Cmd/Ctrl+Enter or hold-to-confirm, asked once.</li><li>Checks pass only if the dropped side alone is missing and nothing leaked in.</li><li>History shows "Dropped by [person], [time]", option, reason, what was dropped.</li><li>Recoverable now: the dropped branch and commits are never deleted; the record says where they are (branch, commit IDs).</li></ul></div></details>
+      <details><summary>Live run and checks<span class="n">6 checks</span></summary><div class="body"><ul class="ac"><li>Step list with queued, running, passed, failed.</li><li>Read, write on scratch, describe, parses, choice honored, tests.</li><li>Raw log per step, one click.</li><li>The real branch is never changed by a run.</li><li>Two automatic retries, then it waits.</li><li>Real test suite under 30 seconds; actual result and output on screen. Tests that can't run show <b>not run</b> and hold the merge. Never a pass that didn't happen.</li></ul></div></details>
+      <details><summary>Held merges<span class="n">4 checks</span></summary><div class="body"><ul class="ac"><li>Failed check, what was tried, and its diff, in plain words.</li><li>Other option (recommendation updated), steer and retry, discard, in that order.</li><li>Discard returns the pull request to Needs resolution, unchanged.</li><li>"Pick a different option" and "steer and retry" both work now: with the editor deferred, they are the ways out of a hold.</li></ul></div></details>
+      <details><summary>Landing a merge<span class="n">3 checks</span></summary><div class="body"><ul class="ac"><li>Result card: what it did, full diff, one primary action, Land.</li><li>Land writes to the pull request's branch; GitHub shows it can merge.</li><li>Never the base branch; never overwrites history.</li></ul></div></details>
+      <details><summary>Decision record and phone<span class="n">3 checks</span></summary><div class="body"><ul class="ac"><li>Every land, drop, hold and discard is recorded with who, when, option, reason, results.</li><li>Phone: same order, one column, detail as a full-height sheet.</li><li>Phone actions: pick, hold-to-confirm, land, steer, discard. No code editing.</li></ul></div></details>
+    </div>
+  </section>
+
+  <section aria-labelledby="modes-h">
+    <h2 id="modes-h">Two modes, one product</h2>
+    <div class="modes">
+      <div class="card demo"><h3>Demo mode <span class="muted" style="font-weight:400">public, no sign-in</span></h3><p class="muted" style="margin:0">What judges try themselves.</p><ul><li>Three prepared pull requests: one clean merge, one held, one where dropping a side is right.</li><li>Plays back <b>real runs recorded from live mode</b>: real options, steps, check results and timings.</li><li>Fast, free per visitor, can't break during judging. Writes nothing.</li><li>Labelled <b>"Demo: recorded from a real run"</b>, with Reset.</li></ul></div>
+      <div class="card live"><h3>Live mode <span class="muted" style="font-weight:400">sign-in, the learner only</span></h3><p class="muted" style="margin:0">What the video shows.</p><ul><li>The real agent on a real repository the learner owns.</li><li>Real checks and real landing: one held merge and one verified merge landing, on camera.</li><li>Other accounts are refused for now.</li></ul></div>
+    </div>
+    <p class="shared muted">Same screens and same code path; demo mode only swaps the data source. Recordings are captured from live mode and re-captured when the flow changes, so the demo never shows something live can't do. The README and Devpost page say which is which.</p>
+  </section>
+
+  <section aria-labelledby="states-h">
+    <h2 id="states-h">States that matter</h2>
+    <div class="states">
+      <div class="card state"><h3>First use</h3><p>One panel: how to connect a repository.</p></div>
+      <div class="card state ok"><h3>No conflicts</h3><p>"No conflicts. Every open pull request can merge."</p></div>
+      <div class="card state wait"><h3>Running</h3><p>Live step list; the row shows Running.</p></div>
+      <div class="card state stop"><h3>Held</h3><p>Nothing changed; failed check, attempt, diff, next actions.</p></div>
+      <div class="card state ok"><h3>Landed</h3><p>Result card stays; the row shows Landed.</p></div>
+      <div class="card state wait"><h3>Changed during review</h3><p>New commits arrive: marked out of date; fresh run required before Land.</p></div>
+      <div class="card state"><h3>Already mergeable</h3><p>Nothing to resolve; no options shown.</p></div>
+      <div class="card state stop"><h3>Service unavailable</h3><p>The step fails with the reason in plain words; nothing is written; retry.</p></div>
+      <div class="card state"><h3>Permissions</h3><p>Demo mode: anyone, writes nothing. Live mode: sign-in, the learner only, repositories they can write to.</p></div>
+      <div class="card state wait"><h3>Demo reset</h3><p>Reset returns the three demo pull requests to their start.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="split-h">
+    <h2 id="split-h">Boundary <span class="muted" style="font-weight:400;font-size:14px">(agreed in review)</span></h2>
+    <div class="split">
+      <div class="card"><h3><span class="tag now">NOW</span>Building for the proof of concept</h3><ul><li>Everything under Features and checks, for one repository (merge-desk for the demo).</li><li>Desktop one-screen layout and the phone layout.</li><li>Keyboard: J/K, Enter, Cmd/Ctrl+Enter.</li><li>Sheets and hold-to-confirm on the phone web view.</li><li>Demo mode and live mode.</li><li>From a hold: pick a different option, steer and retry, discard.</li></ul></div>
+      <div class="card"><h3><span class="tag later">DEFERRED</span>Requested, not needed to prove the kernel</h3><ul><li><b>Side-by-side editor:</b> a held run links to the scratch copy to fix in your own editor.</li><li><b>Hand to a teammate:</b> share the held run's page by link for now.</li><li><b>Phone notification when held:</b> arrives with the Expo app.</li><li><b>"Restore dropped side" button:</b> the button waits; recoverability does not (dropped branch and commits kept, location recorded).</li><li><b>Command palette:</b> comes with the dashboard.</li><li><b>Swipe actions and haptics:</b> a web page can't buzz an iPhone; the Expo app can.</li></ul></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="prio-h">
+    <h2 id="prio-h">Build priority</h2>
+    <div class="card"><ol class="prio"><li><b>Held merge</b>, end to end.</li><li><b>Verified merge</b>, end to end.</li><li><b>Chosen drop</b> with its check.</li><li><b>Options before action</b>, with the recommendation.</li><li>Everything else in the boundary.</li></ol><p class="muted" style="margin:10px 0 0;font-size:14px">If 1 to 3 aren't working by the halfway point: stop, report, cut from the bottom.</p></div>
+  </section>
+
+  <section aria-labelledby="oq-h">
+    <h2 id="oq-h">Open questions</h2>
+    <div class="card"><ol class="oq"><li><s>Who can run and land on the public demo?</s> Resolved: demo mode and live mode, above.</li><li>"Older side" assumed to mean the side whose latest commit is older. <span class="muted">Can be confirmed during the build.</span></li><li>How the real tests run within 30 seconds. <span class="muted">Settled in 4-spec.</span></li></ol></div>
+  </section>
+
+  <footer>Companion to <code>devpost/prd.md</code>, which is canonical. Previous: <code>scope.html</code>. Next: <code>4-spec</code>.</footer>
+</div>
+<script>
+(function () {
+  document.documentElement.classList.add('js');
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('#stepper [role="tab"]'));
+  var panels = tabs.map(function (t) { return document.getElementById(t.getAttribute('aria-controls')); });
+  var prev = document.getElementById('prev'), next = document.getElementById('next');
+  var current = 0;
+  function show(i) {
+    current = Math.max(0, Math.min(tabs.length - 1, i));
+    tabs.forEach(function (t, j) { t.setAttribute('aria-selected', j === current ? 'true' : 'false'); t.tabIndex = j === current ? 0 : -1; panels[j].hidden = j !== current; });
+    prev.disabled = current === 0; next.disabled = current === tabs.length - 1;
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(i); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); show(current + 1); tabs[current].focus(); }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); tabs[current].focus(); }
+    });
+  });
+  prev.addEventListener('click', function () { show(current - 1); });
+  next.addEventListener('click', function () { show(current + 1); });
+  document.getElementById('navrow').hidden = false;
+  show(0);
+})();
+</script>
+</body>
+</html>

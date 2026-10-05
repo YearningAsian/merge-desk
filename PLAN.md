@@ -87,8 +87,8 @@
 | 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ✅ | 1.1 | Done 2026-10-05 (1d4cb50): pins rechecked (no changes), Next 16 scaffold, lockfile via npm 12.2.0; format/lint/typecheck/test/build pass; `tsx` added for scripts |
 | 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | 2026-10-05: env contract and `/api/health` (booleans) done; `/api/stats` and `/judge` land in slice 7 |
 | 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | ✅ | 1.2 | Green 2026-10-05 on 94e0889 (run 37276584816): format, lint, typecheck, unit + playground tests, build, em dash, gitleaks. Follow-up: Actions v4 use deprecated Node 20 |
-| 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
-| 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | 🟡 | 1.3, 1.5 | 2026-10-05 slice 2 (0f6de97): `npm run test:live` passes one schema-valid Gemini call and a sandbox create/merge/deny-all/tests/stop round (6.0 to 9.7 s; tests 0.6 to 1.2 s; Node v24.19.0). `gemini-3.8-flash` 503s on the free tier; verified with `GEMINI_MODEL=gemini-3.5-flash-lite`, default pending learner decision. GitHub App round trip waits for the rotated key (slice 3) |
+| 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ✅ | | 2026-10-05: all required names present (env-check); GitHub App key rotated (A confirmed); Vercel linked, OIDC pulled to `.env.development.local` |
+| 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | 🟡 | 1.3, 1.5 | 2026-10-05 slice 2 (0f6de97): `npm run test:live` passes one schema-valid Gemini call and a sandbox create/merge/deny-all/tests/stop round (6.0 to 9.7 s; tests 0.6 to 1.2 s; Node v24.19.0). Default model `gemini-3.5-flash-lite` (learner, 79bbfe2). Rotated GitHub App key confirmed by A; read round trip claimed for slice 3 |
 
 ### Phase 2: Build
 
@@ -97,7 +97,7 @@
 | 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | ✅ | 1.3 | Done 2026-10-05: gate core, scope guard, events, demo and analysis schemas, `core/options.ts` (keeps/drops from git, older side) |
 | 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | 🟡 | 1.6 | 2026-10-05: `sign.ts` done (HMAC, HKDF key, scope + expiry, tests); session and decision comment in slices 3 and 5. Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
 | 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | 🟡 | 2.1 | 2026-10-05 slice 2 done (0f6de97): analyze/run pipelines with Gemini and the sandbox runner, bounded retries; routes in slices 3 to 5. Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
-| 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | ⬜ | 2.3 | shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |
+| 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | 🟡 | 2.3 | 2026-10-05 claimed for 5-build slice 3: sign-in, PR list, analysis and options on `/live` (Taste pass in BRAND direction). shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |
 | 2.5 | **Checkpoint:** Beat A held + Beat B lands twice locally; chosen drop works; capture real recordings | `demo/recordings/**` | both | ⬜ | 2.4 | PRD priority: held → verified → chosen drop → options → rest; validate recording schemas |
 | 2.6 | Deploy to Vercel + env + probe | `.github/workflows/probe.yml` | B | ⬜ | 2.5 | |
 | 2.7 | `/judge` itinerary against production | `src/app/judge/**` | A | ⬜ | 2.6 | |
@@ -142,8 +142,8 @@
 | # | Step | Who | Unlocks |
 |---|---|---|---|
 | H1 | Register on Devpost for Build With AI: Basics | A | 5.4 |
-| H2 | Gemini API key into `.env.local` and Vercel env | A | 1.6 |
-| H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), installed on `merge-desk` only; App ID, Client ID, client secret in `.env.local` ✅; private key ⏳ being rotated by A (2026-10-05); nothing uses it until A confirms | A | 1.6 |
+| H2 | ✅ Gemini API key in `.env.local` (free tier); Vercel env pending (H4) | A | 1.6 |
+| H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), installed on `merge-desk` only; App ID, Client ID, client secret in `.env.local` ✅; private key rotated and confirmed by A (2026-10-05) | A | 1.6 |
 | H4 | Vercel project linked to this repo; env vars added; production callback URL added to the GitHub App | A | 2.6 |
 | H6 | ✅ Unused empty `merge-desk-playground` repo is gone (GitHub reports it does not exist, checked 2026-10-05) | A | none |
 | H5 | Final submit click on every portal | A | being judged |
@@ -181,4 +181,4 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
 - **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic checks, real sandbox tests and current GitHub guards do.
 
-_Last updated: 2026-10-05, 5-build slice 2 done: Gemini analysis/proposals, signing, sandbox runner; clean VERIFIED, held HELD, drop VERIFIED in the sandbox (agent)_
+_Last updated: 2026-10-05, 5-build slice 3 claimed: sign-in, PR list, conflict analysis on the desk (agent)_

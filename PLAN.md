@@ -86,7 +86,7 @@
 | 1.1 | Repo, `.gitignore`, `.env.example`, README stub | root | A | ✅ | 0.2 | Done 2026-10-05: `.env.example`, README run instructions, presence-only `scripts/env-check.mjs` |
 | 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ✅ | 1.1 | Done 2026-10-05 (1d4cb50): pins rechecked (no changes), Next 16 scaffold, lockfile via npm 12.2.0; format/lint/typecheck/test/build pass; `tsx` added for scripts |
 | 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | 2026-10-05: env contract and `/api/health` (booleans) done; `/api/stats` and `/judge` land in slice 7 |
-| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | 🟡 | 1.2 | 2026-10-05: `ci.yml` (main only, Node 24) committed; green status pending the first run |
+| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | ✅ | 1.2 | Green 2026-10-05 on 94e0889 (run 37276584816): format, lint, typecheck, unit + playground tests, build, em dash, gitleaks. Follow-up: Actions v4 use deprecated Node 20 |
 | 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
 | 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this; verify trusted snapshots, Node image, actual quotas and request duration |
 

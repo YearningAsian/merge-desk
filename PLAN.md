@@ -8,12 +8,12 @@
 
 **Team:**
 - **A (product / frontend / AI / demo / submission):** YearningAsian
-- **B (backend / GitHub rails / CI / deploy):** <!-- teammate or solo: pending answer -->
+- **B (backend / GitHub rails / CI / deploy):** YearningAsian (solo; both owner columns are the same person)
 
-**Event:** <!-- pending: name, venue, dates -->
-**Coding may start:** <!-- from the rules -->
-**Deadline:** <!-- hard time + timezone. Every portal -->
-**Target submit:** <!-- deadline minus 90 min -->
+**Event:** Build With AI: Basics (Devpost Learn, online). Rules: https://learn-ai-basics.devpost.com/rules
+**Coding may start:** submission period opened 2026-09-22 10:00 ET. New projects only, started from an empty folder during the period (this repo: 2026-10-04).
+**Deadline:** 2026-10-26 17:00 EDT. One portal: Devpost.
+**Target submit:** 2026-10-26 15:30 EDT (deadline minus 90 min).
 **Repo:** https://github.com/YearningAsian/merge-desk (public)
 
 **Legend:** ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked · ✂️ cut
@@ -31,11 +31,16 @@
 - **Who pays:** teams running coding agents at volume (platform and developer-productivity teams), per active repository.
 
 **Tracks we enter:**
-- General: <!-- pending event -->
-- Sponsors (max N per rules): <!-- pending event; candidates: GitHub, the LLM provider we use, Vercel -->
-- MLH / tool prizes (only if really wired): <!-- pending -->
+- General: the single judged pool (1st $1,250, 2nd $750, 3rd $500). No sponsor tracks.
+- Sponsors: none at this event. Model provider chosen: Gemini.
+- Tool prizes: none.
 
-**Rules that bite:** <!-- pending: AI disclosure, video length, expo attendance, repo public, frameworks credited -->
+**Rules that bite (quoted from the rules page, 2026-10-04):**
+- Must be built with the **Devpost Learn Skill Pack** (`npx skills add challengepost/learn-ai-basics --all -y`) and a SKILL.md coding agent. Its six skills (1-start ... 6-ship) are the required build process; where they conflict with the zero-to-ship kit, the skill pack wins.
+- Public repo with source, assets, instructions **and the planning documents `scope.md`, `prd.md`, `spec.md`** (the pack writes them to `devpost/`), plus an **open source license file** (MIT).
+- Demo video **less than three (3) minutes**, showing the project working end-to-end, on YouTube or Vimeo.
+- Text description of features. The pack requires the learner to write submission copy; the agent may only fix spelling and grammar.
+- "Projects must be newly created during the Submission Period"; disclose any pre-existing code.
 
 ---
 
@@ -43,8 +48,10 @@
 
 | Criterion (quote the rules) | Surface that answers it | Owner |
 |---|---|---|
-| <!-- pending event criteria --> | Desk conflict view: two intents side by side, Beat A held, Beat B lands | A |
-| Technical depth | Deterministic intent verifier + CI gate on a real public repo; replay eval on real historical merges | B |
+| Design: "a complete, coherent product experience, not just a technical proof of concept" | Desk conflict view: two intents side by side, Beat A held, Beat B lands, one coherent flow | A |
+| Potential Impact: "a credible, specific case for solving a real problem for a real audience" | Hook study + reviewers of agent-written PRs as the audience; the replay eval number | A |
+| Innovation/Idea: "how creative and novel ... does the project differ from existing concepts" | Intent check + CI gate vs AI merge drivers that write output unchecked | A |
+| Presentation: "does the video clearly demonstrate the project working end-to-end" | Under-3-minute video, real UI, Beat A then Beat B | A |
 | Execution: can a judge verify it | `/judge` + public `/api/health` + `/api/stats` + the demo repo's PR history | A |
 
 **Headline number:** "Of N real historical conflict hunks, an unchecked AI resolution dropped an intent in X; Merge Desk held all X." Placeholder until the replay eval (row 2.9) writes it to `docs/FACTS.json`. Never type a number from memory.
@@ -57,8 +64,8 @@
 
 | # | Row | File(s) | Owner | Status | Notes |
 |---|---|---|---|---|---|
-| 0.1 | Rules, deadlines, portals, criteria read | `PLAN.md` header | A | ⛔ | Waiting on event name + deadline |
-| 0.2 | Wedge card approved (signature moment, Beat A/B, tracks) | `PLAN.md` Context | A | 🟡 | Shape approved 2026-10-04 (web desk + GitHub gate). Tracks pending event |
+| 0.1 | Rules, deadlines, portals, criteria read | `PLAN.md` header | A | ✅ | Build With AI: Basics, Devpost, due 2026-10-26 17:00 EDT |
+| 0.2 | Scope approved through the event's skill pack (`1-start`, `2-scope`) | `devpost/scope.md` | A | 🟡 | Shape chosen 2026-10-04 (web desk + GitHub gate); the pack's interview decides final scope |
 | 0.3 | Brand direction | `docs/design/BRAND.md` | A | ✅ | |
 | 0.4 | H-rows listed and assigned | below | A | ✅ | |
 
@@ -124,8 +131,8 @@
 
 | # | Step | Who | Unlocks |
 |---|---|---|---|
-| H1 | Event registration; tell the agent the event name, deadline, portals | A | 0.1 |
-| H2 | LLM key (OpenAI or Gemini) into `.env.local` and Vercel env | A | 1.6 |
+| H1 | Register on Devpost for Build With AI: Basics | A | 5.4 |
+| H2 | Gemini API key into `.env.local` and Vercel env | A | 1.6 |
 | H3 | Fine-grained GitHub token scoped to the demo repo only (contents, pull requests: read/write; checks, actions: read) | A | 1.6 |
 | H4 | Vercel project linked to this repo | A | 2.6 |
 | H5 | Final submit click on every portal | A | being judged |
@@ -163,4 +170,4 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 - **D4 Wired-or-cut:** if production `/api/health` says false, the UI, README, video and writeup do not mention it.
 - **D5 The model proposes, code decides:** the LLM's self-report never unlocks a merge. Only the deterministic verifier and CI do.
 
-_Last updated: 2026-10-04, Phase 0 (agent)_
+_Last updated: 2026-10-04, Phase 0 event rules recorded (agent)_

@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { resetPlan } from "@/core/demo";
-import { ROOT, git, loadDemoConfig, pushBranch, remoteRefs } from "./lib/git";
+import { ROOT, git, loadDemoConfig, pushBranch, remoteRefs } from "./lib/git.mts";
 
 const { values } = parseArgs({ options: { yes: { type: "boolean", default: false } } });
 const config = loadDemoConfig();

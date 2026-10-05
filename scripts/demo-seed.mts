@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { planBranchWrites, resetPlan, seedTagName, type BranchWrite } from "@/core/demo";
-import { ROOT, git, loadDemoConfig, pushBranch, remoteRefs, tryGit } from "./lib/git";
+import { ROOT, git, loadDemoConfig, pushBranch, remoteRefs, tryGit } from "./lib/git.mts";
 
 const { values } = parseArgs({
   options: { yes: { type: "boolean", default: false }, push: { type: "boolean", default: false } },

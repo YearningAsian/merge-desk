@@ -19,9 +19,9 @@
     "test": "vitest run",
     "test:core": "vitest run",
     "test:playground": "npm test --prefix playground",
-    "gate": "tsx scripts/gate.ts",
-    "demo:seed": "tsx scripts/demo-seed.ts",
-    "demo:reset": "tsx scripts/demo-reset.ts",
+    "gate": "tsx scripts/gate.mts",
+    "demo:seed": "tsx scripts/demo-seed.mts",
+    "demo:reset": "tsx scripts/demo-reset.mts",
     "env:check": "node scripts/env-check.mjs"
   },
   "dependencies": {

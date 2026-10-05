@@ -111,7 +111,7 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     yield step(
       "write",
       "passed",
-      `${applied.changedFiles.length} files differ from the head: ${applied.changedFiles.join(", ")}`.slice(
+      `${applied.changedFiles.length} ${applied.changedFiles.length === 1 ? "file differs" : "files differ"} from the head: ${applied.changedFiles.join(", ")}`.slice(
         0,
         2_000,
       ),

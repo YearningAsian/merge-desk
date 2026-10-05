@@ -15,7 +15,7 @@ import { STEP_LABELS, type RunEvent, type StepId } from "@/core/events";
 import type { Option } from "@/core/honor";
 import { runPipeline, type Proposer } from "@/server/pipeline/run";
 import { LocalRunner } from "@/server/runner/local";
-import { ROOT, loadDemoConfig, resolveBranch } from "./lib/git";
+import { ROOT, loadDemoConfig, resolveBranch } from "./lib/git.mts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,

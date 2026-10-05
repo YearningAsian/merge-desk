@@ -41,3 +41,6 @@ Thumbs.db
 # installed agent skills (third-party curriculum; reinstall from skills-lock.json)
 .agents/
 agent/
+
+# Devpost Learn: personal learning context stays out of commits
+/devpost/learner-profile.md

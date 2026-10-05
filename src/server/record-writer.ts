@@ -35,7 +35,8 @@ export function withLocalRecordWriter<T>(
   const previous = queues.get(key) ?? Promise.resolve();
   const next = previous.then(async () => {
     const root = resolve(join(tmpdir(), "merge-desk-record-locks"));
-    const path = resolve(root, createHash("sha256").update(key).digest("hex"));
+    const lockId = createHash("sha256").update(key).digest("hex");
+    const path = resolve(root, lockId);
     if (!path.startsWith(root + sep)) throw new Error("Invalid record lock path");
     try {
       await mkdir(root, { recursive: true });
@@ -43,8 +44,7 @@ export function withLocalRecordWriter<T>(
     } catch {
       return {
         ok: false as const,
-        reason:
-          "This decision record has an active or unconfirmed local writer. Reconcile it before trying again.",
+        reason: `This decision record has an active or unconfirmed local writer, or its lock is unavailable. Lock reference: merge-desk-record-locks/${lockId}. An operator must reconcile GitHub comments and branch state using docs/record-reconciliation.md before retrying.`,
       };
     }
     let unresolved = false;

@@ -47,6 +47,8 @@ Unit and browser suites use fixtures and need no service credentials. The browse
 
 Authenticated live mode requires the owner's GitHub App, Gemini and Sandbox configuration. Follow the [configuration contract](devpost/spec.md#configuration), keep credentials in local or host environment settings, and check presence with `npm run env:check`. The supported live account and repository remain `YearningAsian` and `YearningAsian/merge-desk`. Installing the source does not grant another account live access.
 
+An unconfirmed decision write retains its local lock. Follow the [operator reconciliation procedure](docs/record-reconciliation.md); do not retry an ambiguous write or clear a lock before its remote outcome is settled.
+
 ### Run the gate on a seeded conflict
 
 The `[Demo]` pull requests (label `demo`) are seeded conflicts on `demo/*` branches. They target `demo/base`, never `main`. `npm run gate` merges real branches in a temporary folder, writes a hand-written candidate merge, and checks parsing, whether the chosen option was honored, and the real tests. These manual candidate examples need no AI call; `npm run gate -- clean --ai` uses the configured Gemini client and runner.

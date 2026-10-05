@@ -16,7 +16,14 @@ import { Skeleton } from "@/ui/primitives/skeleton";
 import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource, LandOutcome } from "@/ui/sources/types";
-import { LandAction, LandResult, RecordSection, type LandState, type LandContext } from "@/ui/Land";
+import {
+  LandAction,
+  LandResult,
+  RecordSection,
+  blocksStartingOver,
+  type LandState,
+  type LandContext,
+} from "@/ui/Land";
 import { RunSection } from "@/ui/Run";
 import {
   analysisKey,
@@ -88,6 +95,11 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   // Land per run; the confirmed landing per pull request (it outlives the
   // analysis, whose head it just moved); whether each hold was recorded.
   const [lands, setLands] = useState<Record<string, LandState>>({});
+  // Synchronous interlock also protects callbacks captured before React has
+  // rendered a pending Land. Do not clear it for UNKNOWN or confirmed writes.
+  const landAttempts = useRef(new Map<string, LandState>());
+  const unconfirmedPrs = useRef(new Set<number>());
+  const [blockedPrs, setBlockedPrs] = useState<Record<number, boolean>>({});
   const [landed, setLanded] = useState<
     Record<number, { outcome: LandOutcome; context: LandContext }>
   >({});
@@ -133,6 +145,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     selected && selectedDone ? runKey(keyOf(selected), selectedDone.option) : null;
   const selectedLand = selectedRunKey ? lands[selectedRunKey] : undefined;
   const selectedRecorded = selectedRunKey ? recorded[selectedRunKey] : undefined;
+  const selectedUnconfirmed = selected !== null && Boolean(blockedPrs[selected.number]);
 
   const analyze = useCallback(
     async (pull: PullSummary) => {
@@ -166,6 +179,12 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     async (pull: PullSummary, done: Extract<AnalysisState, { status: "done" }>, steer?: string) => {
       if (!done.token) return;
       const key = runKey(keyOf(pull), done.option);
+      if (
+        unconfirmedPrs.current.has(pull.number) ||
+        blocksStartingOver(landAttempts.current.get(key))
+      )
+        return;
+      landAttempts.current.delete(key);
       running.current.get(key)?.abort();
       const controller = new AbortController();
       running.current.set(key, controller);
@@ -224,9 +243,14 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     [source, settings, queryClient, queueRecord],
   );
 
-  // One deliberate click; never retried. The list and the record refresh
+  // One deliberate click; never automatically retried. The list and the record refresh
   // afterwards whatever the outcome, since GitHub is the source of truth.
   const land = async (pull: PullSummary, key: string, token: string, option: Option) => {
+    if (
+      unconfirmedPrs.current.has(pull.number) ||
+      blocksStartingOver(landAttempts.current.get(key))
+    )
+      return;
     const context = {
       runKey: key,
       option,
@@ -234,8 +258,20 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       base: pull.base.sha,
       at: new Date().toISOString(),
     };
+    landAttempts.current.set(key, { status: "landing" });
+    unconfirmedPrs.current.add(pull.number);
+    setBlockedPrs((map) => ({ ...map, [pull.number]: true }));
     setLands((map) => ({ ...map, [key]: { status: "landing" } }));
     const outcome = await source.land(pull.number, token);
+    landAttempts.current.set(key, { ...outcome, context });
+    if (outcome.outcome !== "UNKNOWN") {
+      unconfirmedPrs.current.delete(pull.number);
+      setBlockedPrs((map) => {
+        const next = { ...map };
+        delete next[pull.number];
+        return next;
+      });
+    }
     setLands((map) => ({ ...map, [key]: { ...outcome, context } }));
     setLanded((map) => ({ ...map, [pull.number]: { outcome, context } }));
     void queryClient.invalidateQueries({ queryKey: [source.mode, repo, "pulls"] });
@@ -243,6 +279,12 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   };
 
   const discard = (pull: PullSummary, key: string, current: RunState | undefined) => {
+    if (
+      unconfirmedPrs.current.has(pull.number) ||
+      blocksStartingOver(landAttempts.current.get(key))
+    )
+      return;
+    landAttempts.current.delete(key);
     if (current?.status === "done" && current.result.token)
       void queueRecord(pull.number, () =>
         source.record(pull.number, current.result.token!, "discarded"),
@@ -397,6 +439,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
               "outcome" in selectedLand &&
               selectedLand.outcome === "LANDED"
             }
+            discardBlocked={selectedUnconfirmed || blocksStartingOver(selectedLand)}
+            pushUnconfirmed={selectedUnconfirmed}
             landing={
               selectedRun?.status === "done" &&
               selectedRun.result.verdict === "VERIFIED" &&
@@ -406,6 +450,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
                     branch={selected.head.ref}
                     base={selected.base.ref}
                     state={selectedLand}
+                    blocked={selectedUnconfirmed}
                     onLand={() =>
                       void land(
                         selected,

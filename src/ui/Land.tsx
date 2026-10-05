@@ -18,6 +18,11 @@ import { cn } from "@/ui/utils";
 
 export type LandState = { status: "landing" } | (LandOutcome & { context: LandContext });
 
+// A dispatched or unconfirmed attempt cannot be forgotten locally. Only a
+// definite refusal permits starting over or another deliberate Land click.
+export const blocksStartingOver = (state: LandState | undefined) =>
+  Boolean(state && (!("outcome" in state) || state.outcome !== "REFUSED"));
+
 export type LandContext = {
   runKey: string;
   option: Option;
@@ -30,15 +35,19 @@ export function LandAction({
   branch,
   base,
   state,
+  blocked = false,
   onLand,
 }: {
   branch: string;
   base: string;
   state: LandState | undefined;
+  blocked?: boolean;
   onLand: () => void;
 }) {
-  if (state && "outcome" in state) return null;
-  const landing = state !== undefined;
+  if (blocked && (!state || "outcome" in state)) return null;
+  if (state && "outcome" in state && state.outcome !== "REFUSED") return null;
+  const landing = state !== undefined && "status" in state;
+  const retry = state !== undefined && "outcome" in state && state.outcome === "REFUSED";
   return (
     <div className="space-y-1 border-t border-hair pt-3">
       <Button
@@ -49,7 +58,11 @@ export function LandAction({
       >
         {landing ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : null}
         <span className="truncate">
-          {landing ? "Landing…" : "Land: push merge commit to "}
+          {landing
+            ? "Landing…"
+            : retry
+              ? "Try Land again: push merge commit to "
+              : "Land: push merge commit to "}
           {landing ? null : <code className="font-mono text-[12.5px]">{branch}</code>}
         </span>
       </Button>
@@ -57,6 +70,12 @@ export function LandAction({
         Does not merge into <code className="font-mono text-[12px]">{base}</code>. Your team still
         merges the pull request.
       </p>
+      {retry ? (
+        <p className="text-[12.5px] text-muted">
+          The previous attempt was refused before a branch update. Another click rechecks the same
+          signed run and every Land guard. It is never retried automatically.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -437,7 +437,8 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
   await expect(result.getByRole("group", { name: "Land: LANDED" })).toHaveCount(0);
   expect(landed).toEqual([{ pr: CLEAN, token: expect.any(String) }]);
 
-  // Run again, then a confirmed Land.
+  // A separate page session starts an independent confirmed-Land fixture.
+  // The UNKNOWN attempt is never discarded or retried.
   answer = {
     status: 200,
     json: {
@@ -448,7 +449,7 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
       record: { ok: true },
     },
   };
-  await detail.getByRole("button", { name: "Discard this run" }).click();
+  await page.reload();
   await detail.getByRole("button", { name: "Run checks" }).click();
   await detail
     .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
@@ -464,6 +465,198 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
   await expect(detail.getByText("Nothing has been pushed.")).toHaveCount(0);
   await shot(page, "landed-1440");
   await noSeriousAxe(page);
+});
+
+for (const phase of ["in-flight", "UNKNOWN"]) {
+  test(`an ${phase} Land cannot be discarded or described as nothing pushed`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signIn(page);
+    const records: Array<{ action: string }> = [];
+    await page.route("**/api/live/record**", (route) => {
+      if (route.request().method() === "POST") records.push(route.request().postDataJSON());
+      return route.fulfill({ json: { entries: [], note: null } });
+    });
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    if (phase === "UNKNOWN") finish();
+    let landCalls = 0;
+    await page.route("**/api/live/land", async (route) => {
+      landCalls += 1;
+      await pending;
+      return route.fulfill({
+        status: 502,
+        json: {
+          outcome: "UNKNOWN",
+          reason:
+            "GitHub did not confirm whether the branch moved. Check the pull request before trying again.",
+        },
+      });
+    });
+    await page.goto(`/live?pr=${CLEAN}`);
+    const detail = page.getByRole("article");
+    await detail.getByRole("button", { name: "Run checks" }).click();
+    const discard = detail.getByRole("button", { name: "Discard this run" });
+    await expect(discard).toBeEnabled();
+    await detail
+      .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+      .click();
+    await expect.poll(() => landCalls).toBe(1);
+    await expect(discard).toBeDisabled();
+    await discard.dispatchEvent("click");
+    expect(records.filter((entry) => entry.action === "discarded")).toHaveLength(0);
+    await expect(detail.getByText("Nothing has been pushed.", { exact: true })).toHaveCount(0);
+    finish();
+    const unknown = detail.getByRole("group", { name: "Land: UNKNOWN" });
+    await expect(unknown).toBeVisible();
+    await expect(discard).toBeDisabled();
+    await discard.dispatchEvent("click");
+    await expect(unknown).toBeVisible();
+    expect(records.filter((entry) => entry.action === "discarded")).toHaveLength(0);
+    expect(landCalls).toBe(1);
+    await expect(detail.getByRole("button", { name: /Try Land again/ })).toHaveCount(0);
+  });
+}
+
+test("a definite REFUSED Land supports one new deliberate click without re-running the pipeline", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const runs = await signIn(page);
+  const attempts: unknown[] = [];
+  await page.route("**/api/live/land", (route) => {
+    attempts.push(route.request().postDataJSON());
+    return attempts.length === 1
+      ? route.fulfill({
+          status: 503,
+          json: {
+            outcome: "REFUSED",
+            reason: "GitHub did not answer before any branch update. Nothing was pushed.",
+          },
+        })
+      : route.fulfill({
+          json: {
+            outcome: "LANDED",
+            commit: "e".repeat(40),
+            branch: "demo/clean/rename",
+            mergeable: "checking",
+            record: { ok: true },
+          },
+        });
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await detail
+    .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+    .click();
+  await expect(detail.getByRole("group", { name: "Land: REFUSED" })).toBeVisible();
+  expect(attempts).toHaveLength(1);
+  const retry = detail.getByRole("button", {
+    name: "Try Land again: push merge commit to demo/clean/rename",
+  });
+  await expect(retry).toBeEnabled();
+  await retry.click();
+  await expect(detail.getByRole("group", { name: "Land: LANDED" })).toBeVisible();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[1]).toEqual(attempts[0]);
+  expect(runs).toHaveLength(1);
+});
+
+test("a verified run can still be discarded before any Land attempt", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const records: Array<{ pr: number; action: string }> = [];
+  let landCalls = 0;
+  await page.route("**/api/live/land", (route) => {
+    landCalls += 1;
+    return route.fulfill({
+      status: 409,
+      json: { outcome: "REFUSED", reason: "Unexpected test Land." },
+    });
+  });
+  await page.route("**/api/live/record**", (route) => {
+    if (route.request().method() === "POST") records.push(route.request().postDataJSON());
+    return route.fulfill({ json: { entries: [], note: null } });
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  const discard = detail.getByRole("button", { name: "Discard this run" });
+  await expect(discard).toBeEnabled();
+  await discard.click();
+  await expect
+    .poll(() => records.some((entry) => entry.pr === CLEAN && entry.action === "discarded"))
+    .toBe(true);
+  await expect(detail.getByRole("button", { name: "Run checks" })).toBeVisible();
+  expect(landCalls).toBe(0);
+});
+
+test("an ambiguous Land blocks other options on that PR while other PRs remain usable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const runs = await signIn(page);
+  const records: Array<{ pr: number; action: string }> = [];
+  await page.route("**/api/live/record**", (route) => {
+    if (route.request().method() === "POST") records.push(route.request().postDataJSON());
+    return route.fulfill({ json: { entries: [], note: null } });
+  });
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let landCalls = 0;
+  await page.route("**/api/live/land", async (route) => {
+    landCalls += 1;
+    await pending;
+    return route.fulfill({
+      status: 502,
+      json: { outcome: "UNKNOWN", reason: "The branch update was not confirmed. Check GitHub." },
+    });
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  const slider = detail.getByRole("slider", { name: "Resolution" });
+  // An existing checked alternative must not provide a route around UNKNOWN.
+  await expect(slider).toBeVisible();
+  await page.keyboard.press("1");
+  await page.keyboard.press("Control+Enter");
+  await expect(detail.getByRole("group", { name: "Result: VERIFIED" })).toBeVisible();
+  await page.keyboard.press("2");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await detail
+    .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+    .click();
+  await expect.poll(() => landCalls).toBe(1);
+  await page.keyboard.press("1");
+  await expect(detail.getByRole("button", { name: "Discard this run" })).toBeDisabled();
+  await expect(detail.getByRole("button", { name: /Land: push merge commit/ })).toHaveCount(0);
+  await expect(detail.getByText("Nothing has been pushed.", { exact: true })).toHaveCount(0);
+  finish();
+  await expect(detail.getByRole("group", { name: "Land: UNKNOWN" })).toBeVisible();
+  await page.keyboard.press("1");
+  await expect(slider).toHaveAttribute("aria-valuetext", "Keep ours, drop theirs");
+  await expect(detail.getByRole("group", { name: "Land: UNKNOWN" })).toBeVisible();
+  const discard = detail.getByRole("button", { name: "Discard this run" });
+  await expect(discard).toBeDisabled();
+  await discard.dispatchEvent("click");
+  await expect(detail.getByRole("button", { name: /Land: push merge commit/ })).toHaveCount(0);
+  await expect(detail.getByText("Nothing has been pushed.", { exact: true })).toHaveCount(0);
+  await page.keyboard.press("3");
+  await page.keyboard.press("Control+Enter");
+  expect(runs).toHaveLength(2);
+  expect(records.filter((entry) => entry.action === "discarded")).toHaveLength(0);
+  expect(landCalls).toBe(1);
+  // The interlock belongs to #1, so #2 can still run and discard a hold.
+  await page.locator(`[data-pr="${HELD}"]`).click();
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await expect(detail.getByRole("group", { name: "Result: HELD" })).toBeVisible();
+  await detail.getByRole("button", { name: "Discard this attempt" }).click();
+  await expect
+    .poll(() => records.some((entry) => entry.pr === HELD && entry.action === "discarded"))
+    .toBe(true);
 });
 
 test("no file conflicts is separate from blocked merge readiness, with current checks and a GitHub action", async ({

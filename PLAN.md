@@ -84,9 +84,9 @@
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
 | 1.1 | Repo, `.gitignore`, `.env.example`, README stub | root | A | 🟡 | 0.2 | Repo public; `.env.example` with scaffold |
-| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | ⬜ | 1.1 | Stack documentation reviewed in 0.7; scaffold, lockfile and build still pending. Recheck pins before install |
-| 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | ⬜ | 1.2 | |
-| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | ⬜ | 1.2 | Workflows held back until the app exists |
+| 1.2 | Stack check (workspace STACK.md protocol) + Next.js scaffold | `docs/stack.md`, `docs/adr/0001-stack.md`, `src/**` | A | 🟡 | 1.1 | Claimed 2026-10-05 for 5-build slice 1: pin recheck + scaffold |
+| 1.3 | Env contract, `/api/health`, `/api/stats`, `/judge` stub | `src/server/env.ts`, `src/app/**` | A | 🟡 | 1.2 | Claimed 2026-10-05 for 5-build slice 1: env contract + /api/health (stats and /judge in slice 7) |
+| 1.4 | CI green (lint, typecheck, test, build, hygiene, secrets) | `.github/workflows/ci.yml` | B | 🟡 | 1.2 | Claimed 2026-10-05 for 5-build slice 1: CI on main, Node 24 |
 | 1.5 | Accounts + keys (each person signs up; keys never in chat/git) | `.env.local` | A | ⬜ | | See H-rows |
 | 1.6 | **Gate:** GitHub App round trip on a disposable demo ref, one schema-valid Gemini Interactions call, sandbox merge/deny-all/tests/disposal smoke check | `tests/{github,llm,runner}.live.test.ts` | B | ⬜ | 1.3, 1.5 | No desk UI before this; verify trusted snapshots, Node image, actual quotas and request duration |
 
@@ -94,7 +94,7 @@
 
 | # | Row | File(s) | Owner | Status | Deps | Notes |
 |---|---|---|---|---|---|---|
-| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | ⬜ | 1.3 | Combine/drop/rename/ambiguity tests; line evidence is not semantic proof |
+| 2.1 | Pure conflict/line-change logic, choices, evidence and schemas | `src/core/**` | B | 🟡 | 1.3 | Claimed 2026-10-05 for 5-build slice 1: honor gate, demo-branch scope guard, seeded demo PRs, main ruleset |
 | 2.2 | Signed analysis/result state + GitHub decision comment | `src/server/{sign,session}.ts`, `src/server/github/**` | B | ⬜ | 1.6 | Bind user/repo/PR/head/base/expiry; no branch lease or DB. Usage throttle is not an atomic budget cap |
 | 2.3 | API routes: analyze, run, land, record (explicit failure shapes) | `src/app/api/**` | B | ⬜ | 2.1 | Node streams, trusted snapshot/deny-all runner, request deadlines; review before merge |
 | 2.4 | Desk UI: PR list, intents, options, checks, read-only diff, inline drops and Land | `src/app/**`, `src/ui/**` | A | ⬜ | 2.3 | shadcn/Radix + Query + Pierre; public recorded demo, learner-only live; phone/keyboard/axe checks |

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merge Desk: Technical Spec</title>
+<meta name="description" content="Technical spec for Merge Desk. Companion to devpost/spec.md (canonical).">
+<style>
+:root {
+  --bg: #f5f5f3; --surface: #fff; --ink: #16181d; --muted: #646a75; --hair: #e3e3df; --hair-strong: #c9c9c3;
+  --ours: #2f6fed; --theirs: #d9711f; --ok: #1f8a4c; --stop: #c93c3c; --wait: #9a7d14;
+  --ours-wash: #eef3fe; --theirs-wash: #fdf2e8; --ok-wash: #e8f4ed; --stop-wash: #fbeaea; --wait-wash: #f8f2dc;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+:focus-visible { outline: 2px solid var(--ours); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--hair); margin-bottom: 24px; }
+.eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 34px/1.1 var(--sans); letter-spacing: -.02em; margin: 6px 0 4px; }
+.sub { color: var(--muted); margin: 0; max-width: 68ch; }
+.pill { font: 600 12px/1 var(--mono); padding: 6px 10px; border-radius: 999px; border: 1px solid currentColor; color: var(--wait); background: var(--wait-wash); }
+h2 { font: 650 19px/1.25 var(--sans); letter-spacing: -.01em; margin: 0 0 12px; }
+h3 { font: 600 14px/1.3 var(--sans); margin: 0 0 4px; }
+section { margin-bottom: 28px; }
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 18px; }
+.muted { color: var(--muted); }
+p { margin: 0 0 10px; }
+code { font: 13px var(--mono); background: #f0f0ec; border: 1px solid var(--hair); padding: 0 4px; border-radius: 4px; }
+.plain { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+@media (max-width: 860px) { .plain { grid-template-columns: 1fr; } }
+.plain .card p { margin: 0; font-size: 14px; }
+.plain .k { font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; display: block; }
+.k.demo { color: var(--wait); } .k.live { color: var(--ok); } .k.ai { color: var(--ours); }
+svg.dia { width: 100%; height: auto; display: block; }
+.mobile-alt { display: none; gap: 10px; }
+.mobile-alt .card { padding: 12px 14px; }
+.mobile-alt p { margin: 0; font-size: 14px; }
+@media (max-width: 680px) { svg.dia { display: none; } .mobile-alt { display: grid; } }
+.legend-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.legend-row span::before { content: ""; display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 6px; }
+.legend-row .dash::before { border-top-style: dashed; }
+.legend-row .lock::before { border-top-color: var(--stop); }
+/* stepper */
+.stepper { display: grid; grid-template-columns: 240px minmax(0, 1fr); padding: 0; overflow: hidden; }
+@media (max-width: 760px) { .stepper { grid-template-columns: 1fr; } }
+.steps { list-style: none; margin: 0; padding: 8px; border-right: 1px solid var(--hair); background: #fafaf8; }
+@media (max-width: 760px) { .steps { border-right: 0; border-bottom: 1px solid var(--hair); display: flex; overflow-x: auto; gap: 4px; } }
+.steps button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; width: 100%; padding: 8px 10px; border-radius: 7px; font-size: 14px; color: var(--muted); }
+@media (max-width: 760px) { .steps button { grid-template-columns: 24px auto; white-space: nowrap; } }
+.steps button span { font: 600 12px/24px var(--mono); text-align: center; border-radius: 50%; background: var(--hair); color: var(--ink); height: 24px; }
+.steps button:hover { background: #f0f0ec; color: var(--ink); }
+.steps button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.steps button[aria-selected="true"] span { background: #fff; }
+.panel { padding: 20px 22px; }
+.panel h3 { font-size: 17px; margin-bottom: 8px; }
+.trace { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.trace li { display: grid; grid-template-columns: 210px 1fr; gap: 12px; font-size: 14px; padding: 6px 0; border-top: 1px solid var(--hair); }
+@media (max-width: 560px) { .trace li { grid-template-columns: 1fr; gap: 2px; } }
+.trace code { white-space: nowrap; }
+.nav { display: flex; gap: 8px; padding-top: 0; }
+.nav button { font: 600 13px var(--sans); padding: 7px 12px; border-radius: 7px; border: 1px solid var(--hair-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+.nav button:hover:not(:disabled) { border-color: var(--ink); }
+.nav button:disabled { opacity: .4; cursor: default; }
+/* land */
+.land { list-style: none; counter-reset: l; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; }
+@media (max-width: 960px) { .land { grid-template-columns: 1fr; } }
+.land li { counter-increment: l; background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 14px; font-size: 14px; position: relative; }
+.land li::before { content: counter(l); font: 700 12px/22px var(--mono); display: inline-block; width: 22px; text-align: center; border-radius: 50%; background: var(--ink); color: #fff; margin-bottom: 8px; }
+.land li.guard { border-color: var(--stop); }
+.land li.guard.nofork::after { content: "refuses otherwise"; }
+.land li.guard.noci::after { content: "holds otherwise"; }
+.land li.guard::after { content: "refuses if moved"; display: table; margin-top: 10px; font: 600 10px/1 var(--mono); color: var(--stop); background: var(--stop-wash); padding: 4px 6px; border-radius: 4px; }
+.landbtn { margin-top: 14px; display: inline-grid; gap: 2px; padding: 10px 14px; border-radius: 8px; background: var(--ink); color: #fff; }
+.landbtn b { font-size: 14px; } .landbtn small { color: #c9c9c3; font-size: 12px; }
+/* components */
+.comps { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; align-items: start; }
+@media (max-width: 860px) { .comps { grid-template-columns: 1fr; } }
+details { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; }
+details[open] { border-color: var(--hair-strong); }
+summary { cursor: pointer; list-style: none; padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-weight: 600; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; flex: none; }
+details[open] summary::before { transform: rotate(45deg); }
+summary .ref { margin-left: auto; font: 500 11px var(--mono); color: var(--muted); text-align: right; }
+details .body { padding: 0 14px 14px 31px; font-size: 14px; }
+details .body p { margin: 0 0 8px; }
+.files { font: 12px/1.6 var(--mono); color: var(--muted); margin-top: 6px; }
+/* stack + tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+th { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+.v { font: 600 13px var(--mono); white-space: nowrap; }
+.warn { color: var(--stop); font-weight: 600; }
+/* github app */
+.settings { display: grid; grid-template-columns: 220px 1fr; gap: 0; font-size: 14px; }
+@media (max-width: 640px) { .settings { grid-template-columns: 1fr; } }
+.settings dt { font-weight: 600; padding: 8px 0; border-top: 1px solid var(--hair); }
+.settings dd { margin: 0; padding: 8px 0; border-top: 1px solid var(--hair); }
+@media (max-width: 640px) { .settings dd { border-top: 0; padding-top: 0; } }
+.copy { font: 600 12px var(--sans); margin-left: 8px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--hair-strong); background: #fff; cursor: pointer; }
+.copy:hover { border-color: var(--ink); }
+/* lists */
+.twocol { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+@media (max-width: 860px) { .twocol { grid-template-columns: 1fr; } }
+.twocol ul, .twocol ol { margin: 0; padding-left: 18px; font-size: 14px; }
+.twocol li { margin: 6px 0; }
+.tag { font: 600 11px/1 var(--mono); padding: 4px 7px; border-radius: 5px; vertical-align: 2px; margin-right: 6px; }
+.tag.q { color: var(--wait); background: var(--wait-wash); }
+.tag.ok { color: var(--ok); background: var(--ok-wash); }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--hair); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Devpost Learn · 4-spec</div>
+      <h1>Merge Desk</h1>
+      <p class="sub">The blueprint: Next.js on Vercel, no database. Demo mode replays real recordings; live mode runs each merge in a throwaway sandbox where git, a line-by-line check and your tests decide. The AI only proposes.</p>
+    </div>
+    <span class="pill" role="status" style="color:#1f8a4c;background:#e8f4ed">spec: approved</span>
+  </header>
+
+  <section aria-labelledby="plain-h">
+    <h2 id="plain-h">How it works, in plain language</h2>
+    <div class="plain">
+      <div class="card"><span class="k demo">Demo mode · anyone</span><p>Plays back recordings of real runs, saved as files in the repo. Fast, free, can't break, writes nothing. Labelled "Demo: recorded from a real run".</p></div>
+      <div class="card"><span class="k live">Live mode · YearningAsian only</span><p>Sign in with GitHub; only on merge-desk. Each run starts a throwaway cloud computer that clones the pull request, does the real <code>git merge</code>, writes the proposal and runs the checks, then is destroyed.</p></div>
+      <div class="card"><span class="k ai">The AI's job</span><p>Gemini describes each side, suggests options and writes the merged code. It never decides: git, the line-by-line check and your tests do.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="arch-h">
+    <h2 id="arch-h">What talks to what</h2>
+    <div class="card">
+      <svg class="dia" viewBox="0 0 980 440" role="img" aria-labelledby="ar-t ar-d">
+        <title id="ar-t">System map</title>
+        <desc id="ar-d">The browser runs the desk with either a live source or a recorded source. The recorded source reads static recording files. The live source streams from API routes on Vercel. The server holds all secrets, calls GitHub with per-repository installation tokens, calls Gemini for structured proposals, and starts a Vercel Sandbox per run. The sandbox clones public repositories without a token and runs tests with the network off.</desc>
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16181d"/></marker></defs>
+        <g font-family="-apple-system, system-ui, sans-serif">
+          <!-- browser -->
+          <rect x="16" y="20" width="250" height="400" rx="12" fill="#fafaf8" stroke="#c9c9c3"/>
+          <text x="32" y="46" font-size="12" font-weight="700" fill="#646a75">BROWSER · phone or desktop</text>
+          <rect x="32" y="60" width="218" height="60" rx="8" fill="#fff" stroke="#16181d"/>
+          <text x="141" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#16181d">Desk UI</text>
+          <text x="141" y="105" text-anchor="middle" font-size="11" fill="#646a75">same screens in both modes</text>
+          <rect x="32" y="150" width="218" height="54" rx="8" fill="#e8f4ed" stroke="#1f8a4c"/>
+          <text x="141" y="173" text-anchor="middle" font-size="13" font-weight="600" fill="#16181d">LiveSource</text>
+          <text x="141" y="191" text-anchor="middle" font-size="11" fill="#646a75">calls API, reads event stream</text>
+          <rect x="32" y="232" width="218" height="54" rx="8" fill="#f8f2dc" stroke="#9a7d14"/>
+          <text x="141" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#16181d">RecordedSource</text>
+          <text x="141" y="273" text-anchor="middle" font-size="11" fill="#646a75">replays with recorded timings</text>
+          <rect x="32" y="330" width="218" height="66" rx="8" fill="#fff" stroke="#c9c9c3" stroke-dasharray="4 3"/>
+          <text x="141" y="356" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">demo/recordings/*.json</text>
+          <text x="141" y="376" text-anchor="middle" font-size="11" fill="#646a75">static, captured from live runs</text>
+          <path d="M141 120 V150" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M32 100 C20 100 20 259 30 259" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M141 286 V330" stroke="#16181d" stroke-width="1.3" fill="none" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <!-- server -->
+          <rect x="340" y="20" width="300" height="400" rx="12" fill="#fff" stroke="#16181d" stroke-width="1.5"/>
+          <text x="356" y="46" font-size="12" font-weight="700" fill="#646a75">NEXT.JS ON VERCEL · holds every secret</text>
+          <g font-size="12">
+            <rect x="356" y="62" width="268" height="40" rx="7" fill="#fafaf8" stroke="#e3e3df"/><text x="368" y="80" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">/api/auth/*</text><text x="368" y="95" font-size="11" fill="#646a75">GitHub App sign-in · YearningAsian only</text>
+            <rect x="356" y="112" width="268" height="56" rx="7" fill="#fafaf8" stroke="#c93c3c"/><text x="368" y="130" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">/api/live/* · guard</text><text x="368" y="145" font-size="11" fill="#646a75">session + allowed repo, in code:</text><text x="368" y="160" font-size="11" fill="#646a75">YearningAsian/merge-desk only</text>
+            <rect x="356" y="178" width="268" height="56" rx="7" fill="#fafaf8" stroke="#e3e3df"/><text x="368" y="196" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">pipeline/analyze · pipeline/run</text><text x="368" y="211" font-size="11" fill="#646a75">streams steps; signs results (HMAC)</text><text x="368" y="226" font-size="11" fill="#646a75">core/honor decides, not the model</text>
+            <rect x="356" y="244" width="268" height="40" rx="7" fill="#fafaf8" stroke="#e3e3df"/><text x="368" y="262" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">github/land</text><text x="368" y="277" font-size="11" fill="#646a75">merge commit, fast-forward only</text>
+            <rect x="356" y="294" width="268" height="40" rx="7" fill="#fafaf8" stroke="#e3e3df"/><text x="368" y="312" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">github/comment</text><text x="368" y="327" font-size="11" fill="#646a75">one decision record per PR, in place</text>
+            <rect x="356" y="344" width="268" height="40" rx="7" fill="#fafaf8" stroke="#e3e3df"/><text x="368" y="362" font-family="ui-monospace, monospace" font-size="11" fill="#16181d">/api/health · /api/stats</text><text x="368" y="377" font-size="11" fill="#646a75">booleans only · FACTS</text>
+          </g>
+          <path d="M250 177 C300 177 310 140 356 140" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)" marker-start="url(#ah)"/>
+          <text x="306" y="198" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" fill="#646a75">NDJSON stream</text>
+          <!-- externals -->
+          <rect x="716" y="36" width="248" height="78" rx="10" fill="#fff" stroke="#16181d"/>
+          <text x="732" y="60" font-size="13" font-weight="700" fill="#16181d">GitHub API</text>
+          <text x="732" y="78" font-size="11" fill="#646a75">GitHub App on merge-desk only</text>
+          <text x="732" y="93" font-size="11" fill="#646a75">contents + PRs; no workflows</text>
+          <rect x="716" y="168" width="248" height="78" rx="10" fill="#eef3fe" stroke="#2f6fed"/>
+          <text x="732" y="192" font-size="13" font-weight="700" fill="#16181d">Gemini 3.8 Flash</text>
+          <text x="732" y="210" font-size="11" fill="#646a75">structured JSON, Zod-validated</text>
+          <text x="732" y="225" font-size="11" fill="#646a75">proposes only</text>
+          <rect x="716" y="300" width="248" height="96" rx="10" fill="#fafaf8" stroke="#16181d"/>
+          <text x="732" y="324" font-size="13" font-weight="700" fill="#16181d">Vercel Sandbox (per run)</text>
+          <text x="732" y="342" font-size="11" fill="#646a75">clone · git merge · write · parse</text>
+          <text x="732" y="358" font-size="11" fill="#646a75">tests with network OFF · 2 min cap</text>
+          <text x="732" y="374" font-size="11" fill="#c93c3c">holds no token · destroyed after</text>
+          <path d="M624 270 C670 270 670 80 716 80" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M624 310 C680 310 690 100 716 96" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M624 200 C670 200 680 207 716 207" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M624 220 C670 220 680 340 716 340" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah)"/>
+          <path d="M964 340 H974 V75 H966" stroke="#646a75" stroke-width="1.2" fill="none" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <text x="966" y="282" text-anchor="end" font-size="10" font-family="ui-monospace, monospace" fill="#646a75">public clone, no token ↑</text>
+        </g>
+      </svg>
+      <div class="mobile-alt">
+        <div class="card"><h3>Browser</h3><p>Desk UI with LiveSource (calls the API, reads the event stream) or RecordedSource (replays <code>demo/recordings/*.json</code>).</p></div>
+        <div class="card"><h3>Next.js on Vercel (holds every secret)</h3><p>Sign-in for YearningAsian only; every live route checks the session and that the repo is merge-desk; pipelines stream steps; Land pushes fast-forward only; one decision record per PR.</p></div>
+        <div class="card"><h3>GitHub API</h3><p>GitHub App on merge-desk only: contents and pull requests. No workflows permission.</p></div>
+        <div class="card"><h3>Gemini 3.8 Flash</h3><p>Structured JSON, validated. Proposes only.</p></div>
+        <div class="card"><h3>Vercel Sandbox, per run</h3><p>Clone, merge, write, parse, tests with the network off. Holds no token. Destroyed after every run.</p></div>
+      </div>
+      <div class="legend-row"><span>request / data</span><span class="dash">static or no-credential</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="journey-h">
+    <h2 id="journey-h">The journey, traced through the system</h2>
+    <div class="card stepper" id="stepper">
+      <ol class="steps" role="tablist" aria-label="Journey steps">
+        <li><button role="tab" aria-selected="true" aria-controls="p1" id="t1"><span>1</span>Open the desk</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p2" id="t2"><span>2</span>Analyze a conflict</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p3" id="t3"><span>3</span>See the options</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p4" id="t4"><span>4</span>Choose and confirm</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p5" id="t5"><span>5</span>Run the checks</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p6" id="t6"><span>6</span>Land or hold</button></li>
+        <li><button role="tab" aria-selected="false" aria-controls="p7" id="t7"><span>7</span>Record it</button></li>
+      </ol>
+      <div>
+        <div class="panel" role="tabpanel" id="p1" aria-labelledby="t1"><h3>1. Open the desk</h3><p class="muted">prd.md › Pull request list</p><ul class="trace"><li><code>/live/page.tsx</code><span>Checks the session cookie; signed out shows only the sign-in panel. <code>/demo</code> needs nothing.</span></li><li><code>GET /api/live/prs</code><span>Guard: session + merge-desk only. Lists open PRs (demo ones badged); <code>mergeable_state</code> "dirty" means conflicting; null shows "Checking".</span></li><li><code>ui/PrList.tsx</code><span>Conflicting first; "files changed on both sides" until analysis gives the exact count.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p2" aria-labelledby="t2"><h3>2. Analyze a conflict</h3><p class="muted">prd.md › Conflict analysis</p><ul class="trace"><li><code>POST /api/live/analyze</code><span>Records the <b>start head commit</b>.</span></li><li><code>runner.prepareMerge</code><span>Sandbox clones at the head, fetches the base, runs <code>git merge</code>, reads base/ours/theirs per conflicted file. Destroyed.</span></li><li><code>core/atoms.ts</code><span>Each side's added and removed lines, renames detected. No AI.</span></li><li><code>gemini/analyze.ts</code><span>One-line intent per side; options. Zod-validated.</span></li><li><code>server/sign.ts</code><span>Analysis returned HMAC-signed, so it can't be altered between steps.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p3" aria-labelledby="t3"><h3>3. See the options</h3><p class="muted">prd.md › Resolution options</p><ul class="trace"><li><code>core/options.ts</code><span>Validates the model's 2-3 options; fills keeps/drops (commits, files, authors) from git data, not the model; labels the older side.</span></li><li><code>ui/Options.tsx</code><span>One Recommended with its reason.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p4" aria-labelledby="t4"><h3>4. Choose and confirm</h3><p class="muted">prd.md › Intentional drops</p><ul class="trace"><li><code>ui/DropConfirm.tsx</code><span>Inline: commits, files and authors lost; names a teammate; warns if dropping main's change will undo it when the PR merges.</span></li><li><code>ui/HoldToConfirm.tsx</code><span>Cmd/Ctrl+Enter or an 800 ms hold. Asked once.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p5" aria-labelledby="t5"><h3>5. Run the checks</h3><p class="muted">prd.md › Live run and checks</p><ul class="trace"><li><code>POST /api/live/run</code><span>Head unchanged? Otherwise "Pull request changed; re-run".</span></li><li><code>gemini/propose.ts</code><span>Merged files + one-line description; steer text on retries.</span></li><li><code>runner.applyProposal</code><span>Fresh sandbox, merge, write, local commit.</span></li><li><code>runner.parseCheck</code><span><code>node --check</code> or a TypeScript syntax parse; unsupported = not run, held.</span></li><li><code>core/honor.ts</code><span>Choice honored, line by line, renames applied, nothing else lost.</span></li><li><code>runner.runTests</code><span>Network set to deny-all first; <code>node --test playground/</code> if the merge only touches <code>playground/</code>, else <code>npm run test:core</code>; 30 s limit; real output shown.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p6" aria-labelledby="t6"><h3>6. Land or hold</h3><p class="muted">prd.md › Landing a merge, Held merges</p><ul class="trace"><li><code>POST /api/live/land</code><span>Land guards (no forks, never main or the base, no CI workflow changes, head unchanged), then a merge commit via the Git Data API and a ref update with <code>force: false</code>.</span></li><li><code>ui/HeldActions.tsx</code><span>Failed check, attempt, diff, Download patch; then pick another option, steer and retry, discard.</span></li></ul></div>
+        <div class="panel" role="tabpanel" id="p7" aria-labelledby="t7"><h3>7. Record it</h3><p class="muted">prd.md › Decision record</p><ul class="trace"><li><code>github/comment.ts</code><span>Finds <code>&lt;!-- merge-desk:record --&gt;</code> and updates it in place; creates it only once.</span></li><li><code>core/record.ts</code><span>Who, when, option, reason, results; for drops the branch and commit IDs. Branches are never deleted.</span></li></ul></div>
+        <div class="panel nav" id="navrow" hidden><button type="button" id="prev">Previous</button><button type="button" id="next">Next</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="run-h">
+    <h2 id="run-h">The run pipeline</h2>
+    <div class="card">
+      <svg class="dia" viewBox="0 0 980 230" role="img" aria-labelledby="rp-t rp-d">
+        <title id="rp-t">Run pipeline</title>
+        <desc id="rp-d">Six steps in order: head unchanged, propose merge, write on scratch copy, it parses, choice honored, tests with network off. If all pass the result is verified and can be landed. If any fail it is held and the attempt can be downloaded as a patch.</desc>
+        <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16181d"/></marker></defs>
+        <g font-family="-apple-system, system-ui, sans-serif" font-size="12">
+          <rect x="10" y="30" width="138" height="56" rx="8" fill="#fff" stroke="#16181d"/><text x="79" y="54" text-anchor="middle" font-weight="600">Head unchanged</text><text x="79" y="72" text-anchor="middle" font-size="10" fill="#646a75">GitHub re-read</text>
+          <rect x="170" y="30" width="138" height="56" rx="8" fill="#eef3fe" stroke="#2f6fed"/><text x="239" y="54" text-anchor="middle" font-weight="600">Propose merge</text><text x="239" y="72" text-anchor="middle" font-size="10" fill="#646a75">Gemini, validated</text>
+          <rect x="330" y="30" width="138" height="56" rx="8" fill="#fff" stroke="#16181d"/><text x="399" y="54" text-anchor="middle" font-weight="600">Write on scratch</text><text x="399" y="72" text-anchor="middle" font-size="10" fill="#646a75">sandbox git</text>
+          <rect x="490" y="30" width="138" height="56" rx="8" fill="#fff" stroke="#16181d"/><text x="559" y="54" text-anchor="middle" font-weight="600">It parses</text><text x="559" y="72" text-anchor="middle" font-size="10" fill="#646a75">node / TS syntax</text>
+          <rect x="650" y="30" width="138" height="56" rx="8" fill="#fff" stroke="#16181d"/><text x="719" y="54" text-anchor="middle" font-weight="600">Choice honored</text><text x="719" y="72" text-anchor="middle" font-size="10" fill="#646a75">core/honor, no AI</text>
+          <rect x="810" y="30" width="160" height="56" rx="8" fill="#fff" stroke="#16181d"/><text x="890" y="54" text-anchor="middle" font-weight="600">Tests</text><text x="890" y="72" text-anchor="middle" font-size="10" fill="#c93c3c">network off · 30 s</text>
+          <path d="M148 58 H170" stroke="#16181d" stroke-width="1.3" marker-end="url(#ah2)"/><path d="M308 58 H330" stroke="#16181d" stroke-width="1.3" marker-end="url(#ah2)"/><path d="M468 58 H490" stroke="#16181d" stroke-width="1.3" marker-end="url(#ah2)"/><path d="M628 58 H650" stroke="#16181d" stroke-width="1.3" marker-end="url(#ah2)"/><path d="M788 58 H810" stroke="#16181d" stroke-width="1.3" marker-end="url(#ah2)"/>
+          <path d="M890 86 C890 120 640 110 640 140" stroke="#16181d" stroke-width="1.3" fill="none" marker-end="url(#ah2)"/>
+                    <text x="20" y="114" font-size="11" fill="#646a75">any step failed or not run, at any point:</text>
+          <path d="M300 112 C300 130 300 130 300 140" stroke="#c93c3c" stroke-width="1.3" fill="none" marker-end="url(#ah2)"/>
+          <rect x="150" y="142" width="300" height="76" rx="10" fill="#fbeaea" stroke="#c93c3c"/>
+          <text x="300" y="166" text-anchor="middle" font-weight="700" fill="#c93c3c">HELD</text>
+          <text x="300" y="186" text-anchor="middle" font-size="11">nothing pushed · Download patch</text>
+          <text x="300" y="203" text-anchor="middle" font-size="11" fill="#646a75">other option · steer and retry · discard</text>
+          <rect x="490" y="142" width="300" height="76" rx="10" fill="#e8f4ed" stroke="#1f8a4c"/>
+          <text x="640" y="166" text-anchor="middle" font-weight="700" fill="#1f8a4c">VERIFIED</text>
+          <text x="640" y="186" text-anchor="middle" font-size="11">description + diff · Land</text>
+          <text x="640" y="203" text-anchor="middle" font-size="11" fill="#646a75">all six passed</text>
+        </g>
+      </svg>
+      <div class="mobile-alt">
+        <div class="card"><h3>Six steps, in order</h3><p>Head unchanged · Propose merge (Gemini, validated) · Write on scratch · It parses · Choice honored (no AI) · Tests (network off, 30 s).</p></div>
+        <div class="card"><h3>All pass: VERIFIED</h3><p>Description and diff, then Land.</p></div>
+        <div class="card"><h3>Any fail or not run: HELD</h3><p>Nothing pushed. Download patch; other option, steer and retry, or discard.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="land-h">
+    <h2 id="land-h">What Land does, exactly</h2>
+    <ol class="land">
+      <li>Session is YearningAsian; repository is merge-desk.</li>
+      <li class="guard nofork">Target is the PR's own branch in this repo: <b>not a fork</b>, not <code>main</code>, not the base.</li>
+      <li class="guard noci">The merge doesn't touch <code>.github/workflows/</code> (the app has no Workflows permission).</li>
+      <li class="guard">Re-read the pull request: head must equal the run's start head.</li>
+      <li class="guard">Merge commit [start head, base], then move the PR branch with <code>force: false</code>.</li>
+    </ol>
+    <div class="landbtn" aria-hidden="true"><b>Land: push merge commit to <span style="font-family:var(--mono)">retry-429</span></b><small>Does not merge into main</small></div>
+  </section>
+
+  <section aria-labelledby="comp-h">
+    <h2 id="comp-h">Components</h2>
+    <div class="comps">
+      <details open><summary>Mode and data source<span class="ref">prd › Demo mode and live mode</span></summary><div class="body"><p>One interface: listPullRequests, analyze, run, land, discard. LiveSource calls the API; RecordedSource replays recordings with their timings. The only difference between modes.</p><div class="files">ui/sources/{types,live,recorded}.ts · ui/ModeBanner.tsx</div></div></details>
+      <details open><summary>Choice-honored check<span class="ref">prd › Intentional drops</span></summary><div class="body"><p><b>Combine:</b> every line either side added is in the result (after renames); no removed line returns. <b>Drop:</b> the kept side's lines are present; none of the dropped side's leak in. <b>Always:</b> outside the conflict, the result equals git's own merge. Output: each intent present or MISSING with evidence lines. Ambiguity holds.</p><div class="files">core/atoms.ts · core/honor.ts</div></div></details>
+      <details><summary>Desk layout<span class="ref">prd › Screens and Layout, Phone</span></summary><div class="body"><p>List left, detail right; sections collapse. Under 768 px: one column, detail in a sheet, actions pinned at the bottom.</p><div class="files">ui/Desk.tsx · ui/Sheet.tsx</div></div></details>
+      <details><summary>Pull request list<span class="ref">prd › Pull request list</span></summary><div class="body"><p>Open PRs for an allowed repo; "dirty" is conflicting; null is "Checking". Empty: "No conflicts. Every open pull request can merge."</p><div class="files">api/live/prs · server/github/prs.ts · ui/PrList.tsx</div></div></details>
+      <details><summary>Conflict analysis and options<span class="ref">prd › Conflict analysis, Resolution options</span></summary><div class="body"><p>Sandbox merge → three versions → atoms → Gemini intents and options → keeps/drops from git data → signed analysis.</p><div class="files">pipeline/analyze.ts · gemini/analyze.ts · core/options.ts · server/sign.ts</div></div></details>
+      <details><summary>Run pipeline and runners<span class="ref">prd › Live run and checks</span></summary><div class="body"><p>Runner interface: prepareMerge, applyProposal, parseCheck, runTests, dispose. SandboxRunner (dependency snapshot per lockfile; 2 min; stop in finally) or LocalRunner (<code>npm run live:local</code>). Two automatic retries at most.</p><div class="files">pipeline/run.ts · runner/{types,sandbox,local}.ts · gemini/propose.ts</div></div></details>
+      <details><summary>Held merges<span class="ref">prd › Held merges</span></summary><div class="body"><p>Failed check in plain words, attempt, diff; Download patch; pick another option (recommendation recomputed), steer and retry, discard. No branch, no push.</p><div class="files">ui/HeldActions.tsx · api/live/record</div></div></details>
+      <details><summary>Landing and decision record<span class="ref">prd › Landing a merge, Decision record</span></summary><div class="body"><p>Fast-forward merge commit; author is the signed-in user. One comment per PR updated in place; drops list branch and commit IDs; branches never deleted.</p><div class="files">api/live/land · github/land.ts · github/comment.ts · core/record.ts</div></div></details>
+      <details><summary>Sign-in and guards<span class="ref">prd › States and Boundaries</span></summary><div class="body"><p>GitHub App user authorization; refuses any login but YearningAsian; token used once and discarded; sealed cookie for 8 h. Every live route checks the session and that the repo is merge-desk, in code; empty settings can never widen access.</p><div class="files">api/auth/* · server/session.ts · server/guard.ts</div></div></details>
+      <details open><summary>Demo scenarios inside merge-desk<span class="ref">prd › Demo mode and live mode</span></summary><div class="body"><p><code>playground/</code>: tiny dependency-free code with <code>node:test</code> tests (seconds). Branches <code>demo/clean/*</code>, <code>demo/held/*</code>, <code>demo/drop/*</code>; PRs titled [Demo], labelled <code>demo</code>, with base <b><code>demo/base</code>, never main</b>. Seed tags rebuild them. CI runs only for PRs into main.</p><div class="files">playground/ · demo/recordings/ · scripts/demo-reset.mjs</div></div></details>
+      <details open><summary>Repository safeguards<span class="ref">spec › Repository safeguards</span></summary><div class="body"><p><b>Ruleset on main:</b> no force pushes, no deletion, updates only by repo admins; the app isn't on the bypass list, so it can never write to main. <b>Reset script:</b> refuses any ref outside <code>refs/heads/demo/*</code>, previews, needs <code>--yes</code>, run by a person only. <b>App:</b> installed on merge-desk only, no Workflows permission.</p><div class="files">server/guard.ts · github/land.ts · scripts/demo-reset.mjs</div></div></details>
+      <details><summary>Engineering support<span class="ref">hackathon kit</span></summary><div class="body"><p>/api/health (booleans), /api/stats (FACTS), /judge, CI (lint, typecheck, tests, build, em-dash, secret scan), production probe.</p><div class="files">api/health · api/stats · judge/page.tsx</div></div></details>
+    </div>
+  </section>
+
+  <section aria-labelledby="stack-h">
+    <h2 id="stack-h">Stack <span class="muted" style="font-weight:400;font-size:14px">verified 2026-10-04</span></h2>
+    <div class="card tablewrap">
+      <table>
+        <thead><tr><th>Piece</th><th>Version</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Node.js</td><td class="v">24 LTS</td><td>Workspace standard; sandbox ships Node 24</td></tr>
+          <tr><td>Next.js · React</td><td class="v">16.3 · 19.3</td><td>Streaming route handlers; Vercel deploy</td></tr>
+          <tr><td>TypeScript</td><td class="v">6.0</td><td><span class="warn">Not 7.0:</span> the ESLint TypeScript plugin supports &lt;6.1</td></tr>
+          <tr><td>Tailwind · Zod</td><td class="v">4.3 · 4.6</td><td>Dense styling; validates every model response and request</td></tr>
+          <tr><td>@google/genai</td><td class="v">2.27</td><td>Gemini <code>gemini-3.8-flash</code>, structured output</td></tr>
+          <tr><td>@vercel/sandbox</td><td class="v">3.5</td><td>Throwaway microVM per run; network policy</td></tr>
+          <tr><td>@octokit/rest · auth-app</td><td class="v">22 · latest</td><td>GitHub API; per-repo installation tokens</td></tr>
+          <tr><td>diff · Vitest · Playwright</td><td class="v">9 · 5.0 · 1.63</td><td>Diffs and checks; unit tests; e2e and stills</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="app-h">
+    <h2 id="app-h">GitHub App: what to enter</h2>
+    <div class="card">
+      <p class="muted" style="font-size:14px">GitHub → Settings → Developer settings → GitHub Apps → New GitHub App. Keys go in <code>.env.local</code> and Vercel env, never chat or git.</p>
+      <dl class="settings">
+        <dt>GitHub App name</dt><dd><code>merge-desk-yearningasian</code><button class="copy" data-copy="merge-desk-yearningasian" type="button">Copy</button></dd>
+        <dt>Homepage URL</dt><dd><code>https://github.com/YearningAsian/merge-desk</code><button class="copy" data-copy="https://github.com/YearningAsian/merge-desk" type="button">Copy</button></dd>
+        <dt>Callback URL</dt><dd><code>http://localhost:3000/api/auth/callback</code><button class="copy" data-copy="http://localhost:3000/api/auth/callback" type="button">Copy</button><br><span class="muted">Add the production one after the first deploy.</span></dd>
+        <dt>Expire user tokens</dt><dd>On</dd>
+        <dt>OAuth during installation · Device Flow</dt><dd>Off · Off</dd>
+        <dt>Webhook</dt><dd>Uncheck <b>Active</b></dd>
+        <dt>Repository permissions</dt><dd>Contents: <b>Read and write</b> · Pull requests: <b>Read and write</b> · Metadata: <b>Read-only</b> (required, automatic) · everything else <b>No access</b>. Checks not needed; <b>Workflows deliberately not granted</b>.</dd>
+        <dt>Account permissions</dt><dd>None</dd>
+        <dt>Install on</dt><dd><b>Only on this account</b>, then Install App → Only select repositories → <code>merge-desk</code></dd>
+        <dt>Then collect</dt><dd>App ID, Client ID, a client secret, a private key (.pem)</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section aria-labelledby="dec-h">
+    <h2 id="dec-h">Decisions, failure modes, and what to confirm</h2>
+    <div class="twocol">
+      <div class="card"><h3><span class="tag ok">YOURS</span>Decided</h3><ul><li>Cloud sandbox; 2 min per run; teardown every run; spend cap; laptop fallback, same code.</li><li>GitHub App on merge-desk only: contents and PRs; Checks dropped; no Workflows; YearningAsian only.</li><li>One repo: demo PRs on <code>demo/*</code> branches into <code>demo/base</code>, never main; reset script limited to <code>demo/*</code>; dogfood on merge-desk.</li><li>Held merges download as a patch; no branch.</li><li>Land checks the head, never force-pushes, says what it does.</li><li>One record comment per PR; secrets server-side; model proposes only; recordings from live runs.</li></ul></div>
+      <div class="card"><h3><span class="tag q">CONFIRM</span>Assumptions</h3><ol><li>Held and discarded entries update the record <b>comment</b> (a write, never code).</li><li>Demo scenarios: <b>clean</b> rename vs retry; <b>held</b> a signature change vs a new call site that git merges but tests reject; <b>drop</b> two fixes of the same bug, keep the newer.</li><li>"Older side" = the side whose latest commit is older.</li><li>Dogfood conflict = two real feature branches of this build.</li><li>The empty <code>merge-desk-playground</code> repo is no longer used and can be deleted.</li><li>Dropping main's side is allowed with a warning that merging undoes it on main.</li></ol></div>
+      <div class="card"><h3>Where it can break</h3><ul><li><b>Sandbox slow or down</b> → failed step, nothing pushed, Retry; laptop runner for recording day.</li><li><b>Model output invalid or planted instructions</b> → validation or honor check fails → held.</li><li><b>PR changed</b> → "re-run"; Land's fast-forward is the last guard.</li><li><b>Land guard trips</b> (fork, main or base, CI workflow files) → refused with the reason; nothing written.</li><li><b>Tests can't run</b> → not run, held. Never a fake pass.</li></ul></div>
+      <div class="card"><h3>One useful unknown</h3><p style="font-size:14px">Can a cloud sandbox clone, merge and test fast enough to watch? The first build slice times every step on the held demo scenario. Evidence: tests under 30 s, whole run under 2 min. Otherwise: dependency snapshot, fewer vCPUs, or the laptop runner.</p><h3 style="margin-top:12px">Check early</h3><p style="font-size:14px;margin:0">Gemini structured output on 3.8 Flash · Sandbox pricing and spend controls · function max duration · <code>Sandbox.list</code> tag filter · production callback URL.</p></div>
+    </div>
+  </section>
+
+  <footer>Companion to <code>devpost/spec.md</code>, which is canonical. Previous: <code>prd.html</code>. Next: <code>5-build</code>.</footer>
+</div>
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('#stepper [role="tab"]'));
+  var panels = tabs.map(function (t) { return document.getElementById(t.getAttribute('aria-controls')); });
+  var prev = document.getElementById('prev'), next = document.getElementById('next'), current = 0;
+  function show(i) {
+    current = Math.max(0, Math.min(tabs.length - 1, i));
+    tabs.forEach(function (t, j) { t.setAttribute('aria-selected', j === current ? 'true' : 'false'); t.tabIndex = j === current ? 0 : -1; panels[j].hidden = j !== current; });
+    prev.disabled = current === 0; next.disabled = current === tabs.length - 1;
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(i); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); show(current + 1); tabs[current].focus(); }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); tabs[current].focus(); }
+    });
+  });
+  prev.addEventListener('click', function () { show(current - 1); });
+  next.addEventListener('click', function () { show(current + 1); });
+  document.getElementById('navrow').hidden = false;
+  show(0);
+  Array.prototype.forEach.call(document.querySelectorAll('.copy'), function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      var done = function () { var o = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = o; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () {});
+    });
+  });
+})();
+</script>
+</body>
+</html>

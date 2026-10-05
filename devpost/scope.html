@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merge Desk: Scope</title>
+<meta name="description" content="Approved scope for Merge Desk, a merge you can watch and understand. Companion to devpost/scope.md (canonical).">
+<style>
+:root {
+  --ink: #12161d; --paper: #fbf8f1; --field: #ece6d8; --line: #d6cdb9; --muted: #5b6270;
+  --ours: #2f6fed; --theirs: #e07a2f; --ok: #1f8a4c; --stop: #c93c3c; --wait: #a68a1f;
+  --ours-wash: #e6eefd; --theirs-wash: #fcefe4; --ok-wash: #e3f2ea; --stop-wash: #f9e4e4;
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+figure { margin: 0; }
+body { margin: 0; background: var(--field); color: var(--ink); font: 16px/1.6 var(--body); }
+a { color: var(--ours); }
+a:focus-visible, summary:focus-visible, button:focus-visible { outline: 3px solid var(--ours); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 24px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(40px, 7vw, 72px)/1 var(--display); margin: 6px 0 0; letter-spacing: -.02em; }
+.status { font: 600 13px/1 var(--mono); padding: 8px 12px; border-radius: 999px; background: var(--ok-wash); color: var(--ok); border: 1.5px solid var(--ok); }
+.lede { font: 400 clamp(19px, 2.4vw, 24px)/1.45 var(--display); max-width: 46ch; margin: 0 0 32px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+.sheet { background: var(--paper); border: 1.5px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 1px 0 var(--line), 0 12px 32px -24px rgba(18,22,29,.35); }
+.sheet + .sheet { margin-top: 24px; }
+h2 { font: 650 22px/1.2 var(--display); margin: 0 0 12px; }
+h3 { font: 600 15px/1.3 var(--body); margin: 0 0 6px; }
+p { margin: 0 0 12px; }
+.kernel { border-left: 4px solid var(--ink); padding-left: 16px; }
+.intents { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 4px; }
+@media (max-width: 420px) { .intents { grid-template-columns: 1fr; } }
+.intent { border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+.intent b { display: block; font: 600 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+.intent.ours { background: var(--ours-wash); border: 1.5px solid var(--ours); }
+.intent.ours b { color: var(--ours); }
+.intent.theirs { background: var(--theirs-wash); border: 1.5px solid var(--theirs); }
+.intent.theirs b { color: #b45a17; }
+code { font: 14px var(--mono); background: rgba(18,22,29,.06); padding: 1px 5px; border-radius: 4px; }
+blockquote { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--field); font-style: italic; }
+.diagram svg { width: 100%; height: auto; display: block; }
+.diagram figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; display: grid; gap: 12px; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; }
+ol.steps li::before { content: counter(s); font: 700 15px/36px var(--mono); text-align: center; width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: var(--paper); }
+.tag { display: inline-block; font: 600 12px/1 var(--mono); padding: 5px 8px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
+.tag.held { background: var(--stop-wash); color: var(--stop); border: 1.5px solid var(--stop); }
+.tag.ok { background: var(--ok-wash); color: var(--ok); border: 1.5px solid var(--ok); }
+.buckets { display: grid; gap: 12px; }
+details { border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+details[open] { border-color: var(--ink); }
+summary { cursor: pointer; list-style: none; padding: 14px 16px; display: flex; align-items: center; gap: 12px; font-weight: 600; }
+summary .count { margin-left: auto; }
+summary::-webkit-details-marker { display: none; }
+summary .count { font: 600 12px/1 var(--mono); color: var(--muted); }
+summary::after { content: "+"; font: 600 20px/1 var(--mono); color: var(--muted); }
+details[open] summary::after { content: "\2212"; }
+details ul { margin: 0; padding: 0 16px 16px 36px; }
+details li { margin: 6px 0; }
+.now summary { box-shadow: inset 4px 0 0 var(--ok); border-radius: 12px; }
+.later summary { box-shadow: inset 4px 0 0 var(--wait); border-radius: 12px; }
+.cut summary { box-shadow: inset 4px 0 0 var(--stop); border-radius: 12px; }
+.why { font: 400 19px/1.5 var(--display); }
+footer { margin-top: 32px; font-size: 14px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .flow-pulse { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Devpost Learn · 2-scope</div>
+      <h1>Merge Desk</h1>
+    </div>
+    <span class="status" role="status">scope: approved</span>
+  </header>
+
+  <p class="lede">A merge you can watch and understand. An AI proposes the resolution, you see what each side meant and what the merge did, and checks run live in front of you before anything lands. On your phone or your computer.</p>
+
+  <div class="grid">
+    <div>
+      <section class="sheet" aria-labelledby="kernel-h">
+        <h2 id="kernel-h">The kernel</h2>
+        <p class="kernel">Merge conflicts stop being a black box. Each side is shown as a plain-language intent next to a visual diff, the proposed merge is checked live for both intents and the tests, and a merge that drops a teammate's change is <strong>held</strong> with the missing intent named.</p>
+        <div class="intents" aria-label="Example: the two intents in a conflict">
+          <div class="intent ours"><b>Ours intends</b>rename <code>fetchUser</code> to <code>getUser</code></div>
+          <div class="intent theirs"><b>Theirs intends</b>retry <code>fetchUser</code> on HTTP 429</div>
+        </div>
+      </section>
+
+      <section class="sheet" aria-labelledby="who-h">
+        <h2 id="who-h">Who it's for</h2>
+        <p>A developer on a small team whose pull request just went red with a conflict because a teammate merged first. Today: raw conflict markers, guessing what the teammate meant, push, wait for CI, test by hand, repeat.</p>
+        <blockquote>"I love working with teammates but hate dealing with merge conflicts and spending lots of time trying to fix it."</blockquote>
+        <p>First user: the learner, on this very repository.</p>
+      </section>
+
+      <section class="sheet" aria-labelledby="done-h">
+        <h2 id="done-h">What "working" looks like</h2>
+        <p>On a phone, open Merge Desk on the merge-desk repo itself, where two real branches from this build conflict.</p>
+        <ol class="steps">
+          <li><div><h3>Open the conflicting pull request</h3>Both sides appear as one-line intents above a side-by-side diff.</div></li>
+          <li><div><h3><span class="tag held">HELD</span>The merge that drops a side</h3>Fails live: "theirs: retry on 429, MISSING". Nothing is pushed.</div></li>
+          <li><div><h3><span class="tag ok">VERIFIED</span>The merge that keeps both</h3>Checks tick green as you watch: parses, both intents kept, tests pass. Tap Land; GitHub shows the pull request can merge.</div></li>
+        </ol>
+      </section>
+    </div>
+
+    <div>
+      <figure class="sheet diagram" aria-labelledby="loop-h">
+        <h2 id="loop-h">The core loop</h2>
+        <svg viewBox="0 0 440 650" role="img" aria-labelledby="svg-t svg-d">
+          <title id="svg-t">Merge Desk core loop</title>
+          <desc id="svg-d">A teammate merges first, so your pull request cannot merge. Merge Desk shows both intents, the AI proposes a merge, and live checks run. If a check fails the merge is held and nothing is pushed. If all pass, you land it on the pull request's branch and the pull request becomes mergeable.</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#12161d"/></marker>
+            <style>
+              .n { font: 600 15px "IBM Plex Sans", system-ui, sans-serif; fill: #12161d; }
+              .s { font: 400 13px "IBM Plex Sans", system-ui, sans-serif; fill: #5b6270; }
+              .m { font: 600 12px "IBM Plex Mono", ui-monospace, monospace; }
+              .edge { stroke: #12161d; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+            </style>
+          </defs>
+          <!-- 1 teammate merges -->
+          <rect x="110" y="10" width="220" height="54" rx="12" fill="#fcefe4" stroke="#e07a2f" stroke-width="1.5"/>
+          <text x="220" y="34" text-anchor="middle" class="n">Teammate merges first</text>
+          <text x="220" y="52" text-anchor="middle" class="s">their change lands on main</text>
+          <path class="edge" d="M220 64 V92"/>
+          <!-- 2 PR conflicts -->
+          <rect x="110" y="94" width="220" height="54" rx="12" fill="#f9e4e4" stroke="#c93c3c" stroke-width="1.5"/>
+          <text x="220" y="118" text-anchor="middle" class="n">Your PR can't merge</text>
+          <text x="220" y="136" text-anchor="middle" class="s">phone or desktop: open Merge Desk</text>
+          <path class="edge" d="M220 148 V176"/>
+          <!-- 3 intents -->
+          <rect x="20" y="178" width="400" height="98" rx="14" fill="#fbf8f1" stroke="#12161d" stroke-width="1.5"/>
+          <text x="220" y="200" text-anchor="middle" class="n">Both intents, side by side</text>
+          <rect x="36" y="212" width="178" height="50" rx="10" fill="#e6eefd" stroke="#2f6fed" stroke-width="1.5"/>
+          <text x="125" y="232" text-anchor="middle" class="m" fill="#2f6fed">OURS</text>
+          <text x="125" y="250" text-anchor="middle" class="s">rename to getUser</text>
+          <rect x="226" y="212" width="178" height="50" rx="10" fill="#fcefe4" stroke="#e07a2f" stroke-width="1.5"/>
+          <text x="315" y="232" text-anchor="middle" class="m" fill="#b45a17">THEIRS</text>
+          <text x="315" y="250" text-anchor="middle" class="s">retry on 429</text>
+          <path class="edge" d="M220 276 V304"/>
+          <!-- 4 AI proposes -->
+          <rect x="110" y="306" width="220" height="54" rx="12" fill="#12161d"/>
+          <text x="220" y="330" text-anchor="middle" class="n" fill="#fbf8f1" style="fill:#fbf8f1">AI proposes a merge</text>
+          <text x="220" y="348" text-anchor="middle" class="s" style="fill:#d6cdb9">and says what it did</text>
+          <path class="edge" d="M220 360 V388"/>
+          <!-- 5 live checks -->
+          <rect x="70" y="390" width="300" height="104" rx="14" fill="#fbf8f1" stroke="#a68a1f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="220" y="412" text-anchor="middle" class="n">Live checks, on screen</text>
+          <circle class="flow-pulse" cx="104" cy="434" r="5" fill="#a68a1f"/><text x="118" y="439" class="s">parses</text>
+          <circle class="flow-pulse" cx="104" cy="458" r="5" fill="#a68a1f"/><text x="118" y="463" class="s">both intents still present</text>
+          <circle class="flow-pulse" cx="104" cy="482" r="5" fill="#a68a1f"/><text x="118" y="487" class="s">the repo's tests pass</text>
+          <!-- branches -->
+          <path class="edge" d="M150 494 C150 520 110 520 110 540"/>
+          <path class="edge" d="M290 494 C290 520 330 520 330 540"/>
+          <text x="58" y="524" text-anchor="middle" class="m" fill="#c93c3c">any fail</text>
+          <text x="384" y="524" text-anchor="middle" class="m" fill="#1f8a4c">all pass</text>
+          <rect x="16" y="542" width="188" height="74" rx="12" fill="#f9e4e4" stroke="#c93c3c" stroke-width="1.5"/>
+          <text x="110" y="568" text-anchor="middle" class="n" style="fill:#c93c3c">HELD</text>
+          <text x="110" y="589" text-anchor="middle" class="s">missing intent named,</text>
+          <text x="110" y="605" text-anchor="middle" class="s">nothing pushed</text>
+          <rect x="236" y="542" width="188" height="74" rx="12" fill="#e3f2ea" stroke="#1f8a4c" stroke-width="1.5"/>
+          <text x="330" y="568" text-anchor="middle" class="n" style="fill:#1f8a4c">LAND</text>
+          <text x="330" y="589" text-anchor="middle" class="s">commit to the PR branch,</text>
+          <text x="330" y="605" text-anchor="middle" class="s">PR turns mergeable</text>
+          <path d="M110 616 V632 H220" stroke="#5b6270" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+          <text x="226" y="636" class="s">fix and re-check</text>
+        </svg>
+        <figcaption>Never writes to <code>main</code>, never force-pushes. The team still merges the pull request.</figcaption>
+      </figure>
+
+      <section class="sheet" aria-labelledby="bound-h">
+        <h2 id="bound-h">Boundary</h2>
+        <div class="buckets">
+          <details class="now" open>
+            <summary>Now: the proof of concept <span class="count">6</span></summary>
+            <ul>
+              <li>Connect one GitHub repository (merge-desk for the demo).</li>
+              <li>List its pull requests that GitHub reports as conflicting.</li>
+              <li>Conflict view: plain-language intents, side-by-side diff, Gemini-proposed merge, one line on what the merge did.</li>
+              <li>Live checks streamed on screen: parses, both intents present, tests pass.</li>
+              <li>Land: commit the checked resolution to the pull request's own branch. Held merges push nothing.</li>
+              <li>One responsive web app for phone and desktop.</li>
+            </ul>
+          </details>
+          <details class="later">
+            <summary>Later <span class="count">7</span></summary>
+            <ul>
+              <li>Full dashboard of projects, pull requests and merges ("an easy to navigate GitHub").</li>
+              <li>Installable desktop / home-screen app that stays out of the way.</li>
+              <li>Expo React Native app with a downloadable Android APK, once the web app works end to end.</li>
+              <li>Many repositories, sign-in with GitHub, notifications.</li>
+              <li>A git merge driver so <code>git merge</code> uses the same checks.</li>
+              <li>More AI providers, with fallback.</li>
+              <li>Replay test over real historical merges.</li>
+            </ul>
+          </details>
+          <details class="cut">
+            <summary>Cut, with reasons <span class="count">3</span></summary>
+            <ul>
+              <li><strong>App-store releases:</strong> review time, nothing for the kernel; the APK covers native.</li>
+              <li><strong>Rebuilding GitHub in general:</strong> not the kernel; the dashboard waits for Later.</li>
+              <li><strong>Merging into <code>main</code> for you:</strong> Merge Desk makes the pull request mergeable; the team merges it.</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="sheet" aria-labelledby="why-h" style="margin-top:24px">
+    <h2 id="why-h">Why it matters to the learner</h2>
+    <p class="why">"I want to use this myself since resolving merge conflicts are a headache and I wanna make a tool that makes collaboration among devs easier."</p>
+  </section>
+
+  <footer>Companion to <code>devpost/scope.md</code>, which is canonical. Next: <code>3-prd</code>.</footer>
+</div>
+</body>
+</html>

@@ -14,7 +14,10 @@ import { guardLive } from "@/server/session";
 import { keepAlive } from "@/server/keep-alive";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// The answer comes by REQUEST_MS; the function lives on (keepAlive) while a
+// record write already sent finishes under its own budget and its lock is
+// released: 55 s + lock wait + RECORD_BUDGET_MS + release, inside 120 s.
+export const maxDuration = 120;
 
 const REPO = CODE_ALLOWED_REPOS[0];
 const Body = z.object({ pr: z.number().int().positive(), token: z.string().min(1).max(4_000_000) });
@@ -24,7 +27,7 @@ const answer = (status: number, outcome: Outcome, body: Record<string, unknown>)
   Response.json({ outcome, ...body }, { status, headers: { "cache-control": "no-store" } });
 const refused = (status: number, reason: string) => answer(status, "REFUSED", { reason });
 
-// Budget for the optional work after the branch moved (maxDuration is 60 s).
+// Budget for the optional work after the branch moved, before the answer.
 const AFTER_LAND_MS = 15_000;
 const REQUEST_MS = 55_000;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

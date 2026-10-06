@@ -124,6 +124,25 @@ describe("shared decision-record lock", () => {
     expect(store.refs.has(lockRef("pr-2"))).toBe(false);
   });
 
+  // Review 6.1 M1: the create applied but its answer was lost, and the read
+  // that would have shown it failed too. The refusal must not leave it behind.
+  it("releases a lock whose create applied when the read-back then fails", async () => {
+    const { octokit, store } = github();
+    const create = store.git.createRef;
+    vi.spyOn(store.git, "createRef").mockImplementationOnce(async (input) => {
+      await create(input);
+      throw new Error("socket hang up after the create applied");
+    });
+    vi.spyOn(store.git, "getRef").mockRejectedValueOnce(
+      Object.assign(new Error("Bad Gateway"), { status: 502 }),
+    );
+    const work = vi.fn(async () => ({ ok: true as const }));
+    const result = await withRefLock(octokit, lock("pr-2", { waitMs: 0 }), work);
+    expect(result).toMatchObject({ ok: false });
+    expect(work).not.toHaveBeenCalled();
+    expect(store.refs.has(lockRef("pr-2"))).toBe(false);
+  });
+
   it("refuses without touching GitHub's refs when its lock commit can't be made", async () => {
     const { octokit, store } = github();
     vi.spyOn(store.git, "createTree").mockRejectedValue(new Error("503"));

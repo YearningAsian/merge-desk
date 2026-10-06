@@ -6,8 +6,7 @@ vi.mock("@/server/throttle", () => ({ throttleReady: ready }));
 
 afterEach(() => vi.unstubAllEnvs());
 
-const health = async (headers: Record<string, string> = {}) =>
-  (await GET(new Request("https://example.invalid/api/health", { headers }))).json();
+const health = async () => (await GET()).json();
 
 describe("GET /api/health", () => {
   it("answers booleans only", async () => {
@@ -19,11 +18,14 @@ describe("GET /api/health", () => {
     expect(JSON.stringify(body)).not.toContain("a-value-that-must-not-appear");
   });
 
-  it("counts Vercel's per-request OIDC header as the sandbox credential", async () => {
+  // Review 6.1 L1: a request header proves nothing; a real count does.
+  it("never takes a caller's OIDC header as the sandbox credential", async () => {
     ready.mockResolvedValue(false);
     vi.stubEnv("VERCEL_OIDC_TOKEN", "");
+    expect(GET.length).toBe(0); // it reads nothing a caller sends, headers included
     expect((await health()).integrations.sandbox).toBe(false);
-    expect((await health({ "x-vercel-oidc-token": "t" })).integrations.sandbox).toBe(true);
+    ready.mockResolvedValue(true);
+    expect((await health()).integrations.sandbox).toBe(true);
   });
 
   it("reports the throttle only as ready as its last real count", async () => {

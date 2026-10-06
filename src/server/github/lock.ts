@@ -112,7 +112,9 @@ async function lockCommit(
 // Takes the lock, waiting up to waitMs for another writer to finish. Every
 // decision comes from what GitHub then reports the ref points at, never from
 // an error's wording: ours means held, absent means try again, anything else
-// belongs to another writer.
+// belongs to another writer. A refusal says whether our own create may have
+// applied unseen (a lost answer, then an unreadable or lagging ref), so the
+// caller can delete it if it is ours.
 async function acquire(
   octokit: Octokit,
   repo: string,
@@ -120,7 +122,7 @@ async function acquire(
   mine: string,
   waitMs: number,
   signal?: AbortSignal,
-): Promise<{ ok: true } | Refusal> {
+): Promise<{ ok: true } | (Refusal & { maybeOurs: boolean })> {
   const { owner, name } = splitRepo(repo);
   const until = Date.now() + waitMs;
   let held = false;
@@ -137,12 +139,14 @@ async function acquire(
       current = await readLock(octokit, repo, ref, signal);
     } catch {
       signal?.throwIfAborted();
-      return { ok: false, reason: UNAVAILABLE };
+      return { ok: false, reason: UNAVAILABLE, maybeOurs: true };
     }
     if (current === mine) return { ok: true };
     held = current !== null;
     if (Date.now() + POLL_MS > until)
-      return { ok: false, reason: held ? heldReason(ref) : UNAVAILABLE };
+      return held
+        ? { ok: false, reason: heldReason(ref), maybeOurs: false }
+        : { ok: false, reason: UNAVAILABLE, maybeOurs: true };
     await pause(POLL_MS, signal);
   }
 }
@@ -209,7 +213,8 @@ const queues = (shared.mergeDeskLockQueues ??= new Map<string, Promise<unknown>>
 // Runs work while holding the named lock. Callers in this process queue
 // behind each other first, so they don't contend on GitHub. The work calls
 // lease.dispatched() before each GitHub mutation and lease.confirmed() once
-// it has read back the result; an unconfirmed mutation keeps the lock.
+// GitHub has answered it (so no late copy can still land); a mutation
+// without an answer keeps the lock.
 export function withRefLock<T>(
   octokit: Octokit,
   input: {
@@ -235,7 +240,7 @@ export function withRefLock<T>(
       signal?.throwIfAborted();
       return { ok: false, reason: UNAVAILABLE };
     }
-    let taken: { ok: true } | Refusal;
+    let taken: Awaited<ReturnType<typeof acquire>>;
     try {
       taken = await acquire(octokit, input.repo, ref, mine, input.waitMs ?? 8_000, signal);
     } catch (error) {
@@ -243,7 +248,11 @@ export function withRefLock<T>(
       await releaseLock(octokit, input.repo, ref, mine);
       throw error;
     }
-    if (!taken.ok) return taken;
+    if (!taken.ok) {
+      // Only ever deletes this writer's own commit, so it is safe to try.
+      if (taken.maybeOurs) await releaseLock(octokit, input.repo, ref, mine);
+      return { ok: false, reason: taken.reason };
+    }
     let unresolved = false;
     try {
       return await work({

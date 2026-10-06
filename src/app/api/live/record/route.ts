@@ -12,7 +12,9 @@ import { withDeadline } from "@/server/deadline";
 import { keepAlive } from "@/server/keep-alive";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+// Answers within 25 s; a record write already sent may finish after that
+// under its own budget (RECORD_BUDGET_MS), and its lock is then released.
+export const maxDuration = 60;
 
 const REPO = CODE_ALLOWED_REPOS[0];
 

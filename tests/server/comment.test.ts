@@ -218,6 +218,59 @@ describe("upsertRecord", () => {
     expect(comments).toHaveLength(0);
   });
 
+  // Review 6.1 M4: the route stops waiting (its answer is sent) while a
+  // comment update is already on its way. That update must finish and be
+  // read back under its own time budget, so ordinary slowness never strands
+  // the lock; only a write still unconfirmed when the budget ends keeps it.
+  it("finishes and confirms a dispatched write after its caller stops waiting", async () => {
+    const { octokit, records, refs } = thread();
+    const stop = new AbortController();
+    const create = octokit.issues.createComment.bind(octokit.issues);
+    vi.spyOn(octokit.issues, "createComment").mockImplementationOnce(async (value) => {
+      stop.abort(); // the response deadline passes mid-request
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return create(value!);
+    });
+    const result = await upsertRecord(octokit, { ...input("slow"), signal: stop.signal });
+    expect(result).toMatchObject({ ok: true });
+    expect(records()).toHaveLength(1);
+    expect(refs.size).toBe(0);
+  });
+
+  it("keeps the lock when a dispatched write is still unconfirmed at the end of its budget", async () => {
+    const { octokit, refs } = thread();
+    vi.spyOn(octokit.issues, "createComment").mockImplementationOnce(
+      () => new Promise(() => undefined), // GitHub never answers
+    );
+    await expect(upsertRecord(octokit, { ...input("hung"), budgetMs: 50 })).rejects.toThrow();
+    expect(refs.has(lockRef("pr-2"))).toBe(true);
+  });
+
+  it("frees the lock when GitHub refuses a write outright", async () => {
+    const { octokit, refs } = thread();
+    vi.spyOn(octokit.issues, "createComment").mockRejectedValueOnce(
+      Object.assign(new Error("Resource not accessible by integration"), { status: 403 }),
+    );
+    await expect(upsertRecord(octokit, input("refused"))).rejects.toThrow();
+    expect(refs.size).toBe(0);
+  });
+
+  it("never starts a write once its caller has stopped waiting", async () => {
+    const { octokit, comments, refs } = thread();
+    const stop = new AbortController();
+    const list = octokit.paginate.bind(octokit);
+    octokit.paginate = (async (...args: Parameters<Octokit["paginate"]>) => {
+      const result = await list(...args);
+      stop.abort(); // stops after the read, before any write
+      return result;
+    }) as Octokit["paginate"];
+    await expect(
+      upsertRecord(octokit, { ...input("late"), signal: stop.signal }),
+    ).rejects.toThrow();
+    expect(comments).toHaveLength(0);
+    expect(refs.size).toBe(0);
+  });
+
   it("refuses an oversized record without discarding history or sending a write", async () => {
     const history = Array.from({ length: 200 }, (_, i) => ({
       ...entry(`history-${i}`),

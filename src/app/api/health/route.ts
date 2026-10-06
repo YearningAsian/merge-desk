@@ -14,11 +14,12 @@ const recordingsPresent = () =>
 
 // Booleans only: whether each integration is configured, never a value.
 // Configured is not the same as proven; the live checks prove each one.
-// On Vercel the sandbox credential arrives per request (the OIDC header), not
-// as a variable. throttle is the one real call: today's tagged sandboxes were
-// counted within the last minute, so live work can be admitted.
-export async function GET(request: Request) {
+// throttle is the one real call: today's tagged sandboxes were counted within
+// the last minute, which also proves the sandbox credential works. A request
+// header is never taken as that credential.
+export async function GET() {
   const status = integrationStatus();
+  const throttle = await throttleReady();
   return Response.json(
     {
       ok: true,
@@ -26,8 +27,8 @@ export async function GET(request: Request) {
       integrations: {
         github: status.github,
         gemini: status.gemini,
-        sandbox: status.sandbox || Boolean(request.headers.get("x-vercel-oidc-token")),
-        throttle: await throttleReady(),
+        sandbox: status.sandbox || throttle,
+        throttle,
         recordings: recordingsPresent(),
       },
     },

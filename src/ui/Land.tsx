@@ -6,6 +6,7 @@ import { OPTION_LABELS } from "@/core/options";
 import type { RecordEntry } from "@/core/record";
 import type { PullSummary } from "@/core/pulls";
 import type { Option } from "@/core/honor";
+import { PinnedActions } from "@/ui/ActionBar";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Section } from "@/ui/Section";
@@ -50,26 +51,28 @@ export function LandAction({
   const retry = state !== undefined && "outcome" in state && state.outcome === "REFUSED";
   return (
     <div className="space-y-1 border-t border-hair pt-3">
-      <Button
-        variant="primary"
-        className="h-11 max-w-full px-4 md:h-9"
-        disabled={landing}
-        onClick={onLand}
-      >
-        {landing ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : null}
-        <span className="truncate">
-          {landing
-            ? "Landing…"
-            : retry
-              ? "Try Land again: push merge commit to "
-              : "Land: push merge commit to "}
-          {landing ? null : <code className="font-mono text-[12.5px]">{branch}</code>}
-        </span>
-      </Button>
-      <p className="text-[12.5px] text-muted">
-        Does not merge into <code className="font-mono text-[12px]">{base}</code>. Your team still
-        merges the pull request.
-      </p>
+      <PinnedActions className="space-y-1">
+        <Button
+          variant="primary"
+          className="h-11 max-w-full px-4 md:h-9"
+          disabled={landing}
+          onClick={onLand}
+        >
+          {landing ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : null}
+          <span className="truncate">
+            {landing
+              ? "Landing…"
+              : retry
+                ? "Try Land again: push merge commit to "
+                : "Land: push merge commit to "}
+            {landing ? null : <code className="font-mono text-[12.5px]">{branch}</code>}
+          </span>
+        </Button>
+        <p className="text-[12.5px] text-muted">
+          Does not merge into <code className="font-mono text-[12px]">{base}</code>. Your team still
+          merges the pull request.
+        </p>
+      </PinnedActions>
       {retry ? (
         <p className="text-[12.5px] text-muted">
           The previous attempt was refused before a branch update. Another click rechecks the same

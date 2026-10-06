@@ -6,6 +6,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { RunEvent } from "@/core/events";
 import type { Option } from "@/core/honor";
 import type { PullSummary } from "@/core/pulls";
+import { ActionBar, ActionBarSlot } from "@/ui/ActionBar";
 import { useMediaQuery } from "@/ui/hooks/useMediaQuery";
 import { PrDetail } from "@/ui/PrDetail";
 import { PrList, type RowState } from "@/ui/PrList";
@@ -118,6 +119,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     return next;
   }, []);
   const wide = useMediaQuery("(min-width: 768px)");
+  // The phone sheet's bottom bar, where the primary action is pinned.
+  const [actionBar, setActionBar] = useState<HTMLDivElement | null>(null);
   const running = useRef(new Map<string, AbortController>());
   const lastOpened = useRef<number | null>(null);
   const linked = useRef(false);
@@ -590,12 +593,15 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
                 {selected ? `Pull request #${selected.number}` : "Pull request"}
               </span>
             </SheetTitle>
-            <div
-              data-sheet-scroll
-              className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]"
-            >
-              {detail}
-            </div>
+            <ActionBar.Provider value={actionBar}>
+              <div
+                data-sheet-scroll
+                className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+              >
+                {detail}
+              </div>
+            </ActionBar.Provider>
+            <ActionBarSlot onElement={setActionBar} />
           </SheetContent>
         </Sheet>
       )}

@@ -5,6 +5,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { STEP_IDS, STEP_LABELS, type Analysis, type ResultEvent, type StepId } from "@/core/events";
 import type { Option } from "@/core/honor";
 import type { ResolvedOption, SideWork } from "@/core/options";
+import { PinnedActions } from "@/ui/ActionBar";
 import { createHold, HOLD_MS } from "@/ui/hold";
 import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
@@ -155,7 +156,7 @@ function RunControls({
   return (
     <div className="space-y-3">
       {drops ? <DropConfirm drops={drops} baseRef={baseRef} /> : null}
-      <div className="flex flex-wrap items-center gap-3">
+      <PinnedActions className="flex flex-wrap items-center gap-3">
         {drops ? (
           <HoldToConfirm label={`Hold to drop ${drops.side} and run`} onConfirm={onRun} />
         ) : (
@@ -163,11 +164,11 @@ function RunControls({
             Run checks
           </Button>
         )}
-        <span className="inline-flex items-center gap-1 text-[12px] text-muted">
+        <span className="inline-flex items-center gap-1 text-[12px] text-muted in-data-pinned:hidden">
           or <Kbd>{mod}</Kbd>
           <Kbd>Enter</Kbd>
         </span>
-      </div>
+      </PinnedActions>
       <p className="text-[12.5px] text-muted">
         Gemini writes the merge for <span className="text-ink">{option.label}</span>. It must parse,
         keep what this option keeps, and pass the tests in an isolated sandbox. Nothing is pushed.
@@ -239,9 +240,11 @@ function HeldActions({
     <div className="space-y-3 border-t border-hair pt-3">
       {suggestion ? (
         <div className="space-y-1">
-          <Button variant="primary" size="sm" onClick={() => onTry(suggestion.kind)}>
-            Try {suggestion.label}
-          </Button>
+          <PinnedActions>
+            <Button variant="primary" size="sm" onClick={() => onTry(suggestion.kind)}>
+              Try {suggestion.label}
+            </Button>
+          </PinnedActions>
           <p className="text-[12.5px] text-muted">
             {failedOption.label} was held, so the next best is {suggestion.label.toLowerCase()}
             {suggestion.reason ? `: ${suggestion.reason}` : "."}

@@ -22,11 +22,11 @@
   "integrationsClaimed": [],
   "integrationAliases": {},
   "demo": {
-    "liveUrl": null,
+    "liveUrl": "https://merge-desk-swart.vercel.app",
     "judgePath": "/judge",
     "repoUrl": "https://github.com/YearningAsian/merge-desk",
     "videoUrl": null,
-    "curlExample": "curl https://<live-url>/api/health"
+    "curlExample": "curl https://merge-desk-swart.vercel.app/api/health"
   },
   "honesty": {
     "sandboxOnly": true,

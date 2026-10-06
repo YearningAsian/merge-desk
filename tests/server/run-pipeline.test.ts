@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunRecord } from "@/core/run";
-import { signRun, verifyRun } from "@/server/pipeline/run";
+import { signLandableRun, signRun, verifyRun } from "@/server/pipeline/run";
 import type { RunEvent } from "@/core/events";
 import { MalformedOutputError } from "@/server/errors";
 import { runPipeline, type Proposer } from "@/server/pipeline/run";
@@ -345,5 +345,19 @@ describe("signed run records", () => {
     const flipped = `${version}.${payload!.slice(0, -2)}AA.${mac}`;
     expect(() => verifyRun(flipped, expected, at)).toThrow();
     expect(() => verifyRun(token, expected, { secret, now: 1_000 + 16 * 60 * 1000 })).toThrow();
+  });
+
+  // Review round 2 (prior L2): a run too large for Land says so when signed.
+  it("signs a run too large for Land as not landable, with the reason", () => {
+    const signer = { user: "YearningAsian", secret };
+    const small = verifyRun(signLandableRun(record, signer), expected, { secret });
+    expect(small.changes).toEqual(record.changes);
+    const big = verifyRun(signLandableRun(record, signer, 100), expected, { secret });
+    expect(big).toMatchObject({
+      changes: null,
+      tree: null,
+      changesNote: "the change is too large to land from Merge Desk",
+      verdict: "VERIFIED",
+    });
   });
 });

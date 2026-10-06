@@ -23,6 +23,8 @@ import { cn } from "@/ui/utils";
 // discard. Nothing on this screen pushes anything.
 
 const MAX_PATCH_LINES = 2_000;
+const UNCONFIRMED_LAND =
+  "The branch update is pending or unconfirmed. Discard is unavailable; reconcile this attempt on GitHub before starting over.";
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export const modifierKey = () =>
@@ -282,12 +284,16 @@ function ResultCard({
   steps,
   option,
   pr,
+  pushed,
+  pushUnconfirmed,
   children,
 }: {
   result: ResultEvent;
   steps: RunSteps;
   option: ResolvedOption;
   pr: number;
+  pushed: boolean;
+  pushUnconfirmed: boolean;
   children?: React.ReactNode;
 }) {
   const verified = result.verdict === "VERIFIED";
@@ -369,7 +375,11 @@ function ResultCard({
             </Reveal>
           </>
         ) : null}
-        <p className="text-[12.5px] text-muted">Nothing has been pushed.</p>
+        {pushUnconfirmed ? (
+          <p className="text-[12.5px] text-wait-text">{UNCONFIRMED_LAND}</p>
+        ) : pushed ? null : (
+          <p className="text-[12.5px] text-muted">Nothing has been pushed.</p>
+        )}
         {children}
       </div>
     </div>
@@ -387,6 +397,11 @@ export function RunSection({
   onCancel,
   onDiscard,
   onOption,
+  landing,
+  pushed = false,
+  pushUnconfirmed = false,
+  discardBlocked = false,
+  recordNote,
 }: {
   analysis: Analysis;
   canRun: boolean;
@@ -398,6 +413,13 @@ export function RunSection({
   onCancel: () => void;
   onDiscard: () => void;
   onOption: (option: Option) => void;
+  // Land's button and outcome, shown on a VERIFIED result.
+  landing?: React.ReactNode;
+  pushed?: boolean;
+  pushUnconfirmed?: boolean;
+  discardBlocked?: boolean;
+  // Whether a hold was recorded on the pull request.
+  recordNote?: React.ReactNode;
 }) {
   const chosen = analysis.options.find((item) => item.kind === option) ?? analysis.options[0]!;
   return (
@@ -413,7 +435,11 @@ export function RunSection({
       }
     >
       {!run ? (
-        <RunControls option={chosen} baseRef={baseRef} canRun={canRun} onRun={() => onRun()} />
+        pushUnconfirmed ? (
+          <p className="text-[12.5px] text-wait-text">{UNCONFIRMED_LAND}</p>
+        ) : (
+          <RunControls option={chosen} baseRef={baseRef} canRun={canRun} onRun={() => onRun()} />
+        )
       ) : (
         <div className="space-y-3">
           {run.steer ? (
@@ -436,30 +462,51 @@ export function RunSection({
                 {run.reason}
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => onRun(run.steer ?? undefined)}>
+                <Button
+                  size="sm"
+                  onClick={() => onRun(run.steer ?? undefined)}
+                  disabled={pushUnconfirmed}
+                >
                   Run again
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onDiscard}>
+                <Button size="sm" variant="ghost" onClick={onDiscard} disabled={discardBlocked}>
                   Discard
                 </Button>
               </div>
             </div>
           ) : null}
           {run.status === "done" ? (
-            <ResultCard result={run.result} steps={run.steps} option={chosen} pr={pr}>
+            <ResultCard
+              result={run.result}
+              steps={run.steps}
+              option={chosen}
+              pr={pr}
+              pushed={pushed}
+              pushUnconfirmed={pushUnconfirmed}
+            >
               {run.result.verdict === "HELD" ? (
-                <HeldActions
-                  suggestion={suggestInstead(analysis.options, chosen.kind, analysis.older)}
-                  failedOption={chosen}
-                  steer={run.steer}
-                  onTry={onOption}
-                  onSteer={(steer) => onRun(steer)}
-                  onDiscard={onDiscard}
-                />
+                <>
+                  {recordNote}
+                  {!pushUnconfirmed ? (
+                    <HeldActions
+                      suggestion={suggestInstead(analysis.options, chosen.kind, analysis.older)}
+                      failedOption={chosen}
+                      steer={run.steer}
+                      onTry={onOption}
+                      onSteer={(steer) => onRun(steer)}
+                      onDiscard={onDiscard}
+                    />
+                  ) : null}
+                </>
               ) : (
-                <Button size="sm" variant="ghost" onClick={onDiscard}>
-                  Discard this run
-                </Button>
+                <>
+                  {landing}
+                  {pushed ? null : (
+                    <Button size="sm" variant="ghost" onClick={onDiscard} disabled={discardBlocked}>
+                      Discard this run
+                    </Button>
+                  )}
+                </>
               )}
             </ResultCard>
           ) : null}

@@ -1,5 +1,6 @@
 import { extname } from "node:path";
 import { truncateLog } from "@/core/events";
+import { isRepoPath } from "@/core/paths";
 import { chooseTestSuite } from "@/server/guard";
 import type {
   LandableChange,
@@ -42,6 +43,104 @@ export const MAX_LANDABLE_BYTES = 2_000_000;
 export const TEST_LIMIT_MS = 30_000;
 export const SHA = /^[0-9a-f]{40}$/;
 
+export type WorkspaceIntegrity = {
+  head: string;
+  tree: string;
+  index: string;
+  bytes: string;
+};
+
+// This program comes from the server, never from the candidate repository.
+// Hash raw bytes (including untracked/ignored files), not Git's stat cache:
+// assume-unchanged, skip-worktree and matching timestamps cannot hide a write.
+// Only executable mode bits belong to this fingerprint, so making the sandbox
+// root-owned and read-only does not change the captured source identity.
+const WORKSPACE_BYTES = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const { createHash } = require("node:crypto");
+const root = process.cwd();
+const hash = createHash("sha256");
+let entries = 0;
+let bytes = 0;
+function visit(relative) {
+  if (++entries > 50000) throw new Error("Source integrity manifest is too large");
+  const full = path.join(root, relative);
+  const stat = fs.lstatSync(full);
+  if (stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory()))
+    throw new Error("Source integrity cannot check symbolic links or special files: " + relative);
+  hash.update(JSON.stringify([relative, stat.isDirectory() ? "directory" : "file", stat.mode & 0o111]) + "\n");
+  if (stat.isDirectory()) {
+    for (const name of fs.readdirSync(full).sort()) visit(path.join(relative, name));
+  } else {
+    bytes += stat.size;
+    if (bytes > 100000000) throw new Error("Source integrity manifest exceeds the byte limit");
+    const contents = fs.readFileSync(full);
+    hash.update(String(contents.length) + "\0");
+    hash.update(contents);
+  }
+}
+for (const name of fs.readdirSync(root).sort()) if (name !== ".git") visit(name);
+for (const name of ["HEAD", "config", "index"]) visit(path.join(".git", name));
+process.stdout.write(hash.digest("hex"));
+`;
+
+export async function captureWorkspaceIntegrity(
+  shell: Shell,
+  expectedTree?: string,
+): Promise<WorkspaceIntegrity> {
+  const head = (await git(shell, ["rev-parse", "HEAD"])).stdout.trim();
+  const tree = (await git(shell, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+  const index = (await git(shell, ["write-tree"])).stdout.trim();
+  if (![head, tree, index].every((value) => SHA.test(value)) || tree !== index)
+    throw new Error("The captured HEAD, tree or index is uncertain");
+  if (expectedTree && tree !== expectedTree)
+    throw new Error("The workspace no longer matches the captured merge tree");
+  const result = await shell.exec("node", ["-e", WORKSPACE_BYTES], { timeoutMs: TEST_LIMIT_MS });
+  const bytes = result.stdout.trim();
+  if (result.code !== 0 || result.timedOut || !/^[0-9a-f]{64}$/.test(bytes))
+    throw new Error(`Could not read source integrity: ${result.output.trim().slice(0, 500)}`);
+  return { head, tree, index, bytes };
+}
+
+async function assertWorkspaceIntegrity(shell: Shell, expected: WorkspaceIntegrity | null) {
+  if (!expected) throw new Error("No captured source integrity is available");
+  const actual = await captureWorkspaceIntegrity(shell, expected.tree);
+  if (
+    actual.head !== expected.head ||
+    actual.index !== expected.index ||
+    actual.bytes !== expected.bytes
+  )
+    throw new Error("The source or Git state changed after the checks captured it");
+}
+
+// Endpoint comparison is useful evidence for the trusted local fallback.
+// It cannot detect a write-and-restore during execution. The public sandbox
+// additionally prevents the test UID from writing the captured checkout.
+export async function runCheckedSuite(
+  trusted: Shell,
+  candidate: Shell,
+  changedFiles: string[],
+  expected: WorkspaceIntegrity | null,
+): Promise<TestResult> {
+  let result: TestResult | undefined;
+  try {
+    await assertWorkspaceIntegrity(trusted, expected);
+    result = await runSuite(candidate, changedFiles);
+    await assertWorkspaceIntegrity(trusted, expected);
+    return result;
+  } catch (error) {
+    const note = `Source integrity check failed: ${error instanceof Error ? error.message : "unknown integrity result"}`;
+    return {
+      state: "failed",
+      suite: result?.suite ?? chooseTestSuite(changedFiles).label,
+      exitCode: result?.exitCode ?? null,
+      output: truncateLog(`${result?.output ?? ""}\n${note}`),
+      durationMs: result?.durationMs ?? 0,
+    };
+  }
+}
+
 const GIT_CONFIG = [
   "-c",
   "core.autocrlf=false",
@@ -60,17 +159,7 @@ export function assertRevisions(revisions: Revisions) {
     throw new Error("Revisions must be full commit ids");
 }
 
-// A relative path inside the repository, never into .git or out of it.
-export function isRepoPath(path: string): boolean {
-  if (!path || path.includes("\0") || path.includes("\\") || path.startsWith("/")) return false;
-  if (/^[A-Za-z]:/.test(path)) return false;
-  return path
-    .split("/")
-    .every(
-      (segment) =>
-        segment !== "" && segment !== "." && segment !== ".." && segment.toLowerCase() !== ".git",
-    );
-}
+export { isRepoPath };
 
 export function assertRepoPath(path: string): string {
   if (!isRepoPath(path)) throw new Error(`Path is outside the repository: ${path}`);

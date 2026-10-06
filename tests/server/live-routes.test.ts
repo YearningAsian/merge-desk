@@ -6,9 +6,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { POST } from "@/app/api/live/analyze/route";
 import { GET } from "@/app/api/live/prs/route";
+import { POST as LAND } from "@/app/api/live/land/route";
+import { POST as RECORD } from "@/app/api/live/record/route";
 import { POST as RUN } from "@/app/api/live/run/route";
 import { AnalyzeEvent, type Analysis } from "@/core/events";
+import type { RunRecord } from "@/core/run";
 import { signAnalysis } from "@/server/pipeline/analyze";
+import { signRun } from "@/server/pipeline/run";
 import { SESSION_COOKIE, sealSession } from "@/server/session";
 
 vi.mock("@/server/github/app", () => ({
@@ -134,5 +138,71 @@ describe("POST /api/live/run", () => {
     expect(await response.json()).toEqual({
       error: "That option wasn't offered for this analysis.",
     });
+  });
+});
+
+describe("POST /api/live/land and /api/live/record", () => {
+  const record: RunRecord = {
+    v: 1,
+    repo: "YearningAsian/merge-desk",
+    pr: 1,
+    verdict: "VERIFIED",
+    option: "combine",
+    drops: null,
+    revisions: { head: "a".repeat(40), base: "b".repeat(40) },
+    tree: "c".repeat(40),
+    changes: [{ path: "playground/src/api.js", mode: "100644", content: "x" }],
+    changesNote: null,
+    description: null,
+    reason: null,
+    summary: [],
+    checks: [],
+    analysisModel: "m",
+    proposeModel: "m",
+    steer: null,
+    finishedAt: "2026-10-05T12:00:00.000Z",
+  };
+  const call = async (
+    handler: (request: Request) => Promise<Response>,
+    path: string,
+    body: unknown,
+    origin = "http://localhost:3000",
+  ) =>
+    handler(
+      new Request(`http://localhost:3000${path}`, {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          origin,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it("refuses a cross-site Land before reading anything", async () => {
+    const token = signRun(record, { user: "YearningAsian", secret: SECRET });
+    const response = await call(LAND, "/api/live/land", { pr: 1, token }, "https://evil.example");
+    expect(response.status).toBe(403);
+  });
+
+  it("refuses to land a forged run, someone else's run or another pull request's run", async () => {
+    const forged = await call(LAND, "/api/live/land", { pr: 1, token: "v1.forged.sig" });
+    expect(forged.status).toBe(403);
+    expect(await forged.json()).toMatchObject({ outcome: "REFUSED" });
+    const theirs = signRun(record, { user: "someone-else", secret: SECRET });
+    expect((await call(LAND, "/api/live/land", { pr: 1, token: theirs })).status).toBe(403);
+    const mine = signRun(record, { user: "YearningAsian", secret: SECRET });
+    expect((await call(LAND, "/api/live/land", { pr: 2, token: mine })).status).toBe(403);
+  });
+
+  it("records a hold only for a run that was actually held", async () => {
+    const verified = signRun(record, { user: "YearningAsian", secret: SECRET });
+    const response = await call(RECORD, "/api/live/record", {
+      pr: 1,
+      token: verified,
+      action: "held",
+    });
+    expect(response.status).toBe(409);
   });
 });

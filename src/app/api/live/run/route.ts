@@ -9,7 +9,7 @@ import { geminiProposer } from "@/server/gemini/propose";
 import { installationOctokit } from "@/server/github/app";
 import { readPull } from "@/server/github/prs";
 import { verifyAnalysis } from "@/server/pipeline/analyze";
-import { runPipeline, signRun } from "@/server/pipeline/run";
+import { runPipeline, signLandableRun } from "@/server/pipeline/run";
 import { liveRunner } from "@/server/runner";
 import type { AppliedProposal } from "@/server/runner/types";
 import { guardLive } from "@/server/session";
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
             steer: body.data.steer || null,
             finishedAt: new Date().toISOString(),
           };
-          send({ ...event, token: signRun(record, { user: guard.login, secret }) });
+          send({ ...event, token: signLandableRun(record, { user: guard.login, secret }) });
         }
         if (!ended) stop(`Stopped after ${DEADLINE_MS / 1000} s. Nothing was pushed.`);
       } catch {

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 import type {
   AppliedProposal,
   ParseResult,
@@ -15,14 +15,16 @@ import {
   RUN_LIMIT_MS,
   assertRepoPath,
   assertRevisions,
+  captureWorkspaceIntegrity,
   commitProposal,
   describeMerge,
   git,
   mergeIntoHead,
   parseFiles,
-  runSuite,
+  runCheckedSuite,
   type ExecResult,
   type Shell,
+  type WorkspaceIntegrity,
 } from "./workspace";
 
 // Runs merges in a temporary folder on this machine with local git and node.
@@ -80,6 +82,7 @@ function spawnLimited(
 export class LocalRunner implements Runner {
   workdir: string | null = null;
   private readonly source: string;
+  private integrity: WorkspaceIntegrity | null = null;
 
   constructor(options: { source: string }) {
     this.source = options.source;
@@ -136,7 +139,9 @@ export class LocalRunner implements Runner {
   async applyProposal(revisions: Revisions, files: ProposedFile[]): Promise<AppliedProposal> {
     await this.checkout(revisions);
     const state = await mergeIntoHead(this.shell, revisions);
-    return commitProposal(this.shell, revisions, state, files);
+    const applied = await commitProposal(this.shell, revisions, state, files);
+    this.integrity = await captureWorkspaceIntegrity(this.shell, applied.tree);
+    return applied;
   }
 
   parseCheck(paths: string[]): Promise<ParseResult[]> {
@@ -144,12 +149,17 @@ export class LocalRunner implements Runner {
   }
 
   runTests(changedFiles: string[]): Promise<TestResult> {
-    return runSuite(this.shell, changedFiles);
+    // Trusted manual use only. These before/after hashes catch persistent
+    // changes; same-user Windows processes can still change and restore bytes.
+    return runCheckedSuite(this.shell, this.shell, changedFiles, this.integrity);
   }
 
   async dispose(): Promise<void> {
+    this.integrity = null;
     if (!this.workdir) return;
-    const dir = this.workdir;
+    const dir = resolve(this.workdir);
+    if (!dir.startsWith(resolve(tmpdir()) + sep) || !basename(dir).startsWith("merge-desk-run-"))
+      throw new Error("Refusing to remove an unexpected runner folder");
     this.workdir = null;
     await rm(dir, { recursive: true, force: true, maxRetries: 3 });
   }

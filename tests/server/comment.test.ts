@@ -271,6 +271,43 @@ describe("upsertRecord", () => {
     expect(refs.size).toBe(0);
   });
 
+  // Review 6.2 M5: the caller stops right after the lock is taken, before the
+  // first read. Nothing is sent, the lock is freed, and no rejection is left
+  // unhandled (vitest fails the run on one).
+  it("stops cleanly when its caller leaves just after the lock is taken", async () => {
+    const { octokit, comments, refs } = thread();
+    const stop = new AbortController();
+    const create = octokit.git.createRef.bind(octokit.git);
+    vi.spyOn(octokit.git, "createRef").mockImplementationOnce(async (value) => {
+      const result = await create(value!);
+      stop.abort();
+      return result;
+    });
+    await expect(
+      upsertRecord(octokit, { ...input("left"), signal: stop.signal }),
+    ).rejects.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(comments).toHaveLength(0);
+    expect(refs.size).toBe(0);
+  });
+
+  // Review 6.2 M6: the write's budget runs out before anything is sent (a
+  // slow read). Nothing may be marked as sent, so the lock is freed.
+  it("frees the lock when its budget runs out before anything is sent", async () => {
+    const { octokit, comments, refs } = thread();
+    const send = vi.spyOn(octokit.issues, "createComment");
+    const list = octokit.paginate.bind(octokit);
+    octokit.paginate = (async (...args: Parameters<Octokit["paginate"]>) => {
+      const result = await list(...args);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return result;
+    }) as Octokit["paginate"];
+    await expect(upsertRecord(octokit, { ...input("late"), budgetMs: 30 })).rejects.toThrow();
+    expect(send).not.toHaveBeenCalled();
+    expect(comments).toHaveLength(0);
+    expect(refs.size).toBe(0);
+  });
+
   it("refuses an oversized record without discarding history or sending a write", async () => {
     const history = Array.from({ length: 200 }, (_, i) => ({
       ...entry(`history-${i}`),

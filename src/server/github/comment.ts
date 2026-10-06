@@ -83,13 +83,14 @@ export async function readRecord(
   };
 }
 
-// How long a write that was already sent may take to be answered and read
-// back, counted from its first dispatch. Routes size maxDuration around it.
+// How long one record write may take once it holds the lock: reading,
+// sending, and reading back what was sent. Routes size maxDuration around it.
 export const RECORD_BUDGET_MS = 20_000;
 
 // Settles with work, or rejects when the signal aborts (whether or not the
-// call itself honors the signal).
+// call itself honors the signal). Work that loses the race is still handled.
 function within<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  work.catch(() => undefined);
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) return reject(signal.reason);
     const abort = () => reject(signal.reason);
@@ -109,8 +110,9 @@ function within<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 
 // `signal` stops the caller waiting: nothing new is sent once it aborts.
 // A write already sent is not cancelled with it; it finishes, and is read
-// back, under its own budget (budgetMs from its first dispatch). Cancelling
-// it mid-flight would leave it unconfirmed and keep the lock for a human.
+// back, under the write's own budget (budgetMs from taking the lock).
+// Cancelling it mid-flight would leave it unconfirmed and keep the lock for
+// a human. Once the budget is spent nothing more is sent either.
 export function upsertRecord(
   octokit: Octokit,
   input: {
@@ -134,12 +136,14 @@ export function upsertRecord(
     signal: stop,
   };
   return withRefLock(octokit, lock, async (lease) => {
-    let budget: AbortSignal | null = null;
-    // Sends one mutation: never after the caller stopped, and released from
-    // the lock's keep only once GitHub has answered it.
+    const budget = AbortSignal.timeout(input.budgetMs ?? RECORD_BUDGET_MS);
+    let sent = false;
+    // Sends one mutation: never after the caller stopped or the budget ran
+    // out, and released from the lock's keep only once GitHub answered it.
     const send = async (mutation: (signal: AbortSignal) => Promise<unknown>) => {
       stop?.throwIfAborted();
-      budget ??= AbortSignal.timeout(input.budgetMs ?? RECORD_BUDGET_MS);
+      budget.throwIfAborted();
+      sent = true;
       lease.dispatched();
       try {
         await within(mutation(budget), budget);
@@ -151,12 +155,14 @@ export function upsertRecord(
       }
       lease.confirmed();
     };
-    // Before anything is sent, reads stop with the caller; after, they run
-    // on the write's budget so it can still be confirmed.
+    // Before anything is sent, reads stop with the caller too; after, only
+    // the budget ends them, so a sent write can still be confirmed.
     const read = () => {
-      const signal = budget ?? stop;
-      const reading = listOwn(octokit, input.repo, input.pr, input.appId, input.seal, signal);
-      return signal ? within(reading, signal) : reading;
+      const signal = sent || !stop ? budget : AbortSignal.any([stop, budget]);
+      return within(
+        listOwn(octokit, input.repo, input.pr, input.appId, input.seal, signal),
+        signal,
+      );
     };
     for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
       const own = await read();

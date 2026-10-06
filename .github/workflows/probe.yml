@@ -28,7 +28,7 @@ jobs:
           REQUIRE: ${{ vars.PROBE_REQUIRE }}
           BRAND: ${{ vars.PROBE_BRAND }}
         run: |
-          if [ -z "$BASES" ]; then echo "PROBE_BASE_URLS is not set: nothing was checked"; exit 1; fi
+          if [ -z "$(echo $BASES)" ]; then echo "PROBE_BASE_URLS is not set: nothing was checked"; exit 1; fi
           python3 - <<'PY'
           import json, os, urllib.error, urllib.request
           def get(url):
@@ -41,7 +41,9 @@ jobs:
                       return r.status
               except urllib.error.HTTPError as e:
                   return e.code
-          for base in os.environ["BASES"].split():
+          bases = os.environ["BASES"].split()
+          assert bases, "PROBE_BASE_URLS has no origins: nothing was checked"
+          for base in bases:
               h = json.loads(get(base + "/api/health"))
               need = ["github", "gemini", "sandbox", "throttle"] + os.environ.get("REQUIRE", "").split()
               missing = [k for k in need if h.get("integrations", {}).get(k) is not True]

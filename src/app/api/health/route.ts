@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { integrationStatus } from "@/server/env";
+import { throttleReady } from "@/server/throttle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +14,12 @@ const recordingsPresent = () =>
 
 // Booleans only: whether each integration is configured, never a value.
 // Configured is not the same as proven; the live checks prove each one.
-export function GET() {
+// throttle is the one real call: today's tagged sandboxes were counted within
+// the last minute, which also proves the sandbox credential works. A request
+// header is never taken as that credential.
+export async function GET() {
   const status = integrationStatus();
+  const throttle = await throttleReady();
   return Response.json(
     {
       ok: true,
@@ -22,7 +27,8 @@ export function GET() {
       integrations: {
         github: status.github,
         gemini: status.gemini,
-        sandbox: status.sandbox,
+        sandbox: status.sandbox || throttle,
+        throttle,
         recordings: recordingsPresent(),
       },
     },

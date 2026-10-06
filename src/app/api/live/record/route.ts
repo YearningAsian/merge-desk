@@ -8,11 +8,13 @@ import { verifyRun } from "@/server/pipeline/run";
 import { recordSeal } from "@/server/sign";
 import { deskLink, entryFor } from "@/server/record";
 import { guardLive } from "@/server/session";
-import { decisionWriterReason } from "@/server/record-writer";
 import { withDeadline } from "@/server/deadline";
+import { keepAlive } from "@/server/keep-alive";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+// Answers within 25 s; a record write already sent may finish after that
+// under its own budget (RECORD_BUDGET_MS), and its lock is then released.
+export const maxDuration = 60;
 
 const REPO = CODE_ALLOWED_REPOS[0];
 
@@ -50,9 +52,11 @@ const Body = z.object({
 export async function POST(request: Request) {
   const controller = new AbortController();
   const signal = AbortSignal.any([controller.signal, request.signal]);
+  const work = performRecord(request, signal);
+  keepAlive(work); // after the deadline it may still be releasing the record lock
   try {
     return await withDeadline(
-      performRecord(request, signal),
+      work,
       25_000,
       json(503, {
         error: "The record update was not confirmed before the request deadline.",
@@ -66,8 +70,6 @@ export async function POST(request: Request) {
 async function performRecord(request: Request, signal: AbortSignal) {
   const guard = await guardLive(request, { mutating: true });
   if (!guard.ok) return guard.response;
-  const writerReason = decisionWriterReason(request);
-  if (writerReason) return json(503, { error: writerReason });
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return json(400, { error: "Send the signed run and what to record." });
   const { pr, token, action } = body.data;
@@ -87,7 +89,11 @@ async function performRecord(request: Request, signal: AbortSignal) {
 
   try {
     signal.throwIfAborted();
-    const octokit = await installationOctokit(REPO, { pull_requests: "write" });
+    // contents: write is for the record lock (a ref), never for code.
+    const octokit = await installationOctokit(REPO, {
+      contents: "write",
+      pull_requests: "write",
+    });
     signal.throwIfAborted();
     const pull = await readPull(octokit, REPO, pr);
     signal.throwIfAborted();

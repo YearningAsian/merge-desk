@@ -8,7 +8,7 @@ Merge Desk shows a merge conflict as two intentions side by side ("ours renames 
 
 Built and verified locally: the live desk analyzes conflicts, runs proposed merges through parsing, choice-honored checks and real tests, and can Land the checked merge commit on a permitted `demo/*` PR branch. Real GitHub checks exercised Land, HELD, Discard, reset, replay refusal and signature-tamper refusal. The desk separates file conflicts from GitHub merge readiness and labels historical Land results. See [PLAN.md](PLAN.md), [devpost/checklist.md](devpost/checklist.md) and the [review record](.review/round-4-codex.md) for evidence and limits.
 
-Production live mode is not enabled: the published health endpoint reports all integrations false. Land and decision writes currently require the loopback development writer; production coordination is not configured. Public `/demo`, `/judge`, recordings and the submission video remain future work. Merging source does not authorize a production deployment.
+Production live mode is not enabled: the published health endpoint reports all integrations false. Decision-record writes coordinate through one lock ref per pull request in this repository (`refs/merge-desk/locks/pr-<number>`), so the laptop and hosted servers share it; an unconfirmed write keeps its lock for a human to reconcile ([docs/record-reconciliation.md](docs/record-reconciliation.md)). Public `/demo`, `/judge`, recordings and the submission video remain future work. Merging source does not authorize a production deployment.
 
 ## Local workflow
 

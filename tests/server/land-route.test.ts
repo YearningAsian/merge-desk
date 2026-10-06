@@ -93,12 +93,36 @@ describe("Land route total deadline and writer scope", () => {
     });
   });
 
-  it("refuses an unsupported production writer before GitHub calls", async () => {
+  it("lands and records from a hosted production deployment", async () => {
     prepare();
     vi.stubEnv("NODE_ENV", "production");
-    expect(await (await POST(request())).json()).toMatchObject({ outcome: "REFUSED" });
-    expect(mocks.client).not.toHaveBeenCalled();
-    expect(mocks.land).not.toHaveBeenCalled();
+    vi.stubEnv("VERCEL", "1");
+    const hosted = new Request("https://merge-desk.example.invalid/api/live/land", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pr: 1, token: "fixture" }),
+    });
+    expect(await (await POST(hosted)).json()).toMatchObject({
+      outcome: "LANDED",
+      record: { ok: true },
+    });
+    expect(mocks.land).toHaveBeenCalledTimes(1);
+    expect(mocks.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for a token that can write the lock ref when recording a decision", async () => {
+    prepare();
+    const input = new Request("https://merge-desk.example.invalid/api/live/record", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pr: 1, token: "fixture", action: "discarded" }),
+    });
+    await recordPOST(input);
+    expect(mocks.client).toHaveBeenCalledWith("YearningAsian/merge-desk", {
+      contents: "write",
+      pull_requests: "write",
+    });
+    expect(mocks.record).toHaveBeenCalledTimes(1);
   });
 
   it("stops slow preparation without initiating a later branch update", async () => {

@@ -8,13 +8,14 @@ import {
   type RecordSeal,
 } from "@/core/record";
 import { splitRepo } from "./app";
-import { withLocalRecordWriter } from "@/server/record-writer";
+import { withRefLock } from "./lock";
 
 // The one Merge Desk record on a pull request: a comment this App wrote (the
 // marker alone proves nothing; anyone can paste it), carrying the marker and
-// a seal that checks out. The local writer coordinates modules and processes
-// on the same host, then reads back: success is reported only once the entry
-// is actually stored. Hosted writes refuse until shared coordination exists.
+// a seal that checks out. Writers coordinate through the shared lock ref
+// (./lock.ts), wherever they run, then read back: success is reported only
+// once the entry is actually stored. The octokit needs contents: write for
+// the lock as well as pull_requests: write for the comment.
 // Preexisting duplicate records are folded into the oldest; an outside edit is
 // left exactly as it is, and a new one is started below it. Nothing is ever
 // deleted.
@@ -82,6 +83,36 @@ export async function readRecord(
   };
 }
 
+// How long one record write may take once it holds the lock: reading,
+// sending, and reading back what was sent. Routes size maxDuration around it.
+export const RECORD_BUDGET_MS = 20_000;
+
+// Settles with work, or rejects when the signal aborts (whether or not the
+// call itself honors the signal). Work that loses the race is still handled.
+function within<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  work.catch(() => undefined);
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+  });
+}
+
+// `signal` stops the caller waiting: nothing new is sent once it aborts.
+// A write already sent is not cancelled with it; it finishes, and is read
+// back, under the write's own budget (budgetMs from taking the lock).
+// Cancelling it mid-flight would leave it unconfirmed and keep the lock for
+// a human. Once the budget is spent nothing more is sent either.
 export function upsertRecord(
   octokit: Octokit,
   input: {
@@ -92,19 +123,49 @@ export function upsertRecord(
     deskUrl: string | null;
     seal: RecordSeal;
     signal?: AbortSignal;
+    budgetMs?: number;
   },
 ): Promise<{ ok: true; entries: RecordEntry[] } | { ok: false; reason: string }> {
   const { owner, name } = splitRepo(input.repo);
-  return withLocalRecordWriter(`${input.repo}#${input.pr}`, async (lease) => {
-    for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-      const own = await listOwn(
-        octokit,
-        input.repo,
-        input.pr,
-        input.appId,
-        input.seal,
-        input.signal,
+  const stop = input.signal;
+  const lock = {
+    repo: input.repo,
+    name: `pr-${input.pr}`,
+    scope: `${input.repo}#${input.pr}`,
+    holder: `${input.entry.who} (${input.entry.action})`,
+    signal: stop,
+  };
+  return withRefLock(octokit, lock, async (lease) => {
+    const budget = AbortSignal.timeout(input.budgetMs ?? RECORD_BUDGET_MS);
+    let sent = false;
+    // Sends one mutation: never after the caller stopped or the budget ran
+    // out, and released from the lock's keep only once GitHub answered it.
+    const send = async (mutation: (signal: AbortSignal) => Promise<unknown>) => {
+      stop?.throwIfAborted();
+      budget.throwIfAborted();
+      sent = true;
+      lease.dispatched();
+      try {
+        await within(mutation(budget), budget);
+      } catch (error) {
+        // A 4xx is GitHub refusing it outright: nothing applied, nothing late.
+        const status = (error as { status?: number }).status;
+        if (status !== undefined && status >= 400 && status < 500) lease.confirmed();
+        throw error;
+      }
+      lease.confirmed();
+    };
+    // Before anything is sent, reads stop with the caller too; after, only
+    // the budget ends them, so a sent write can still be confirmed.
+    const read = () => {
+      const signal = sent || !stop ? budget : AbortSignal.any([stop, budget]);
+      return within(
+        listOwn(octokit, input.repo, input.pr, input.appId, input.seal, signal),
+        signal,
       );
+    };
+    for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+      const own = await read();
       const valid = own.filter((record) => record.entries);
       const entries = addEntry(union(valid), input.entry);
       const body = renderRecord(entries, {
@@ -119,46 +180,43 @@ export function upsertRecord(
           reason:
             "The decision record is full. Existing history was preserved; this decision was not recorded.",
         };
-      input.signal?.throwIfAborted();
       if (valid[0]) {
-        lease.dispatched();
-        await octokit.issues.updateComment({
-          owner,
-          repo: name,
-          comment_id: valid[0].id,
-          body,
-          request: { signal: input.signal },
-        });
-        for (const extra of valid.slice(1)) {
-          input.signal?.throwIfAborted();
-          lease.dispatched();
-          await octokit.issues.updateComment({
+        const first = valid[0].id;
+        await send((signal) =>
+          octokit.issues.updateComment({
             owner,
             repo: name,
-            comment_id: extra.id,
-            body: FOLDED_BODY,
-            request: { signal: input.signal },
-          });
-        }
+            comment_id: first,
+            body,
+            request: { signal },
+          }),
+        );
+        for (const extra of valid.slice(1))
+          await send((signal) =>
+            octokit.issues.updateComment({
+              owner,
+              repo: name,
+              comment_id: extra.id,
+              body: FOLDED_BODY,
+              request: { signal },
+            }),
+          );
       } else {
-        lease.dispatched();
-        await octokit.issues.createComment({
-          owner,
-          repo: name,
-          issue_number: input.pr,
-          body,
-          request: { signal: input.signal },
-        });
+        await send((signal) =>
+          octokit.issues.createComment({
+            owner,
+            repo: name,
+            issue_number: input.pr,
+            body,
+            request: { signal },
+          }),
+        );
       }
 
       // Read back: exactly one valid record, holding this entry.
-      const after = (
-        await listOwn(octokit, input.repo, input.pr, input.appId, input.seal, input.signal)
-      ).filter((record) => record.entries);
-      if (after.length === 1 && after[0]!.entries!.some((entry) => entry.id === input.entry.id)) {
-        lease.confirmed();
+      const after = (await read()).filter((record) => record.entries);
+      if (after.length === 1 && after[0]!.entries!.some((entry) => entry.id === input.entry.id))
         return { ok: true as const, entries: after[0]!.entries! };
-      }
     }
     return {
       ok: false as const,

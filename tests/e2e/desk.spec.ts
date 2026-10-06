@@ -218,6 +218,63 @@ test("phone: the list is home and the detail opens as a full-height sheet", asyn
   await shot(page, "list-390");
 });
 
+// The bar must sit at the bottom of the screen, whatever the sheet's scroll.
+async function inThumbReach(page: Page, bar: ReturnType<Page["getByRole"]>) {
+  const box = (await bar.boundingBox())!;
+  const height = page.viewportSize()!.height;
+  expect(box.y + box.height).toBeGreaterThan(height - 2);
+  expect(box.y).toBeGreaterThan(height * 0.7);
+}
+
+test("phone: the primary action is pinned at the bottom of the sheet, run to land", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await page.route("**/api/live/land", (route) =>
+    route.fulfill({
+      json: {
+        outcome: "LANDED",
+        commit: "e".repeat(40),
+        branch: "demo/clean/rename",
+        mergeable: "mergeable",
+        record: { ok: true },
+      },
+    }),
+  );
+
+  // Held: Run sits in the bar before the run, "Try ..." after the hold.
+  await page.goto(`/live?pr=${HELD}`);
+  const sheet = page.getByRole("dialog");
+  const bar = sheet.getByRole("group", { name: "Actions" });
+  const run = bar.getByRole("button", { name: "Run checks" });
+  await expect(run).toBeVisible();
+  await inThumbReach(page, bar);
+  expect((await run.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await run.click();
+  await expect(sheet.getByRole("group", { name: "Result: HELD" })).toBeVisible();
+  await expect(bar.getByRole("button", { name: /^Try / })).toBeVisible();
+  await inThumbReach(page, bar);
+  await shot(page, "sheet-held-bar-390");
+
+  // Clean: VERIFIED puts Land, with its "does not merge" line, in the bar.
+  await page.goto(`/live?pr=${CLEAN}`);
+  await bar.getByRole("button", { name: "Run checks" }).click();
+  await expect(sheet.getByRole("group", { name: "Result: VERIFIED" })).toBeVisible();
+  const land = bar.getByRole("button", { name: "Land: push merge commit to demo/clean/rename" });
+  await expect(land).toBeVisible();
+  await expect(bar.getByText("Does not merge into demo/base.", { exact: false })).toBeVisible();
+  await inThumbReach(page, bar);
+  await noHorizontalOverflow(page);
+  await shot(page, "sheet-verified-bar-390");
+  await noSeriousAxe(page);
+  await land.click();
+  await expect(sheet.getByRole("group", { name: "Land: LANDED" })).toBeVisible();
+  // Nothing left to do: the bar gives its space back.
+  await expect(bar).toBeHidden();
+  await shot(page, "sheet-landed-390");
+});
+
 test("a ?pr= link opens that pull request; the slider skips an option not offered", async ({
   page,
 }) => {

@@ -1,0 +1,60 @@
+name: probe
+
+# Live probe of the production deployment (PLAN 2.6). Keep it on through judging.
+# It only reads public endpoints and never signs in, so it needs no secrets.
+# Repository variables (Settings > Secrets and variables > Actions > Variables):
+#   PROBE_BASE_URLS  required: space-separated origins, e.g. "https://merge-desk.vercel.app".
+#                    Unset fails the run: a green probe must always mean production answered.
+#   PROBE_REQUIRE    extra /api/health integrations that must be true; "github gemini sandbox
+#                    throttle" are always required
+#   PROBE_BRAND      text the homepage must carry (default "Merge Desk")
+# Odd minutes because GitHub deprioritizes :00 schedules; judge freshness by the newest run's age.
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Health, stats, homepage and the signed-out guard answer from production
+        env:
+          BASES: ${{ vars.PROBE_BASE_URLS }}
+          REQUIRE: ${{ vars.PROBE_REQUIRE }}
+          BRAND: ${{ vars.PROBE_BRAND }}
+        run: |
+          if [ -z "$(echo $BASES)" ]; then echo "PROBE_BASE_URLS is not set: nothing was checked"; exit 1; fi
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+          def get(url):
+              with urllib.request.urlopen(url, timeout=30) as r:
+                  assert r.status == 200, (url, r.status)
+                  return r.read()
+          def status(url):
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as r:
+                      return r.status
+              except urllib.error.HTTPError as e:
+                  return e.code
+          bases = os.environ["BASES"].split()
+          assert bases, "PROBE_BASE_URLS has no origins: nothing was checked"
+          for base in bases:
+              h = json.loads(get(base + "/api/health"))
+              need = ["github", "gemini", "sandbox", "throttle"] + os.environ.get("REQUIRE", "").split()
+              missing = [k for k in need if h.get("integrations", {}).get(k) is not True]
+              assert h.get("ok") is True and not missing, (base, "not live:", missing, h)
+              assert all(isinstance(v, bool) for v in h["integrations"].values()), (base, "health must be booleans only")
+              stats = json.loads(get(base + "/api/stats"))
+              assert stats.get("projectName") == "Merge Desk", (base, "stats is not this project's FACTS.json")
+              brand = os.environ.get("BRAND", "").strip() or "Merge Desk"
+              assert brand.encode() in get(base + "/"), (base, "homepage does not carry", brand)
+              # Live mode stays closed to anyone signed out.
+              code = status(base + "/api/live/prs")
+              assert code == 401, (base, "signed-out /api/live/prs answered", code)
+              print("probe ok", base, h["integrations"])
+          PY

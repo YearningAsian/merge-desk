@@ -21,7 +21,7 @@ export type ListSandboxes = (signal: AbortSignal) => AsyncIterable<Created>;
 export type Admission =
   { ok: true; used: number; cap: number } | { ok: false; status: 429 | 503; reason: string };
 
-const listTagged: ListSandboxes = (signal) => ({
+export const listTagged: ListSandboxes = (signal) => ({
   async *[Symbol.asyncIterator]() {
     const result = await Sandbox.list({
       tags: SANDBOX_TAGS,

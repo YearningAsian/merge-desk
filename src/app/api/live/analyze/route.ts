@@ -7,8 +7,9 @@ import { GeminiClient } from "@/server/gemini/client";
 import { installationOctokit } from "@/server/github/app";
 import { readPull } from "@/server/github/prs";
 import { analyzePipeline, signAnalysis } from "@/server/pipeline/analyze";
-import { liveRunner } from "@/server/runner";
+import { liveRunner, usesSandbox } from "@/server/runner";
 import { guardLive } from "@/server/session";
+import { admitLiveWork } from "@/server/throttle";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -29,6 +30,12 @@ export async function POST(request: Request) {
   if (!guard.ok) return guard.response;
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return refuse(400, "Send the pull request number (and a known model).");
+
+  // Every live analysis or run boots a sandbox; the day's count gates it.
+  if (usesSandbox()) {
+    const admission = await admitLiveWork({ signal: request.signal });
+    if (!admission.ok) return refuse(admission.status, admission.reason);
+  }
 
   // A 404 here means the App has no installation on the repository (signing
   // in doesn't install it), not a missing pull request, so it is asked apart.

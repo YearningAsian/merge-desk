@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { integrationStatus } from "@/server/env";
+import { throttleReady } from "@/server/throttle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,10 @@ const recordingsPresent = () =>
 
 // Booleans only: whether each integration is configured, never a value.
 // Configured is not the same as proven; the live checks prove each one.
-export function GET() {
+// On Vercel the sandbox credential arrives per request (the OIDC header), not
+// as a variable. throttle is the one real call: today's tagged sandboxes were
+// counted within the last minute, so live work can be admitted.
+export async function GET(request: Request) {
   const status = integrationStatus();
   return Response.json(
     {
@@ -22,7 +26,8 @@ export function GET() {
       integrations: {
         github: status.github,
         gemini: status.gemini,
-        sandbox: status.sandbox,
+        sandbox: status.sandbox || Boolean(request.headers.get("x-vercel-oidc-token")),
+        throttle: await throttleReady(),
         recordings: recordingsPresent(),
       },
     },

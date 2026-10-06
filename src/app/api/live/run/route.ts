@@ -10,9 +10,10 @@ import { installationOctokit } from "@/server/github/app";
 import { readPull } from "@/server/github/prs";
 import { verifyAnalysis } from "@/server/pipeline/analyze";
 import { runPipeline, signLandableRun } from "@/server/pipeline/run";
-import { liveRunner } from "@/server/runner";
+import { liveRunner, usesSandbox } from "@/server/runner";
 import type { AppliedProposal } from "@/server/runner/types";
 import { guardLive } from "@/server/session";
+import { admitLiveWork } from "@/server/throttle";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -60,6 +61,12 @@ export async function POST(request: Request) {
   }
   const chosen = analysis.options.find((option) => option.kind === body.data.option);
   if (!chosen) return refuse(400, "That option wasn't offered for this analysis.");
+
+  // Every live analysis or run boots a sandbox; the day's count gates it.
+  if (usesSandbox()) {
+    const admission = await admitLiveWork({ signal: request.signal });
+    if (!admission.ok) return refuse(admission.status, admission.reason);
+  }
 
   let octokit;
   try {

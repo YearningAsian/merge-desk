@@ -8,13 +8,14 @@ import {
   type RecordSeal,
 } from "@/core/record";
 import { splitRepo } from "./app";
-import { withLocalRecordWriter } from "@/server/record-writer";
+import { withRefLock } from "./lock";
 
 // The one Merge Desk record on a pull request: a comment this App wrote (the
 // marker alone proves nothing; anyone can paste it), carrying the marker and
-// a seal that checks out. The local writer coordinates modules and processes
-// on the same host, then reads back: success is reported only once the entry
-// is actually stored. Hosted writes refuse until shared coordination exists.
+// a seal that checks out. Writers coordinate through the shared lock ref
+// (./lock.ts), wherever they run, then read back: success is reported only
+// once the entry is actually stored. The octokit needs contents: write for
+// the lock as well as pull_requests: write for the comment.
 // Preexisting duplicate records are folded into the oldest; an outside edit is
 // left exactly as it is, and a new one is started below it. Nothing is ever
 // deleted.
@@ -95,7 +96,14 @@ export function upsertRecord(
   },
 ): Promise<{ ok: true; entries: RecordEntry[] } | { ok: false; reason: string }> {
   const { owner, name } = splitRepo(input.repo);
-  return withLocalRecordWriter(`${input.repo}#${input.pr}`, async (lease) => {
+  const lock = {
+    repo: input.repo,
+    name: `pr-${input.pr}`,
+    scope: `${input.repo}#${input.pr}`,
+    holder: `${input.entry.who} (${input.entry.action})`,
+    signal: input.signal,
+  };
+  return withRefLock(octokit, lock, async (lease) => {
     for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
       const own = await listOwn(
         octokit,

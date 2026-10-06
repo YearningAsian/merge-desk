@@ -1,11 +1,10 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
-import { rmdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { createHmac, randomUUID } from "node:crypto";
 import type { Octokit } from "@octokit/rest";
 import { describe, expect, it, vi } from "vitest";
 import { MARKER, renderRecord, type RecordEntry, type RecordSeal } from "@/core/record";
 import { readRecord, upsertRecord } from "@/server/github/comment";
+import { lockRef } from "@/server/github/lock";
+import { fakeRefs } from "../helpers/fake-refs";
 
 const APP_ID = 7;
 const seal: RecordSeal = {
@@ -29,8 +28,9 @@ const entry = (id: string): RecordEntry => ({
 
 type Stored = { id: number; body: string; performed_via_github_app: { id: number } | null };
 
-// An in-memory pull request thread with GitHub's comment calls. Every call
-// yields to the event loop first, so concurrent requests really interleave.
+// An in-memory pull request thread with GitHub's comment calls, plus the
+// ref calls the record lock uses. Every call yields to the event loop first,
+// so concurrent requests really interleave.
 function thread(initial: Stored[] = [], hooks: { afterUpdate?: (c: Stored) => void } = {}) {
   const comments = [...initial];
   let next = 100;
@@ -53,13 +53,17 @@ function thread(initial: Stored[] = [], hooks: { afterUpdate?: (c: Stored) => vo
       return { data: {} };
     },
   };
+  const refs = fakeRefs();
   const octokit = {
     issues,
+    git: refs.git,
+    repos: refs.repos,
+    graphql: refs.graphql,
     paginate: async (method: () => Promise<{ data: unknown[] }>) => (await method()).data,
   } as unknown as Octokit;
   const records = () =>
     comments.filter((c) => c.performed_via_github_app?.id === APP_ID && c.body.includes(MARKER));
-  return { octokit, comments, records };
+  return { octokit, comments, records, refs: refs.refs };
 }
 
 const input = (id: string) => ({
@@ -76,7 +80,7 @@ describe("upsertRecord", () => {
     const repo = `YearningAsian/review-${randomUUID()}`;
     const scope = `${repo}#2`;
     const original = renderRecord([entry("original")], { deskUrl: null, seal, scope });
-    const { octokit, comments } = thread([
+    const { octokit, comments, refs } = thread([
       { id: 1, body: original, performed_via_github_app: { id: APP_ID } },
     ]);
     let lateBody: string | undefined;
@@ -84,22 +88,22 @@ describe("upsertRecord", () => {
       lateBody = value!.body!;
       throw new Error("Connection closed after dispatch; remote write still pending");
     });
+    await expect(upsertRecord(octokit, { ...input("A"), repo })).rejects.toThrow();
+    // The lock stays on GitHub, naming who held it, for an operator to reconcile.
+    expect(refs.has(lockRef("pr-2"))).toBe(true);
+    vi.useFakeTimers();
+    let next;
     try {
-      await expect(upsertRecord(octokit, { ...input("A"), repo })).rejects.toThrow();
-      const next = await upsertRecord(octokit, { ...input("B"), repo });
-      expect(next.ok).toBe(false);
-      comments[0]!.body = lateBody!; // The first PATCH finally completes remotely.
-      const saved = await readRecord(octokit, { repo, pr: 2, appId: APP_ID, seal });
-      expect(saved.entries.map((value) => value.id)).toEqual(["original", "A"]);
+      const pending = upsertRecord(octokit, { ...input("B"), repo });
+      await vi.advanceTimersByTimeAsync(10_000); // past the lock's wait
+      next = await pending;
     } finally {
-      // This is a fake provider. Only after its pending operation is resolved
-      // may this test reconcile its own unique lock; production never auto-unlocks.
-      if (lateBody) comments[0]!.body = lateBody;
-      const root = resolve(join(tmpdir(), "merge-desk-record-locks"));
-      const lock = resolve(root, createHash("sha256").update(scope).digest("hex"));
-      if (!lock.startsWith(root + sep)) throw new Error("Unexpected fixture lock path");
-      if (lateBody) await rmdir(lock).catch(() => undefined);
+      vi.useRealTimers();
     }
+    expect(next).toMatchObject({ ok: false, reason: expect.stringContaining(lockRef("pr-2")) });
+    comments[0]!.body = lateBody!; // The first PATCH finally completes remotely.
+    const saved = await readRecord(octokit, { repo, pr: 2, appId: APP_ID, seal });
+    expect(saved.entries.map((value) => value.id)).toEqual(["original", "A"]);
   });
   it("does not allow separate module instances to build stale replacement bodies", async () => {
     vi.resetModules();
@@ -185,17 +189,33 @@ describe("upsertRecord", () => {
     expect(saved.entries.map((entry) => entry.id)).toEqual(["first"]);
   });
 
-  it("refuses distributed production writes before any GitHub call", async () => {
+  it("writes from a hosted production server through the shared lock, then frees it", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    const { octokit, comments } = thread();
-    const reads = vi.spyOn(octokit, "paginate");
+    vi.stubEnv("VERCEL", "1");
+    const { octokit, records, refs } = thread();
     try {
-      expect(await upsertRecord(octokit, input("production"))).toMatchObject({ ok: false });
-      expect(reads).not.toHaveBeenCalled();
-      expect(comments).toHaveLength(0);
+      expect(await upsertRecord(octokit, input("production"))).toMatchObject({ ok: true });
+      expect(records()).toHaveLength(1);
+      expect(refs.size).toBe(0);
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it("refuses while another server instance holds the lock, writing nothing", async () => {
+    const { octokit, comments, refs } = thread();
+    refs.set(lockRef("pr-2"), "f".repeat(40));
+    const reads = vi.spyOn(octokit, "paginate");
+    vi.useFakeTimers();
+    try {
+      const pending = upsertRecord(octokit, input("blocked"));
+      await vi.advanceTimersByTimeAsync(10_000); // past the lock's wait
+      expect(await pending).toMatchObject({ ok: false });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(reads).not.toHaveBeenCalled();
+    expect(comments).toHaveLength(0);
   });
 
   it("refuses an oversized record without discarding history or sending a write", async () => {

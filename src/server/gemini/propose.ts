@@ -4,7 +4,7 @@ import { RULES } from "@/core/honor";
 import { OPTION_LABELS } from "@/core/options";
 import type { Proposer } from "@/server/pipeline/run";
 import { fileBlock } from "./analyze";
-import type { GeminiClient } from "./client";
+import type { StructuredClient } from "@/server/llm/structured";
 
 // Gemini writes the merged contents of every conflicted file for the chosen
 // option. The answer is only a proposal: the run checks that it parses, that
@@ -65,7 +65,7 @@ export function proposePrompt(
 }
 
 export function geminiProposer(
-  client: GeminiClient,
+  client: StructuredClient,
   analysis: { files: AnalysisFile[]; intents: { ours: string; theirs: string } },
 ): Proposer {
   return async (request) => {
@@ -74,11 +74,12 @@ export function geminiProposer(
       system: SYSTEM,
       input: proposePrompt(analysis.files, analysis.intents, request),
       maxOutputTokens: 16_384,
+      signal: request.signal,
     });
     return {
       files: value.files,
       description: value.description.trim(),
-      source: `Gemini (${client.model})`,
+      source: client.label,
     };
   };
 }

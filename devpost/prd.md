@@ -111,6 +111,7 @@ Learner decision: "Same UI and same code path for both; demo mode only swaps the
   - [ ] The screen is clearly labelled **"Demo: recorded from a real run"** and has a **Reset** that starts the demo over.
 - **Live mode (sign-in, the learner's account only for now):** the real agent on a real repository, with real checks and real landing. This is what the submission video shows, on a repository the learner owns, including one held merge and one verified merge landing.
   - [ ] Signing in is required before anything can run or land; other accounts are refused.
+  - [ ] Settings can switch the model from Gemini (the server's key) to Claude, GPT or any OpenRouter model on the user's own key (learner, 2026-10-07). The key is kept sealed for that sign-in, never shown again or stored on the server, and cleared on sign-out; whichever model proposes, the same checks decide. Not mentioned in judge-facing copy until a real call with a real key has passed.
 - **Recordings come from live mode:** demo recordings are captured from live mode once it works, and re-captured whenever the flow changes, so the demo never shows something the live system can't do.
 - **Stated plainly:** the README and the Devpost page say what judges can try themselves (demo mode) and that the video shows live mode.
 
@@ -175,7 +176,7 @@ Agreed in review. Each was requested and is worth building, but none is needed t
 - Expo React Native app with a downloadable Android APK (from scope Later), bringing haptics, swipe actions and notifications.
 - Full dashboard across projects, pull requests and merges; many repositories; sign-in with GitHub.
 - A git merge driver so `git merge` uses the same checks.
-- More AI providers; a replay test over real historical merges.
+- More AI providers with automatic fallback; a replay test over real historical merges. (Your own Claude, GPT or OpenRouter key in Settings was pulled in on 2026-10-07; see *Features and Behavior > Demo mode and live mode*.)
 
 ## Non-Goals
 

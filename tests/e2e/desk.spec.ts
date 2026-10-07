@@ -362,6 +362,61 @@ test("settings pick the model; keys open help and details; a reload reuses the a
   expect(bodies[1]).toEqual({ pr: CLEAN, model: "gemini-3.8-flash" });
 });
 
+test("settings: Claude on your own key, sealed by the server and never shown again", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  const bodies: Array<{ pr: number; model?: string }> = [];
+  await page.route("**/api/live/analyze", (route) => {
+    const body = route.request().postDataJSON() as { pr: number; model?: string };
+    bodies.push(body);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/x-ndjson",
+      body: byPr[body.pr]!,
+    });
+  });
+  const answers: string[] = [];
+  page.on("response", async (response) => {
+    if (new URL(response.url()).pathname === "/api/live/keys") answers.push(await response.text());
+  });
+  await page.goto(`/live?pr=${CLEAN}`);
+  await expect(page.getByRole("article").getByRole("slider", { name: "Resolution" })).toBeVisible();
+
+  await page.keyboard.press(",");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("radio", { name: /Claude on your Anthropic key/ }).click();
+  const field = settings.getByLabel("Anthropic API key");
+  await expect(field).toHaveAttribute("type", "password");
+  const key = "sk-ant-e2e-" + "x".repeat(40);
+  await field.fill(key);
+  await settings.getByRole("button", { name: "Save key" }).click();
+  await expect(settings.getByText("Saved and sealed for this sign-in.")).toBeVisible();
+  await expect(settings.getByLabel("Anthropic API key")).toHaveCount(0);
+  expect(answers.join("")).not.toContain(key);
+  const sealed = (await page.context().cookies()).find((c) => c.name === "merge_desk_keys")!;
+  expect(sealed.httpOnly).toBe(true);
+  expect(sealed.sameSite).toBe("Strict");
+  expect(sealed.value).not.toContain(key);
+  expect(await page.evaluate(() => document.cookie)).not.toContain("merge_desk_keys");
+  await noSeriousAxe(page);
+  await shot(page, "settings-own-key-1440");
+
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("article")
+    .getByRole("button", { name: "Analyze with Claude Opus 5.5" })
+    .click();
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[1]).toEqual({ pr: CLEAN, model: "anthropic:claude-opus-5-5" });
+
+  await page.keyboard.press(",");
+  await settings.getByRole("button", { name: "Remove key" }).click();
+  await expect(settings.getByLabel("Anthropic API key")).toBeVisible();
+  expect((await page.context().cookies()).some((c) => c.name === "merge_desk_keys")).toBe(false);
+});
+
 test("held: steps tick to HELD with the failed check, then steer and retry or discard", async ({
   page,
 }) => {

@@ -2,15 +2,16 @@
 
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
-import { ModelId } from "@/core/models";
+import { ModelChoice } from "@/core/models";
 
 // Merge Desk's preferences, kept in this browser (localStorage) and shared
-// by its tabs. Nothing here is secret, and the server checks the model again.
+// by its tabs. Nothing here is secret (model keys live in a sealed cookie,
+// see server/keys), and the server checks the model again.
 // Each field falls back to its default on its own, so a stale or hand-edited
 // value can't break the desk.
 
 export const Settings = z.object({
-  model: z.union([z.literal("server"), ModelId]).catch("server"),
+  model: z.union([z.literal("server"), ModelChoice]).catch("server"),
   autoAnalyze: z.boolean().catch(true),
   refreshSeconds: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60)]).catch(30),
   diffLayout: z.enum(["auto", "split", "unified"]).catch("auto"),

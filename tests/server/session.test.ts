@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   OAUTH_COOKIE,
   SESSION_COOKIE,
+  SESSION_TTL_S,
   checkOAuthState,
   guardLive,
   readCookie,
@@ -58,10 +59,12 @@ describe("guardLive", () => {
   });
 
   it("lets the allowlisted login in, and checks the origin on mutating routes", async () => {
-    const seal = await sealSession("YearningAsian", { env });
+    const now = Date.now();
+    const seal = await sealSession("YearningAsian", { env, now });
     expect(await guardLive(request(cookie(SESSION_COOKIE, seal)), { env })).toEqual({
       ok: true,
       login: "YearningAsian",
+      exp: now + SESSION_TTL_S * 1000,
     });
     const crossSite = await guardLive(
       request(cookie(SESSION_COOKIE, seal), "https://evil.example"),

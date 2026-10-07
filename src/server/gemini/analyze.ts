@@ -1,7 +1,7 @@
 import type { AnalysisFile } from "@/core/events";
 import { ModelAnalysis, type Commit } from "@/core/options";
 import type { Analyst } from "@/server/pipeline/analyze";
-import type { GeminiClient } from "./client";
+import type { StructuredClient } from "@/server/llm/structured";
 
 // Gemini reads both sides of a conflict and says, in one line each, what
 // each side meant to do, then proposes two or three options with one
@@ -73,13 +73,14 @@ export function analyzePrompt(input: Parameters<Analyst>[0]): string {
     .join("\n");
 }
 
-export function geminiAnalyst(client: GeminiClient): Analyst {
+export function geminiAnalyst(client: StructuredClient): Analyst {
   return async (input) => {
     const { value } = await client.structured({
       schema: ModelAnalysis,
       system: SYSTEM,
       input: analyzePrompt(input),
       maxOutputTokens: 4_096,
+      signal: input.signal,
     });
     return value;
   };

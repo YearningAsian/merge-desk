@@ -33,14 +33,14 @@ export function readCookie(header: string | null, name: string): string | null {
 export function cookieHeader(
   name: string,
   value: string,
-  options: { maxAge: number; secure: boolean; path?: string },
+  options: { maxAge: number; secure: boolean; path?: string; sameSite?: "Lax" | "Strict" },
 ): string {
   return [
     `${name}=${value}`,
     `Path=${options.path ?? "/"}`,
     `Max-Age=${options.maxAge}`,
     "HttpOnly",
-    "SameSite=Lax",
+    `SameSite=${options.sameSite ?? "Lax"}`,
     ...(options.secure ? ["Secure"] : []),
   ].join("; ");
 }
@@ -110,7 +110,9 @@ export const OAUTH_COOKIE_TTL_S = OAUTH_TTL_S;
 const json = (status: number, error: string) =>
   Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
 
-export type LiveGuard = { ok: true; login: string } | { ok: false; response: Response };
+// `exp` is the session's end, which model keys saved in it share.
+export type LiveGuard =
+  { ok: true; login: string; exp: number } | { ok: false; response: Response };
 
 // Every /api/live route: signed in, allowlisted, and for anything that spends
 // quota or writes, sent by this site's own pages.
@@ -125,7 +127,7 @@ export async function guardLive(
     return { ok: false, response: json(403, "This account can't use live mode.") };
   if (options.mutating && !isSameOrigin(request))
     return { ok: false, response: json(403, "Request refused: it didn't come from Merge Desk.") };
-  return { ok: true, login: session.login };
+  return { ok: true, login: session.login, exp: session.exp };
 }
 
 export function isSameOrigin(request: Request): boolean {

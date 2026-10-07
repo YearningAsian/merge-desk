@@ -31,6 +31,7 @@
     "env:check": "node scripts/env-check.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@google/genai": "2.27.0",
     "@octokit/auth-app": "8.3.1",
     "@octokit/rest": "22.0.1",
@@ -43,6 +44,7 @@
     "iron-session": "9.0.1",
     "lucide-react": "1.52.0",
     "next": "16.3.8",
+    "openai": "7.30.0",
     "radix-ui": "1.6.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",

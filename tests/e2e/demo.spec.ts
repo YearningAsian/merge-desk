@@ -163,10 +163,16 @@ test("judge guide: every stop opens its recorded pull request in the demo", asyn
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/judge");
     await expect(page.getByRole("heading", { name: "Try it without signing in" })).toBeVisible();
-    for (const id of ["held", "clean", "drop"] as const)
-      await expect(
-        page.getByRole("link", { name: recordings[id].pull.title, exact: true }),
-      ).toHaveAttribute("href", `/demo?pr=${pr(id)}`);
+    for (const id of ["held", "clean", "drop"] as const) {
+      const link = page.getByRole("link", { name: recordings[id].pull.title, exact: true });
+      await expect(link).toHaveAttribute("href", `/demo?pr=${pr(id)}`);
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAccessibleDescription(/opens? in a new tab/i);
+    }
+    await expect(page.getByRole("link", { name: "Open the demo" })).toHaveAttribute(
+      "target",
+      "_blank",
+    );
     await expect(page.getByRole("link", { name: "/api/health" })).toBeVisible();
     await noHorizontalOverflow(page);
     await shot(page, `judge-${width}`);

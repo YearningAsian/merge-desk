@@ -57,6 +57,10 @@ function Code({ children }: { children: React.ReactNode }) {
 
 const linkStyle = "underline underline-offset-2 hover:text-ink";
 
+// The demo opens beside the guide, so a judge can follow the steps while
+// trying them. Described, not renamed, for screen readers.
+const NEW_TAB = { target: "_blank", rel: "noopener", "aria-describedby": "new-tab-note" } as const;
+
 export default function JudgePage() {
   return (
     <main
@@ -84,10 +88,14 @@ export default function JudgePage() {
         </p>
         <Link
           href="/demo"
+          {...NEW_TAB}
           className="inline-flex h-11 items-center gap-2 rounded-desk bg-ink px-4 text-[14px] font-medium text-white hover:bg-ink/90"
         >
           Open the demo <ArrowRight aria-hidden className="size-4" />
         </Link>
+        <p id="new-tab-note" className="text-[12.5px] text-muted">
+          Demo links open in a new tab, so this guide stays open.
+        </p>
       </header>
 
       <ol className="space-y-8">
@@ -98,8 +106,12 @@ export default function JudgePage() {
               {stop.title}
             </h2>
             <p>
-              <Link href={`/demo?pr=${stop.recording.source.pr}`} className={linkStyle}>
-                {stop.recording.pull.title}
+              <Link
+                href={`/demo?pr=${stop.recording.source.pr}`}
+                {...NEW_TAB}
+                className={`inline-flex items-center gap-1 ${linkStyle}`}
+              >
+                {stop.recording.pull.title} <ExternalLink aria-hidden className="size-3.5" />
               </Link>{" "}
               <span className="text-muted">(#{stop.recording.source.pr})</span>
             </p>

@@ -106,6 +106,7 @@ Learner decision: "Same UI and same code path for both; demo mode only swaps the
 
 - **Demo mode (public, no sign-in):** anyone can click through the full flow on three prepared pull requests: one clean merge, one that gets held, one where dropping a side is the right call.
   - [ ] It plays back real runs captured from live mode (real options, agent steps, check results and timings), so it is fast, costs nothing per visitor, and cannot break during judging.
+  - [ ] It acts out everything live mode does, with no "live mode only" screens: steering, the decision record and Land replay real ones captured on the demo pull requests, which were reset after each Land (learner, 2026-10-07).
   - [ ] Nothing is written to any repository in demo mode.
   - [ ] The screen is clearly labelled **"Demo: recorded from a real run"** and has a **Reset** that starts the demo over.
 - **Live mode (sign-in, the learner's account only for now):** the real agent on a real repository, with real checks and real landing. This is what the submission video shows, on a repository the learner owns, including one held merge and one verified merge landing.

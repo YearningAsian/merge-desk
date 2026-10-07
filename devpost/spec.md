@@ -38,7 +38,7 @@ PRD ref: `prd.md > The Core Journey`.
    **Held** → result card with the failed check, what was tried, the diff and a **Download patch** button → pick another option, steer and retry, or discard.
 7. **Recorded** → the server updates the pull request's single Merge Desk comment with the entry.
 
-In demo mode, steps 2 to 7 come from a recording file played back with its original timings; no request leaves the browser except to load the file.
+In demo mode, steps 2 to 7 come from a recording file played back with its original timings; no request leaves the browser except to load the file. Land, steering and the decision record are acted out from real ones captured on the demo pull requests (revised 2026-10-07, learner).
 
 ## Stack
 
@@ -237,7 +237,7 @@ Add recordings schema validation, formatting and Playwright/axe journeys to the 
 | UI state (selection, open sections, step lifecycle) | Typed React reducer in browser memory | User actions and validated stream events | Reset on reload |
 
 **Event shape** (shared by live streams and recordings): `{ t: msSinceStart, step: StepId, state: "queued" | "running" | "passed" | "failed" | "not_run", detail?: string, log?: string }`.
-**Recording file:** `{ scenario, capturedAt, source: { repo, pr, headSha }, analysis, option, events[], result }`. `npm run recordings:check` validates every file against the schema in CI.
+**Recording file (v2, 2026-10-07):** `{ v, scenario, capturedAt, runner, source: { repo, pr, headSha, baseSha }, pull, analysis[], runs[] }`, where each run is `{ option, steer, events[], held, discarded, land }`: a run of every offered option and a steered retry of every held one, the hold and discard entries the decision record stored, and for a verified run the real Land (commit, timing, record entry, the pull request as GitHub listed it after). `npm run record` captures them through live mode's route handlers, landing on the demo pull requests and resetting them after each Land. `npm run recordings:check` validates every file against the schema and for completeness in CI.
 
 ## File Structure
 

@@ -18,6 +18,7 @@ import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource, LandOutcome } from "@/ui/sources/types";
 import {
+  DemoLand,
   LandAction,
   LandResult,
   RecordSection,
@@ -53,10 +54,11 @@ const without = <T,>(map: Record<string, T>, key: string) => {
 };
 
 // Restored on the client only; the first render shows the list skeleton
-// either way, so the server and browser agree.
-const restore = (): DeskState => ({
+// either way, so the server and browser agree. Demo mode keeps nothing: a
+// reload or Reset starts the recordings over.
+const restore = (mode: DataSource["mode"]): DeskState => ({
   ...initialDesk,
-  analyses: typeof window === "undefined" ? {} : loadAnalyses(),
+  analyses: typeof window === "undefined" || mode === "demo" ? {} : loadAnalyses(),
 });
 
 // The open pull request lives in the address (?pr=N), so a reload, a
@@ -90,7 +92,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     refetchInterval: settings.refreshSeconds ? settings.refreshSeconds * 1000 : false,
     refetchIntervalInBackground: false,
   });
-  const [state, dispatch] = useReducer(deskReducer, undefined, restore);
+  const [state, dispatch] = useReducer(deskReducer, source.mode, restore);
+  const demo = source.mode === "demo";
   const [detailsOpen, setDetailsOpen] = useState(false);
   const queryClient = useQueryClient();
   // Land per run; the confirmed landing per pull request (it outlives the
@@ -130,7 +133,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     return () => controllers.forEach((controller) => controller.abort());
   }, []);
 
-  useEffect(() => saveAnalyses(state.analyses), [state.analyses]);
+  useEffect(() => {
+    if (!demo) saveAnalyses(state.analyses);
+  }, [demo, state.analyses]);
 
   const pulls = query.data?.pulls ?? [];
   const selected = pulls.find((pull) => pull.number === state.selected) ?? null;
@@ -314,12 +319,12 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         ? selectedRun.result.verdict
         : null;
   useEffect(() => {
-    const base = "Live mode | Merge Desk";
+    const base = demo ? "Demo | Merge Desk" : "Live mode | Merge Desk";
     document.title = runWord && selected ? `${runWord} #${selected.number} | Merge Desk` : base;
     return () => {
       document.title = base;
     };
-  }, [runWord, selected]);
+  }, [demo, runWord, selected]);
 
   const open = (number: number) => {
     lastOpened.current = number;
@@ -403,7 +408,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         !state.analyses[keyOf(selected)] &&
         Object.keys(state.analyses).some((key) => key.startsWith(`${selected.number}:`))
       }
-      model={chosenModel(settings)}
+      model={demo ? undefined : chosenModel(settings)}
+      recorded={demo}
       detailsOpen={detailsOpen}
       onDetailsOpen={setDetailsOpen}
       onAnalyze={() => void analyze(selected)}
@@ -427,6 +433,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
           <RunSection
             analysis={selectedDone.analysis}
             canRun={Boolean(selectedDone.token)}
+            canSteer={!demo}
             option={selectedDone.option}
             run={selectedRun}
             pr={selected.number}
@@ -445,9 +452,13 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
             discardBlocked={selectedUnconfirmed || blocksStartingOver(selectedLand)}
             pushUnconfirmed={selectedUnconfirmed}
             landing={
+              demo &&
               selectedRun?.status === "done" &&
-              selectedRun.result.verdict === "VERIFIED" &&
-              selectedRun.result.token ? (
+              selectedRun.result.verdict === "VERIFIED" ? (
+                <DemoLand branch={selected.head.ref} base={selected.base.ref} />
+              ) : selectedRun?.status === "done" &&
+                selectedRun.result.verdict === "VERIFIED" &&
+                selectedRun.result.token ? (
                 <>
                   <LandAction
                     branch={selected.head.ref}
@@ -499,7 +510,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         ) : null
       }
       record={
-        selected.mergeable !== "mergeable" || landed[selected.number] ? (
+        !demo && (selected.mergeable !== "mergeable" || landed[selected.number]) ? (
           <RecordSection source={source} pr={selected.number} />
         ) : null
       }

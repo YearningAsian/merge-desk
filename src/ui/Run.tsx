@@ -223,6 +223,7 @@ function HeldActions({
   suggestion,
   failedOption,
   steer,
+  canSteer,
   onTry,
   onSteer,
   onDiscard,
@@ -230,6 +231,8 @@ function HeldActions({
   suggestion: ResolvedOption | null;
   failedOption: ResolvedOption;
   steer: string | null;
+  // Steering asks Gemini again, which demo mode never does.
+  canSteer: boolean;
   onTry: (option: Option) => void;
   onSteer: (steer: string) => void;
   onDiscard: () => void;
@@ -251,30 +254,36 @@ function HeldActions({
           </p>
         </div>
       ) : null}
-      <form
-        className="space-y-1.5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (text.trim()) onSteer(text.trim());
-        }}
-      >
-        <label htmlFor={id} className="block text-[12.5px] font-medium text-ink">
-          Steer and retry {failedOption.label.toLowerCase()}
-        </label>
-        <div className="flex gap-2">
-          <input
-            id={id}
-            value={text}
-            maxLength={200}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="One line for Gemini, e.g. keep the old call working too"
-            className="h-9 min-w-0 flex-1 rounded-[6px] border border-control-border bg-surface px-2.5 text-[13px] placeholder:text-muted"
-          />
-          <Button type="submit" disabled={!text.trim()}>
-            Retry
-          </Button>
-        </div>
-      </form>
+      {!canSteer ? (
+        <p className="text-[12.5px] text-muted">
+          Steer and retry sends Gemini one more line, so it works in live mode only.
+        </p>
+      ) : (
+        <form
+          className="space-y-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (text.trim()) onSteer(text.trim());
+          }}
+        >
+          <label htmlFor={id} className="block text-[12.5px] font-medium text-ink">
+            Steer and retry {failedOption.label.toLowerCase()}
+          </label>
+          <div className="flex gap-2">
+            <input
+              id={id}
+              value={text}
+              maxLength={200}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="One line for Gemini, e.g. keep the old call working too"
+              className="h-9 min-w-0 flex-1 rounded-[6px] border border-control-border bg-surface px-2.5 text-[13px] placeholder:text-muted"
+            />
+            <Button type="submit" disabled={!text.trim()}>
+              Retry
+            </Button>
+          </div>
+        </form>
+      )}
       <Button size="sm" variant="ghost" onClick={onDiscard}>
         Discard this attempt
       </Button>
@@ -392,6 +401,7 @@ function ResultCard({
 export function RunSection({
   analysis,
   canRun,
+  canSteer = true,
   option,
   run,
   pr,
@@ -408,6 +418,7 @@ export function RunSection({
 }: {
   analysis: Analysis;
   canRun: boolean;
+  canSteer?: boolean;
   option: Option;
   run: RunState | undefined;
   pr: number;
@@ -495,6 +506,7 @@ export function RunSection({
                       suggestion={suggestInstead(analysis.options, chosen.kind, analysis.older)}
                       failedOption={chosen}
                       steer={run.steer}
+                      canSteer={canSteer}
                       onTry={onOption}
                       onSteer={(steer) => onRun(steer)}
                       onDiscard={onDiscard}

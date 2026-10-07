@@ -88,45 +88,47 @@ function Select<T extends string | number>({
   );
 }
 
-function SettingsBody({ settings }: { settings: Settings }) {
+function SettingsBody({ settings, demo }: { settings: Settings; demo: boolean }) {
   const id = useId();
   const field = (name: string) => `${id}-${name}`;
   return (
     <div className="divide-y divide-hair px-5">
-      <fieldset className="py-3">
-        <legend className="text-[13px] font-medium text-ink">Gemini model</legend>
-        <p className="mt-0.5 text-[12px] text-muted">
-          Used for new analyses. An existing analysis keeps the model it was made with until you
-          analyze again.
-        </p>
-        <RadioGroup
-          aria-label="Gemini model"
-          value={settings.model}
-          onValueChange={(model) => updateSettings({ model: model as Settings["model"] })}
-          className="mt-2.5 gap-1"
-        >
-          {[
-            { id: "server", label: "Server default", note: "Whatever this server is set to." },
-            ...MODEL_CHOICES,
-          ].map((choice) => (
-            <label
-              key={choice.id}
-              htmlFor={field(`model-${choice.id}`)}
-              className="flex cursor-pointer items-start gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-ink/[0.03]"
-            >
-              <RadioGroupItem
-                id={field(`model-${choice.id}`)}
-                value={choice.id}
-                className="mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="block text-[13px] text-ink">{choice.label}</span>
-                <span className="block text-[12px] text-muted">{choice.note}</span>
-              </span>
-            </label>
-          ))}
-        </RadioGroup>
-      </fieldset>
+      {demo ? null : (
+        <fieldset className="py-3">
+          <legend className="text-[13px] font-medium text-ink">Gemini model</legend>
+          <p className="mt-0.5 text-[12px] text-muted">
+            Used for new analyses. An existing analysis keeps the model it was made with until you
+            analyze again.
+          </p>
+          <RadioGroup
+            aria-label="Gemini model"
+            value={settings.model}
+            onValueChange={(model) => updateSettings({ model: model as Settings["model"] })}
+            className="mt-2.5 gap-1"
+          >
+            {[
+              { id: "server", label: "Server default", note: "Whatever this server is set to." },
+              ...MODEL_CHOICES,
+            ].map((choice) => (
+              <label
+                key={choice.id}
+                htmlFor={field(`model-${choice.id}`)}
+                className="flex cursor-pointer items-start gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-ink/[0.03]"
+              >
+                <RadioGroupItem
+                  id={field(`model-${choice.id}`)}
+                  value={choice.id}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[13px] text-ink">{choice.label}</span>
+                  <span className="block text-[12px] text-muted">{choice.note}</span>
+                </span>
+              </label>
+            ))}
+          </RadioGroup>
+        </fieldset>
+      )}
 
       <Row
         label="Analyze when a pull request opens"
@@ -227,8 +229,9 @@ function ShortcutList() {
   );
 }
 
-// Mounted once per desk view; also applies the reduce-motion choice.
-export function DeskOverlays() {
+// Mounted once per desk view; also applies the reduce-motion choice. Demo
+// mode replays recorded answers, so it has no model to choose.
+export function DeskOverlays({ demo = false }: { demo?: boolean }) {
   const settings = useSettings();
   const [open, setOpen] = useState<Overlay | null>(null);
   useEffect(() => onOverlay(setOpen), []);
@@ -240,7 +243,7 @@ export function DeskOverlays() {
     <>
       <Dialog open={open === "settings"} onOpenChange={(next) => setOpen(next ? "settings" : null)}>
         <DialogContent title="Settings">
-          <SettingsBody settings={settings} />
+          <SettingsBody settings={settings} demo={demo} />
         </DialogContent>
       </Dialog>
       <Dialog

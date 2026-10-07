@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { sign, verify, SignatureError, type SignedScope } from "@/server/sign";
+import { DEMO_TOKEN } from "@/ui/sources/recorded";
 
 const secret = "s".repeat(40);
 const scope: SignedScope = {
@@ -58,6 +59,13 @@ describe("sign and verify", () => {
     expect(() => verify(token, expected, Body, { secret, now: now + 1_000 })).toThrow(/Expired/);
     const wrong = sign(scope, { other: 1 }, { secret, now });
     expect(() => verify(wrong, expected, Body, { secret, now })).toThrow(/wrong shape/);
+  });
+
+  it("refuses demo mode's token like any other unsigned one", () => {
+    for (const kind of ["analysis", "result"] as const)
+      expect(() => verify(DEMO_TOKEN, { ...expected, kind }, Body, { secret, now })).toThrow(
+        SignatureError,
+      );
   });
 
   it("needs a long enough secret", () => {

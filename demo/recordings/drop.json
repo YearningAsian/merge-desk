@@ -1,0 +1,626 @@
+{
+  "v": 1,
+  "scenario": "drop",
+  "capturedAt": "2026-10-06T22:00:13.256Z",
+  "runner": "sandbox",
+  "source": {
+    "repo": "YearningAsian/merge-desk",
+    "pr": 6,
+    "headSha": "d32055264f2be740c52c32093f766dce73438942",
+    "baseSha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+  },
+  "pull": {
+    "number": 6,
+    "title": "[Demo] Parse price strings in toCents",
+    "author": "YearningAsian",
+    "url": "https://github.com/YearningAsian/merge-desk/pull/6",
+    "draft": false,
+    "head": {
+      "ref": "demo/drop/fix-b",
+      "sha": "d32055264f2be740c52c32093f766dce73438942",
+      "repo": "YearningAsian/merge-desk"
+    },
+    "base": {
+      "ref": "demo/base",
+      "sha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+    },
+    "demo": true,
+    "mergeable": "conflicting",
+    "readiness": {
+      "state": "blocked",
+      "githubState": "dirty",
+      "checkedHead": "d32055264f2be740c52c32093f766dce73438942",
+      "reasons": [
+        "File conflicts need resolution.",
+        "No checks were reported for this head. Required checks were not verified."
+      ],
+      "checks": {
+        "state": "none",
+        "items": [],
+        "reason": "No checks were reported for this head. Required checks were not verified.",
+        "observedAt": "2026-10-06T21:58:37.902Z"
+      }
+    },
+    "fork": false,
+    "filesBothSides": [
+      "playground/src/money.js"
+    ],
+    "updatedAt": "2026-10-06T21:54:51Z"
+  },
+  "analysis": [
+    {
+      "t": 0,
+      "step": "prepare",
+      "state": "queued"
+    },
+    {
+      "t": 1,
+      "step": "analyze",
+      "state": "queued"
+    },
+    {
+      "t": 1,
+      "step": "prepare",
+      "state": "running"
+    },
+    {
+      "t": 3802,
+      "step": "prepare",
+      "state": "passed",
+      "detail": "1 conflicted file: playground/src/money.js · ours 1 commits · theirs 1 commits"
+    },
+    {
+      "t": 3802,
+      "step": "analyze",
+      "state": "running"
+    },
+    {
+      "t": 5373,
+      "step": "analyze",
+      "state": "passed",
+      "detail": "ours: parse price strings and use Math.round for cents\ntheirs: add Number.EPSILON to avoid floating point rounding issues"
+    },
+    {
+      "t": 5373,
+      "type": "analysis",
+      "ok": true,
+      "analysis": {
+        "v": 1,
+        "repo": "YearningAsian/merge-desk",
+        "pr": 6,
+        "revisions": {
+          "head": "d32055264f2be740c52c32093f766dce73438942",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25"
+        },
+        "mergeBase": "586cb92434fa72752e779fd47cfdcfa92a5836ed",
+        "files": [
+          {
+            "path": "playground/src/money.js",
+            "base": "// Money helpers for the Merge Desk demo scenarios.\n\nexport function toCents(dollars) {\n  return Math.floor(dollars * 100);\n}\n",
+            "ours": "// Money helpers for the Merge Desk demo scenarios.\n\nexport function toCents(amount) {\n  const dollars = typeof amount === \"string\" ? Number(amount.replace(/[$,\\s]/g, \"\")) : amount;\n  if (!Number.isFinite(dollars)) {\n    throw new TypeError(`Not an amount: ${amount}`);\n  }\n  return Math.round(dollars * 100);\n}\n",
+            "theirs": "// Money helpers for the Merge Desk demo scenarios.\n\nexport function toCents(dollars) {\n  return Math.round((dollars + Number.EPSILON) * 100);\n}\n",
+            "merged": "// Money helpers for the Merge Desk demo scenarios.\n\n<<<<<<< HEAD\nexport function toCents(amount) {\n  const dollars = typeof amount === \"string\" ? Number(amount.replace(/[$,\\s]/g, \"\")) : amount;\n  if (!Number.isFinite(dollars)) {\n    throw new TypeError(`Not an amount: ${amount}`);\n  }\n  return Math.round(dollars * 100);\n||||||| 586cb92\nexport function toCents(dollars) {\n  return Math.floor(dollars * 100);\n=======\nexport function toCents(dollars) {\n  return Math.round((dollars + Number.EPSILON) * 100);\n>>>>>>> a41f224f7a69b10eabb38387d237110019ac4f25\n}\n"
+          }
+        ],
+        "intents": {
+          "ours": "parse price strings and use Math.round for cents",
+          "theirs": "add Number.EPSILON to avoid floating point rounding issues"
+        },
+        "options": [
+          {
+            "kind": "combine",
+            "label": "Combine both",
+            "summary": "parse price strings and round cents using Math.round with Number.EPSILON",
+            "recommended": true,
+            "reason": "Combining both changes ensures we can handle string inputs safely while also avoiding floating point precision errors.",
+            "keeps": [
+              {
+                "side": "ours",
+                "commits": [
+                  {
+                    "sha": "d32055264f2be740c52c32093f766dce73438942",
+                    "subject": "Parse price strings and round cents in toCents",
+                    "author": "YearningAsian"
+                  }
+                ],
+                "files": [
+                  "playground/src/money.js"
+                ],
+                "authors": [
+                  "YearningAsian"
+                ]
+              },
+              {
+                "side": "theirs",
+                "commits": [
+                  {
+                    "sha": "a41f224f7a69b10eabb38387d237110019ac4f25",
+                    "subject": "Round cents with an epsilon nudge",
+                    "author": "YearningAsian"
+                  }
+                ],
+                "files": [
+                  "playground/src/money.js"
+                ],
+                "authors": [
+                  "YearningAsian"
+                ]
+              }
+            ],
+            "drops": null
+          },
+          {
+            "kind": "keep_ours",
+            "label": "Keep ours, drop theirs",
+            "summary": "parse price strings and round cents without the epsilon nudge",
+            "recommended": false,
+            "reason": "Pick this if you do not want the extra complexity of Number.EPSILON in rounding.",
+            "keeps": [
+              {
+                "side": "ours",
+                "commits": [
+                  {
+                    "sha": "d32055264f2be740c52c32093f766dce73438942",
+                    "subject": "Parse price strings and round cents in toCents",
+                    "author": "YearningAsian"
+                  }
+                ],
+                "files": [
+                  "playground/src/money.js"
+                ],
+                "authors": [
+                  "YearningAsian"
+                ]
+              }
+            ],
+            "drops": {
+              "side": "theirs",
+              "commits": [
+                {
+                  "sha": "a41f224f7a69b10eabb38387d237110019ac4f25",
+                  "subject": "Round cents with an epsilon nudge",
+                  "author": "YearningAsian"
+                }
+              ],
+              "files": [
+                "playground/src/money.js"
+              ],
+              "authors": [
+                "YearningAsian"
+              ]
+            }
+          },
+          {
+            "kind": "keep_theirs",
+            "label": "Keep theirs, drop ours",
+            "summary": "apply Number.EPSILON rounding to numeric inputs only, dropping string parsing",
+            "recommended": false,
+            "reason": "Pick this if string parsing is not needed and you only want the rounding fix.",
+            "keeps": [
+              {
+                "side": "theirs",
+                "commits": [
+                  {
+                    "sha": "a41f224f7a69b10eabb38387d237110019ac4f25",
+                    "subject": "Round cents with an epsilon nudge",
+                    "author": "YearningAsian"
+                  }
+                ],
+                "files": [
+                  "playground/src/money.js"
+                ],
+                "authors": [
+                  "YearningAsian"
+                ]
+              }
+            ],
+            "drops": {
+              "side": "ours",
+              "commits": [
+                {
+                  "sha": "d32055264f2be740c52c32093f766dce73438942",
+                  "subject": "Parse price strings and round cents in toCents",
+                  "author": "YearningAsian"
+                }
+              ],
+              "files": [
+                "playground/src/money.js"
+              ],
+              "authors": [
+                "YearningAsian"
+              ]
+            }
+          }
+        ],
+        "older": null,
+        "commits": {
+          "ours": [
+            {
+              "sha": "d32055264f2be740c52c32093f766dce73438942",
+              "author": "YearningAsian",
+              "date": "2026-10-05T02:08:26-05:00",
+              "subject": "Parse price strings and round cents in toCents",
+              "files": [
+                "playground/src/money.js",
+                "playground/test/money-input.test.js"
+              ]
+            }
+          ],
+          "theirs": [
+            {
+              "sha": "a41f224f7a69b10eabb38387d237110019ac4f25",
+              "author": "YearningAsian",
+              "date": "2026-10-05T02:08:26-05:00",
+              "subject": "Round cents with an epsilon nudge",
+              "files": [
+                "playground/src/money.js",
+                "playground/test/money-rounding.test.js"
+              ]
+            }
+          ]
+        },
+        "model": "gemini-3.5-flash-lite"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "option": "combine",
+      "events": [
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "propose",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "write",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "parse",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "honor",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "tests",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "running"
+        },
+        {
+          "t": 403,
+          "step": "revisions",
+          "state": "passed",
+          "detail": "head d320552 · base a41f224"
+        },
+        {
+          "t": 403,
+          "step": "propose",
+          "state": "running"
+        },
+        {
+          "t": 1667,
+          "step": "propose",
+          "state": "passed",
+          "detail": "Gemini (gemini-3.5-flash-lite): Combine parsing of price strings and Number.EPSILON with Math.round for cents"
+        },
+        {
+          "t": 1667,
+          "step": "write",
+          "state": "running"
+        },
+        {
+          "t": 6823,
+          "step": "write",
+          "state": "passed",
+          "detail": "2 files differ from the head: playground/src/money.js, playground/test/money-rounding.test.js"
+        },
+        {
+          "t": 6823,
+          "step": "parse",
+          "state": "running"
+        },
+        {
+          "t": 6946,
+          "step": "parse",
+          "state": "passed",
+          "detail": "playground/src/money.js: node --check"
+        },
+        {
+          "t": 6946,
+          "step": "honor",
+          "state": "running"
+        },
+        {
+          "t": 6949,
+          "step": "honor",
+          "state": "passed",
+          "detail": "ours: parse price strings and use Math.round for cents, present\ntheirs: add Number.EPSILON to avoid floating point rounding issues, present",
+          "log": "Combine both: inside the conflicts, every line either side changed must be in the result, with the other side's renames applied; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"parse price strings and use Math.round for cents\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"add Number.EPSILON to avoid floating point rounding issues\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+        },
+        {
+          "t": 6950,
+          "step": "tests",
+          "state": "running"
+        },
+        {
+          "t": 10111,
+          "step": "tests",
+          "state": "passed",
+          "detail": "node --test (playground): passed (exit 0, 482 ms)",
+          "log": "✔ fetchUser returns the user (1.051827ms)\n✔ displayName uses the user's name (0.210406ms)\n✔ chargeCustomer charges a positive amount (0.851964ms)\n✔ chargeCustomer refuses a zero amount (0.482605ms)\n✔ chargeCustomer records the currency (0.151948ms)\n✔ chargeMonthly charges the plan price (0.159175ms)\n✔ toCents parses price strings (0.904281ms)\n✔ toCents refuses text that is not an amount (0.407986ms)\n✔ toCents rounds 19.99 to 1999 cents (0.735519ms)\n✔ toCents rounds 0.29 to 29 cents (0.142427ms)\n✔ toCents converts whole dollars (0.655036ms)\n✔ fetchUser retries after HTTP 429 (0.929967ms)\n✔ fetchUser gives up after two retries (0.55308ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 308.734244\n"
+        },
+        {
+          "t": 11335,
+          "type": "result",
+          "verdict": "VERIFIED",
+          "failed": [],
+          "summary": [
+            "ours: parse price strings and use Math.round for cents, present",
+            "theirs: add Number.EPSILON to avoid floating point rounding issues, present"
+          ],
+          "description": "Combine parsing of price strings and Number.EPSILON with Math.round for cents",
+          "changedFiles": [
+            "playground/src/money.js",
+            "playground/test/money-rounding.test.js"
+          ],
+          "patch": "diff --git a/playground/src/money.js b/playground/src/money.js\nindex af8c0e5..981aed4 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -5,5 +5,5 @@ export function toCents(amount) {\n   if (!Number.isFinite(dollars)) {\n     throw new TypeError(`Not an amount: ${amount}`);\n   }\n-  return Math.round(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\n"
+        }
+      ]
+    },
+    {
+      "option": "keep_ours",
+      "events": [
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "propose",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "write",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "parse",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "honor",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "tests",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "running"
+        },
+        {
+          "t": 719,
+          "step": "revisions",
+          "state": "passed",
+          "detail": "head d320552 · base a41f224"
+        },
+        {
+          "t": 719,
+          "step": "propose",
+          "state": "running"
+        },
+        {
+          "t": 1890,
+          "step": "propose",
+          "state": "passed",
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep ours to parse price strings and use Math.round for cents"
+        },
+        {
+          "t": 1890,
+          "step": "write",
+          "state": "running"
+        },
+        {
+          "t": 6529,
+          "step": "write",
+          "state": "passed",
+          "detail": "1 file differs from the head: playground/test/money-rounding.test.js"
+        },
+        {
+          "t": 6529,
+          "step": "parse",
+          "state": "running"
+        },
+        {
+          "t": 6658,
+          "step": "parse",
+          "state": "passed",
+          "detail": "playground/src/money.js: node --check"
+        },
+        {
+          "t": 6658,
+          "step": "honor",
+          "state": "running"
+        },
+        {
+          "t": 6659,
+          "step": "honor",
+          "state": "passed",
+          "detail": "ours: parse price strings and use Math.round for cents, present\ntheirs: add Number.EPSILON to avoid floating point rounding issues, dropped as chosen",
+          "log": "Keep ours: inside the conflicts the result must match ours and none of theirs; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"parse price strings and use Math.round for cents\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"add Number.EPSILON to avoid floating point rounding issues\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  }\n}"
+        },
+        {
+          "t": 6659,
+          "step": "tests",
+          "state": "running"
+        },
+        {
+          "t": 9959,
+          "step": "tests",
+          "state": "passed",
+          "detail": "node --test (playground): passed (exit 0, 520 ms)",
+          "log": "✔ fetchUser returns the user (1.130993ms)\n✔ displayName uses the user's name (0.275098ms)\n✔ chargeCustomer charges a positive amount (1.419326ms)\n✔ chargeCustomer refuses a zero amount (0.680502ms)\n✔ chargeCustomer records the currency (0.255661ms)\n✔ chargeMonthly charges the plan price (0.283161ms)\n✔ toCents parses price strings (1.373619ms)\n✔ toCents refuses text that is not an amount (0.633315ms)\n✔ toCents rounds 19.99 to 1999 cents (0.852554ms)\n✔ toCents rounds 0.29 to 29 cents (0.183834ms)\n✔ toCents converts whole dollars (0.789743ms)\n✔ fetchUser retries after HTTP 429 (0.944492ms)\n✔ fetchUser gives up after two retries (0.537135ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 378.212053\n"
+        },
+        {
+          "t": 11171,
+          "type": "result",
+          "verdict": "VERIFIED",
+          "failed": [],
+          "summary": [
+            "ours: parse price strings and use Math.round for cents, present",
+            "theirs: add Number.EPSILON to avoid floating point rounding issues, dropped as chosen"
+          ],
+          "description": "Keep ours to parse price strings and use Math.round for cents",
+          "changedFiles": [
+            "playground/test/money-rounding.test.js"
+          ],
+          "patch": "diff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\n"
+        }
+      ]
+    },
+    {
+      "option": "keep_theirs",
+      "events": [
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "propose",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "write",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "parse",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "honor",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "tests",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "running"
+        },
+        {
+          "t": 1292,
+          "step": "revisions",
+          "state": "passed",
+          "detail": "head d320552 · base a41f224"
+        },
+        {
+          "t": 1292,
+          "step": "propose",
+          "state": "running"
+        },
+        {
+          "t": 2409,
+          "step": "propose",
+          "state": "passed",
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep theirs version for toCents function"
+        },
+        {
+          "t": 2409,
+          "step": "write",
+          "state": "running"
+        },
+        {
+          "t": 7374,
+          "step": "write",
+          "state": "passed",
+          "detail": "2 files differ from the head: playground/src/money.js, playground/test/money-rounding.test.js"
+        },
+        {
+          "t": 7374,
+          "step": "parse",
+          "state": "running"
+        },
+        {
+          "t": 7509,
+          "step": "parse",
+          "state": "passed",
+          "detail": "playground/src/money.js: node --check"
+        },
+        {
+          "t": 7509,
+          "step": "honor",
+          "state": "running"
+        },
+        {
+          "t": 7511,
+          "step": "honor",
+          "state": "passed",
+          "detail": "ours: parse price strings and use Math.round for cents, dropped as chosen\ntheirs: add Number.EPSILON to avoid floating point rounding issues, present",
+          "log": "Keep theirs: inside the conflicts the result must match theirs and none of ours; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"parse price strings and use Math.round for cents\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"add Number.EPSILON to avoid floating point rounding issues\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+        },
+        {
+          "t": 7511,
+          "step": "tests",
+          "state": "running"
+        },
+        {
+          "t": 10455,
+          "step": "tests",
+          "state": "failed",
+          "detail": "node --test (playground): failed (exit 1, 473 ms)",
+          "log": "✔ fetchUser returns the user (1.188952ms)\n✔ displayName uses the user's name (0.227284ms)\n✔ chargeCustomer charges a positive amount (0.861428ms)\n✔ chargeCustomer refuses a zero amount (0.421719ms)\n✔ chargeCustomer records the currency (0.170198ms)\n✔ chargeMonthly charges the plan price (0.153521ms)\n✖ toCents parses price strings (1.536006ms)\n✖ toCents refuses text that is not an amount (0.31585ms)\n✔ toCents rounds 19.99 to 1999 cents (0.859489ms)\n✔ toCents rounds 0.29 to 29 cents (0.17878ms)\n✔ toCents converts whole dollars (0.756068ms)\n✔ fetchUser retries after HTTP 429 (0.916404ms)\n✔ fetchUser gives up after two retries (0.497526ms)\nℹ tests 13\nℹ suites 0\nℹ pass 11\nℹ fail 2\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 324.684422\n\n✖ failing tests:\n\ntest at test/money-input.test.js:5:1\n✖ toCents parses price strings (1.536006ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  NaN !== 123450\n  \n      at TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/money-input.test.js:6:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: NaN,\n    expected: 123450,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/money-input.test.js:10:1\n✖ toCents refuses text that is not an amount (0.31585ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError).\n      at TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/money-input.test.js:11:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n"
+        },
+        {
+          "t": 11627,
+          "type": "result",
+          "verdict": "HELD",
+          "failed": [
+            "tests"
+          ],
+          "summary": [
+            "ours: parse price strings and use Math.round for cents, dropped as chosen",
+            "theirs: add Number.EPSILON to avoid floating point rounding issues, present"
+          ],
+          "description": "Keep theirs version for toCents function",
+          "changedFiles": [
+            "playground/src/money.js",
+            "playground/test/money-rounding.test.js"
+          ],
+          "patch": "diff --git a/playground/src/money.js b/playground/src/money.js\nindex af8c0e5..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,9 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n-export function toCents(amount) {\n-  const dollars = typeof amount === \"string\" ? Number(amount.replace(/[$,\\s]/g, \"\")) : amount;\n-  if (!Number.isFinite(dollars)) {\n-    throw new TypeError(`Not an amount: ${amount}`);\n-  }\n-  return Math.round(dollars * 100);\n+export function toCents(dollars) {\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\n"
+        }
+      ]
+    }
+  ]
+}

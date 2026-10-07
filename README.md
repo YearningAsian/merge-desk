@@ -8,7 +8,13 @@ Merge Desk shows a merge conflict as two intentions side by side ("ours renames 
 
 Built and verified locally: the live desk analyzes conflicts, runs proposed merges through parsing, choice-honored checks and real tests, and can Land the checked merge commit on a permitted `demo/*` PR branch. Real GitHub checks exercised Land, HELD, Discard, reset, replay refusal and signature-tamper refusal. The desk separates file conflicts from GitHub merge readiness and labels historical Land results. See [PLAN.md](PLAN.md), [devpost/checklist.md](devpost/checklist.md) and the [review record](.review/round-4-codex.md) for evidence and limits.
 
-Production is deployed at https://merge-desk-swart.vercel.app (from `main`, deliberately: pushes never deploy it). Live mode there is sign-in only, for the allowlisted account on this repository; `/api/health` reports the GitHub App, Gemini, the sandbox credential and the daily usage throttle as configured, and a probe checks it every 30 minutes. Live work is refused once the day's sandbox count reaches `DAILY_LIVE_RUN_CAP` or when it can't be counted; that is a usage throttle, not a hard spending limit. Decision-record writes coordinate through one lock ref per pull request in this repository (`refs/merge-desk/locks/pr-<number>`), so the laptop and hosted servers share it; an unconfirmed write keeps its lock for a human to reconcile ([docs/record-reconciliation.md](docs/record-reconciliation.md)). Public `/demo`, `/judge`, recordings and the submission video remain future work.
+Production is deployed at https://merge-desk-swart.vercel.app (from `main`, deliberately: pushes never deploy it). Live mode there is sign-in only, for the allowlisted account on this repository; `/api/health` reports the GitHub App, Gemini, the sandbox credential and the daily usage throttle as configured, and a probe checks it every 30 minutes. Live work is refused once the day's sandbox count reaches `DAILY_LIVE_RUN_CAP` or when it can't be counted; that is a usage throttle, not a hard spending limit. Decision-record writes coordinate through one lock ref per pull request in this repository (`refs/merge-desk/locks/pr-<number>`), so the laptop and hosted servers share it; an unconfirmed write keeps its lock for a human to reconcile ([docs/record-reconciliation.md](docs/record-reconciliation.md)). Demo mode (`/demo`) and the judge's guide (`/judge`) are built and tested locally and reach production with the next deliberate deploy; the submission video remains future work.
+
+## Try the demo
+
+Open `/demo`, or `/judge` for a short guided tour. No sign-in and no keys: the desk replays real runs recorded from the three seeded demo pull requests (#1 verified, #2 held, #6 a chosen drop), with Gemini's actual answers, the sandbox's actual checks and test output, at their original pace. Every option each analysis offered was recorded, so the slider never lands on something the demo can't play. Demo mode sends no requests and writes nothing; **Reset** starts it over. Landing and steering need live mode.
+
+The recordings live in [`demo/recordings/`](demo/recordings) and carry no signatures, so they can't authorize anything. `npm run record` re-captures them through the same pipeline live mode uses (it needs the live configuration, and every sandbox boot counts against the daily throttle); `npm run recordings:check` validates them; `npm run facts` re-measures the demo numbers in [`docs/FACTS.json`](docs/FACTS.json), and a unit test fails if the two disagree.
 
 ## Local workflow
 
@@ -18,7 +24,7 @@ Production is deployed at https://merge-desk-swart.vercel.app (from `main`, deli
 4. If every check passes, Land rechecks the reviewed head and base and adds the checked merge commit to the pull request's own permitted branch. The update atomically requires the expected head. A base change after the final read remains a documented race. Held runs push no code; retry, choose another option, discard or download the attempt as a patch.
 5. Merge Desk never writes to the base branch or force-pushes. Attempts update one sealed decision comment on the pull request; a failed or unconfirmed record update is reported separately. Review checks and merge readiness, then use **Review and merge on GitHub** for the actual PR merge. The app does not merge into `main`.
 
-The planned public `/demo` and `/judge` views replay recorded real runs with no sign-in or writes. `/live` uses GitHub App sign-in, accepts only the learner's account, and operates only on this repository. Seeded demo pull requests target `demo/base`, never `main`. The submission video will show real live runs, including a held result and a verified merge landing.
+The public `/demo` and `/judge` views replay recorded real runs with no sign-in or writes. `/live` uses GitHub App sign-in, accepts only the learner's account, and operates only on this repository. Seeded demo pull requests target `demo/base`, never `main`. The submission video will show real live runs, including a held result and a verified merge landing.
 
 ## Stack
 
@@ -36,11 +42,12 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm test
+npm run recordings:check
 npm run test:playground
 npm run build
 npx playwright install chromium
 npm run e2e
-npm run dev             # http://localhost:3000/live
+npm run dev             # http://localhost:3000/demo needs no keys; /live needs configuration
 ```
 
 Unit and browser suites use fixtures and need no service credentials. The browser suite normally builds and serves the app on port 3100; leave that port free for a fresh build. `npm run test:live` separately exercises real configured services and consumes quota.
@@ -61,4 +68,4 @@ npm run gate -- held --candidate combined       # HELD: a real test fails
 npm run gate -- drop --candidate keep-ours --option keep_ours   # VERIFIED, theirs dropped as chosen
 ```
 
-The local runner is for trusted manual runs on your own machine; it has no network isolation. Gate runs push nothing. `npm run demo:reset -- --yes` is an operator tool, never invoked by Merge Desk; it rebuilds validated `demo/*` branches from their `demo-seed/*` tags. Resetting branches does not reopen a PR GitHub already merged. PR #3 is preserved as historical Land and GitHub-merge evidence; #1 and #2 remain the original open fixtures.
+The local runner is for trusted manual runs on your own machine; it has no network isolation. Gate runs push nothing. `npm run demo:reset -- --yes` is an operator tool, never invoked by Merge Desk; it rebuilds validated `demo/*` branches from their `demo-seed/*` tags. Resetting branches does not reopen a PR GitHub already merged. PR #3 is preserved as historical Land and GitHub-merge evidence; #1 and #2 remain the original open fixtures, and #6 reopened the drop scenario for the demo recordings.

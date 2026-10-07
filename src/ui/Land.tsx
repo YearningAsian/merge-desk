@@ -83,6 +83,26 @@ export function LandAction({
   );
 }
 
+// Demo mode in place of Land: the same words, and what live mode would do.
+// Nothing is pushed, so there is no button to press.
+export function DemoLand({ branch, base }: { branch: string; base: string }) {
+  return (
+    <div className="space-y-1 border-t border-hair pt-3 text-[12.5px]">
+      <p className="font-medium text-ink">
+        Land: push merge commit to <code className="font-mono text-[12px]">{branch}</code>
+      </p>
+      <p className="text-muted">
+        Live mode only. After rechecking that neither{" "}
+        <code className="font-mono text-[12px]">{branch}</code> nor{" "}
+        <code className="font-mono text-[12px]">{base}</code> moved since this run, Land adds this
+        merge commit to the pull request&apos;s own branch and records the decision in one comment
+        on the pull request. It never merges into{" "}
+        <code className="font-mono text-[12px]">{base}</code>. Demo mode writes nothing.
+      </p>
+    </div>
+  );
+}
+
 export function LandResult({
   outcome,
   repo,

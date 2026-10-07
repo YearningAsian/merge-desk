@@ -35,6 +35,7 @@ export function PrDetail({
   stale,
   titleId,
   model,
+  recorded = false,
   detailsOpen,
   onDetailsOpen,
   onAnalyze,
@@ -52,6 +53,8 @@ export function PrDetail({
   titleId: string;
   // The model Settings asks for (undefined: the server's default).
   model: string | undefined;
+  // Demo mode: the GitHub snapshot is the one taken when the run was recorded.
+  recorded?: boolean;
   detailsOpen: boolean;
   onDetailsOpen: (open: boolean) => void;
   onAnalyze: () => void;
@@ -99,7 +102,7 @@ export function PrDetail({
         </div>
       </header>
 
-      <PrStatus pull={pull} repo={repo} />
+      <PrStatus pull={pull} repo={repo} recorded={recorded} />
       {landed ? <div className="mb-4">{landed}</div> : null}
       {pull.fork ? (
         <Notice>Pull requests from forks aren&apos;t supported yet. Nothing was run.</Notice>

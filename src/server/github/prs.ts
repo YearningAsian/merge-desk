@@ -305,13 +305,34 @@ async function filesOnBothSides(
   }
 }
 
+// GitHub's pull.base.sha is the base when the pull request was opened or last
+// updated, not where the base branch is now (found by the dogfood run). A
+// merge against it can miss a conflict, and a guard comparing it can't see
+// the base move, so every decision reads the branch's current tip.
+async function baseTip(octokit: Octokit, repo: string, ref: string): Promise<string> {
+  const { owner, name } = splitRepo(repo);
+  const { data } = await octokit.git.getRef({ owner, repo: name, ref: `heads/${ref}` });
+  const sha = (data as { object?: { sha?: unknown } }).object?.sha;
+  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha))
+    throw new Error(`Couldn't read the tip of ${ref}`);
+  return sha;
+}
+
+const atTip = <T extends PullData>(pull: T, sha: string): T => ({
+  ...pull,
+  base: { ...pull.base, sha },
+});
+
+// For analysis, runs, Land and the record: the base is the branch's current
+// tip, or the read fails.
 export async function readPull(octokit: Octokit, repo: string, number: number) {
   const { owner, name } = splitRepo(repo);
   const { data } = await octokit.pulls.get({ owner, repo: name, pull_number: number });
-  return {
-    data: data as PullData & { state: string },
-    summary: summarize(repo, data as PullData, null),
-  };
+  const pull = atTip(
+    data as PullData & { state: string },
+    await baseTip(octokit, repo, data.base.ref),
+  );
+  return { data: pull, summary: summarize(repo, pull, null) };
 }
 
 export async function listPulls(
@@ -328,14 +349,27 @@ export async function listPulls(
     sort: "updated",
     direction: "desc",
   });
+  // One tip per base branch. The list is for display, so an unreadable tip
+  // shows GitHub's own value; every decision reads it again (readPull).
+  const tips = new Map<string, Promise<string | null>>();
+  const tipOf = (ref: string) => {
+    if (!tips.has(ref))
+      tips.set(
+        ref,
+        baseTip(octokit, repo, ref).catch(() => null),
+      );
+    return tips.get(ref)!;
+  };
   const pulls = await Promise.all(
     data.map(async (listed) => {
       // The list endpoint omits mergeability; the single-pull read has it.
-      const { data: pull } = await octokit.pulls.get({
+      const { data: read } = await octokit.pulls.get({
         owner,
         repo: name,
         pull_number: listed.number,
       });
+      const tip = await tipOf(read.base.ref);
+      const pull = tip ? atTip(read as PullData, tip) : (read as PullData);
       const [files, checks] = await Promise.all([
         pull.mergeable === true
           ? Promise.resolve(null)

@@ -182,7 +182,8 @@ async function performLand(
       try {
         signal.throwIfAborted();
         const after = await readPull(octokit, REPO, pr);
-        if (after.summary.mergeable !== "checking") {
+        // Right after the push GitHub can still answer for the old head.
+        if (after.summary.head.sha === commit && after.summary.mergeable !== "checking") {
           mergeable = after.summary.mergeable;
           break;
         }

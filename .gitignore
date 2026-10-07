@@ -23,6 +23,7 @@ next-env.d.ts
 # tests, media scratch, review rounds
 playwright-report/
 test-results/
+.playwright-mcp/
 docs/video/raw/
 .review/
 

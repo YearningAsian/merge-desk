@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { snapshotReady } from "@/server/deps-snapshot";
 import { integrationStatus } from "@/server/env";
 import { throttleReady } from "@/server/throttle";
 
@@ -30,6 +31,7 @@ export async function GET() {
         sandbox: status.sandbox || throttle,
         throttle,
         recordings: recordingsPresent(),
+        snapshot: await snapshotReady(),
       },
     },
     { headers: { "cache-control": "no-store" } },

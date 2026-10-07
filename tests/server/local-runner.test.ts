@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -28,9 +31,22 @@ const git = (...args: string[]) =>
     encoding: "utf8",
   }).trim();
 
+// Copies keep their source's modes, and in the sandbox the checkout these
+// fixtures come from is read-only; the throwaway repository must not be.
+function copyWritable(from: string, to: string) {
+  cpSync(from, to, { recursive: true });
+  const allowWrites = (path: string) => {
+    const stat = statSync(path);
+    chmodSync(path, stat.mode | 0o200);
+    if (stat.isDirectory())
+      for (const name of readdirSync(path)) if (name !== ".git") allowWrites(join(path, name));
+  };
+  allowWrites(to);
+}
+
 function commitOverlay(from: string, overlay: string, message: string) {
   git("checkout", "--quiet", "--detach", from);
-  cpSync(join(ROOT, overlay), repo, { recursive: true });
+  copyWritable(join(ROOT, overlay), repo);
   git("add", "--", "playground");
   git(
     "-c",
@@ -48,7 +64,7 @@ function commitOverlay(from: string, overlay: string, message: string) {
 beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), "merge-desk-runner-src-"));
   git("init", "--quiet", "--initial-branch=main");
-  cpSync(join(ROOT, "playground"), join(repo, "playground"), { recursive: true });
+  copyWritable(join(ROOT, "playground"), join(repo, "playground"));
   git("add", "--", "playground");
   git(
     "-c",

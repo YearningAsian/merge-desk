@@ -43,7 +43,13 @@ describe("integrationStatus", () => {
       GEMINI_API_KEY: "",
       SESSION_SECRET: "x".repeat(32),
     });
-    expect(status).toEqual({ github: true, gemini: false, sandbox: false, session: true });
+    expect(status).toEqual({
+      github: true,
+      gemini: false,
+      sandbox: false,
+      session: true,
+      snapshot: false,
+    });
   });
 
   it("does not count a short session secret as configured", () => {

@@ -122,11 +122,12 @@ export async function runCheckedSuite(
   candidate: Shell,
   changedFiles: string[],
   expected: WorkspaceIntegrity | null,
+  options: SuiteOptions = {},
 ): Promise<TestResult> {
   let result: TestResult | undefined;
   try {
     await assertWorkspaceIntegrity(trusted, expected);
-    result = await runSuite(candidate, changedFiles);
+    result = await runSuite(candidate, changedFiles, options);
     await assertWorkspaceIntegrity(trusted, expected);
     return result;
   } catch (error) {
@@ -407,22 +408,41 @@ export async function parseFiles(shell: Shell, paths: string[]): Promise<ParseRe
   return results;
 }
 
-export async function runSuite(shell: Shell, changedFiles: string[]): Promise<TestResult> {
+// `vitest`: the absolute path of the trusted dependency snapshot's Vitest,
+// given only after the runner checked this working copy may use it. The
+// app's own suite runs only with it, started directly, never through npm.
+export type SuiteOptions = { vitest?: string };
+
+export const NO_DEPENDENCIES =
+  "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.";
+
+export async function runSuite(
+  shell: Shell,
+  changedFiles: string[],
+  options: SuiteOptions = {},
+): Promise<TestResult> {
   const suite = chooseTestSuite(changedFiles);
   if (suite.id === "none")
     return { state: "not_run", suite: suite.label, exitCode: null, output: "", durationMs: 0 };
-  if (suite.id === "app") {
+  if (suite.id === "app" && !options.vitest) {
     return {
       state: "not_run",
       suite: suite.label,
       exitCode: null,
-      output:
-        "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.",
+      output: NO_DEPENDENCIES,
       durationMs: 0,
     };
   }
   const started = Date.now();
-  const exit = await shell.exec("node", ["--test"], { cwd: suite.cwd, timeoutMs: TEST_LIMIT_MS });
+  const exit =
+    suite.id === "app"
+      ? await shell.exec("node", [options.vitest!, "run", "--configLoader", "runner"], {
+          timeoutMs: TEST_LIMIT_MS,
+        })
+      : await shell.exec(suite.command[0], suite.command.slice(1), {
+          cwd: suite.cwd,
+          timeoutMs: TEST_LIMIT_MS,
+        });
   const durationMs = Date.now() - started;
   if (exit.timedOut) {
     return {

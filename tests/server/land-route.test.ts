@@ -50,14 +50,18 @@ function prepare() {
     repos: { get: async () => ({ data: { default_branch: "main", node_id: "repository" } }) },
     users: { getByUsername: async () => ({ data: { id: 1 } }) },
   });
-  mocks.pull.mockResolvedValue({
+  // Before the Land GitHub reports the signed head; after it, the landed commit.
+  const pullAt = (sha: string) => ({
     data: { state: "open" },
     summary: {
-      head: { ref: "demo/clean/rename", sha: "a".repeat(40) },
+      head: { ref: "demo/clean/rename", sha },
       base: { ref: "demo/base", sha: "b".repeat(40) },
       mergeable: "mergeable",
     },
   });
+  mocks.pull
+    .mockResolvedValueOnce(pullAt("a".repeat(40)))
+    .mockResolvedValue(pullAt("c".repeat(40)));
   mocks.land.mockResolvedValue({ commit: "c".repeat(40) });
   mocks.record.mockResolvedValue({ ok: true });
 }
@@ -221,5 +225,41 @@ describe("Land route total deadline and writer scope", () => {
     await done;
     expect(response!.status).toBe(503);
     expect(signal.aborted).toBe(true);
+  });
+});
+
+// Review 3.2 low: right after the push GitHub can still answer for the old
+// head (three recorded Lands said "conflicting", then GitHub listed them
+// mergeable). Only a reading at the landed commit counts.
+describe("Land route: mergeability after the push", () => {
+  const at = (sha: string, mergeable: string) => ({
+    data: { state: "open" },
+    summary: {
+      head: { ref: "demo/clean/rename", sha },
+      base: { ref: "demo/base", sha: "b".repeat(40) },
+      mergeable,
+    },
+  });
+
+  it("ignores GitHub's answer for the old head and waits for the landed commit", async () => {
+    prepare();
+    vi.useFakeTimers();
+    mocks.pull
+      .mockResolvedValueOnce(at("a".repeat(40), "conflicting")) // the Land's own read
+      .mockResolvedValueOnce(at("a".repeat(40), "conflicting"))
+      .mockResolvedValueOnce(at("c".repeat(40), "checking"))
+      .mockResolvedValue(at("c".repeat(40), "mergeable"));
+    const done = POST(request());
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await (await done).json()).toMatchObject({ outcome: "LANDED", mergeable: "mergeable" });
+  });
+
+  it("says GitHub is still checking when it never reports the landed commit", async () => {
+    prepare();
+    vi.useFakeTimers();
+    mocks.pull.mockResolvedValue(at("a".repeat(40), "conflicting"));
+    const done = POST(request());
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await (await done).json()).toMatchObject({ outcome: "LANDED", mergeable: "checking" });
   });
 });

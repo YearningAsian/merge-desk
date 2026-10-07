@@ -1,3 +1,4 @@
+import { depsSnapshotId } from "@/server/env";
 import { LocalRunner } from "./local";
 import { SandboxRunner } from "./sandbox";
 import type { Runner } from "./types";
@@ -13,5 +14,10 @@ export const usesSandbox = (env: Env = process.env) =>
 export function liveRunner(repo: string, signal?: AbortSignal, env: Env = process.env): Runner {
   const url = `https://github.com/${repo}.git`;
   if (!usesSandbox(env)) return new LocalRunner({ source: url });
-  return new SandboxRunner({ repoUrl: url, signal });
+  const snapshotId = depsSnapshotId(env);
+  return new SandboxRunner({
+    repoUrl: url,
+    signal,
+    ...(snapshotId ? { dependencies: { snapshotId } } : {}),
+  });
 }

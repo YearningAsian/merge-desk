@@ -104,7 +104,7 @@
 | 2.8 | FACTS measured with provenance | `docs/FACTS.json` | A | ✅ | 2.5 | Done 2026-10-06 (e19f9e3): five demo numbers from `npm run facts` with provenance; a unit test fails if FACTS and the recordings disagree; served by production `/api/stats`. Relock at 5.1 |
 | 2.9 | Later: replay eval on real historical merges (unchecked AI vs gated) | `eval/**` | A | ⬜ | 2.1 | Deferred by approved PRD; no measured headline until this is actually built |
 | 2.10 | Later: git merge driver sharing the pure core | `cli/**` | B | ⬜ | 2.1 | Deferred by approved PRD; outside this web POC |
-| 2.11 | Demo acts out every action from recorded real writes (Land, decision record, hold, discard, steer) | `scripts/record.mts`, `src/core/recording.ts`, `src/ui/**` | A | 🟡 | 2.7 | 2026-10-07 claimed (Claude Opus 5.5) from the learner's slice 6/7 feedback: no "live mode only" swaps; real Lands on demo PRs #1 and #6 approved, each followed by `npm run demo:reset`; steering recorded with one fixed line per held option |
+| 2.11 | Demo acts out every action from recorded real writes (Land, decision record, hold, discard, steer) | `scripts/record.mts`, `src/core/recording.ts`, `src/ui/**` | A | ✅ | 2.7 | Done 2026-10-07 (fe90f73), production dpl_Gfm32xmsXxT2hnDrdWpDzmBAmmbo: recordings v2 via live route handlers, 15 runs (6 steered), 3 real Lands (393147f #1, c759708 and 51f92c4 #6) each reset; steered retries show the choice-honored check catching MISSING/LEAKED for real; 331 unit, 28 e2e local, 8 demo journeys on production; health recordings true, no error logs |
 | 2.12 | Settings: bring your own model key (Claude, GPT and others), kept secure | `src/server/**`, `src/ui/**` | A | ⬜ | 2.11 | 2026-10-07 requested by the learner; cost and security design to agree before building (scope change, rule 7 review) |
 
 ### Phase 3: Freeze and harden
@@ -112,7 +112,7 @@
 | # | Row | File(s) | Owner | Status | Notes |
 |---|---|---|---|---|---|
 | 3.1 | Feature freeze declared; unfinished depth ✂️ and removed | `PLAN.md` | A | ⬜ | |
-| 3.2 | Final adversarial sweep, different model | `.review/` | B | ⬜ | Until clean round |
+| 3.2 | Final adversarial sweep, different model | `.review/` | B | ⬜ | Until clean round. Known low (2026-10-07): the Land route's `mergeable` answer can be GitHub's pre-push value (three recorded Lands said conflicting, then GitHub listed them mergeable); the desk doesn't show it; fix to accept a reading only at the landed head |
 | 3.3 | Live abuse checks on production (replay land, double land, forged PR number, oversized file, prompt injection in code comments) | n/a | B | ⬜ | |
 | 3.4 | Truth sweep: PLAN = code = live site | `PLAN.md` | A | ⬜ | |
 | 3.5 | Claims dry run (`check_claims.py`) | n/a | A | ⬜ | |
@@ -186,7 +186,7 @@ Contract changes: tell the other lane before committing; mark the commit `⚠️
 
 Historical STOP 1 checkpoint (2026-10-05): STOP 1 after authorized round 4 repairs, Codex (GPT-6). Original independent scope `main...266edda` includes 91c4407, 5b3cbdc, 41c72a3; 266edda is PLAN-only, no discrepancy. Findings formed before prior review files: 2 high, 4 medium; affected follow-up added M5 (medium), then closed all high/medium in fix `e1212e7`. Fresh isolated GPT-6 follow-up found and rechecked the final ambiguous-write lock repair. Claude CLI is signed out, so repair follow-up is same-model; separate-model review before merge remains outstanding. One low remains: authorized editor replay of an older valid same-PR record (not accepted on learner's behalf). Report: `.review/round-4-codex.md` has complete a–j results, prior-round fix assessment, commands and limits. Final verification: 250 unit tests / 29 files, 12 browser tests and production build pass; typecheck passes; lint 0 errors / 1 existing ignored scratch warning. Record writes are limited to loopback development/test on a shared local lock filesystem; ambiguous dispatched writes retain their lock for human reconciliation. Production Land/record refuse until shared coordination is configured. Live Sandbox protection and real Land remain unverified; literal base-race, whole-PR workflow and daily-admission gaps are explicit. Waiting for learner's **continue**; no push, PR, Land/reset, merge or deploy. `probe.yml` is untouched, untracked, unstaged and reserved for slice 6.
 
-_Last updated: 2026-10-07, slice 7 live on production; waiting on the learner's phone check (slices 6 and 7) and the two dogfood changes for slice 8 (Claude Opus 5.5)_
+_Last updated: 2026-10-07, demo act-out (2.11) live on production; waiting on the learner's phone check, the go for bring-your-own model keys (2.12) and the two dogfood changes for slice 8 (Claude Opus 5.5)_
 
 Round 4 repair task claimed (2026-10-05, Codex GPT-6): resume Step 1 only, failing regression tests before fixes, independent affected-boundary follow-up and read-only eligibility assessment. Original review scope remains `main...266edda`; no scope discrepancy found. Keep all later learner approval gates, the fixed login/repository allowlists, and parked `probe.yml`. No push, PR, live Land/reset, merge or deploy in this task.
 

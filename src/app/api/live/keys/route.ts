@@ -18,7 +18,7 @@ const json = (status: number, body: Record<string, unknown>, cookie?: string) =>
 export async function GET(request: Request) {
   const guard = await guardLive(request);
   if (!guard.ok) return guard.response;
-  const keys = await readKeys(request.headers.get("cookie"), guard.login);
+  const keys = await readKeys(request.headers.get("cookie"), guard);
   return json(200, { saved: savedProviders(keys) });
 }
 
@@ -30,9 +30,9 @@ export async function POST(request: Request) {
   const body = Save.safeParse(await request.json().catch(() => null));
   if (!body.success)
     return json(400, { error: "That doesn't look like an API key for a supported provider." });
-  const keys = await readKeys(request.headers.get("cookie"), guard.login);
+  const keys = await readKeys(request.headers.get("cookie"), guard);
   const next = { ...keys, [body.data.provider]: body.data.key };
-  return json(200, { saved: savedProviders(next) }, keysCookie(await sealKeys(guard.login, next)));
+  return json(200, { saved: savedProviders(next) }, keysCookie(await sealKeys(guard, next)));
 }
 
 const Remove = z.object({ provider: KeyProvider.optional() });
@@ -43,12 +43,12 @@ export async function DELETE(request: Request) {
   if (!guard.ok) return guard.response;
   const body = Remove.safeParse(await request.json().catch(() => ({})));
   if (!body.success) return json(400, { error: "Unknown provider." });
-  const keys = await readKeys(request.headers.get("cookie"), guard.login);
+  const keys = await readKeys(request.headers.get("cookie"), guard);
   const next = body.data.provider ? { ...keys, [body.data.provider]: undefined } : {};
   const left = Object.values(next).some(Boolean);
   return json(
     200,
     { saved: savedProviders(next) },
-    keysCookie(left ? await sealKeys(guard.login, next) : null),
+    keysCookie(left ? await sealKeys(guard, next) : null),
   );
 }

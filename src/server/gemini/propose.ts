@@ -74,6 +74,7 @@ export function geminiProposer(
       system: SYSTEM,
       input: proposePrompt(analysis.files, analysis.intents, request),
       maxOutputTokens: 16_384,
+      signal: request.signal,
     });
     return {
       files: value.files,

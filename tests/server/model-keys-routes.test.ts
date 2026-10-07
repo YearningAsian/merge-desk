@@ -7,7 +7,7 @@ import { POST as RUN } from "@/app/api/live/run/route";
 import { AnalyzeEvent, type Analysis } from "@/core/events";
 import { KEYS_COOKIE, readKeys, sealKeys } from "@/server/keys";
 import { signAnalysis } from "@/server/pipeline/analyze";
-import { SESSION_COOKIE, sealSession } from "@/server/session";
+import { SESSION_COOKIE, SESSION_TTL_S, sealSession } from "@/server/session";
 
 // Your own model keys at the routes: a key is required before anything is
 // spent, belongs to one sign-in, and is never sent back.
@@ -23,10 +23,14 @@ vi.mock("@/server/github/app", () => ({
 }));
 
 const SECRET = "z".repeat(48);
+// One sign-in session per test: the session cookie and the keys seal share it.
+let now = Date.now();
+const me = () => ({ login: "YearningAsian", exp: now + SESSION_TTL_S * 1000 });
 const KEY = "sk-ant-api03-" + "A".repeat(40);
 const saved = { ...process.env };
 beforeEach(() => {
   vi.resetAllMocks();
+  now = Date.now();
   process.env.SESSION_SECRET = SECRET;
   process.env.ALLOWED_LOGINS = "YearningAsian";
   delete process.env.RUNNER;
@@ -49,7 +53,9 @@ async function request(
   body: unknown,
   extra: { keys?: string; login?: string; origin?: string | null } = {},
 ) {
-  const cookies = [`${SESSION_COOKIE}=${await sealSession(extra.login ?? "YearningAsian")}`];
+  const cookies = [
+    `${SESSION_COOKIE}=${await sealSession(extra.login ?? "YearningAsian", { now })}`,
+  ];
   if (extra.keys) cookies.push(`${KEYS_COOKIE}=${extra.keys}`);
   const headers: Record<string, string> = {
     cookie: cookies.join("; "),
@@ -94,13 +100,13 @@ describe("a model on your own key", () => {
     });
 
     it(`${name}: a key sealed for another sign-in doesn't count`, async () => {
-      const elsewhere = await sealKeys("someone-else", { anthropic: KEY });
+      const elsewhere = await sealKeys({ ...me(), login: "someone-else" }, { anthropic: KEY });
       expect((await call("anthropic:claude-opus-5-5", elsewhere)).status).toBe(400);
       expect(mocks.admit).not.toHaveBeenCalled();
     });
 
     it(`${name}: with the key saved, goes on to the daily count`, async () => {
-      const keys = await sealKeys("YearningAsian", { anthropic: KEY });
+      const keys = await sealKeys(me(), { anthropic: KEY });
       const response = await call("anthropic:claude-opus-5-5", keys);
       expect(response.status).toBe(429);
       expect(mocks.admit).toHaveBeenCalledTimes(1);
@@ -147,7 +153,7 @@ describe("/api/live/keys", () => {
     expect(cookie).toContain("Path=/api/live");
     expect(cookie).not.toContain(KEY);
     const seal = cookie.split(";")[0]!.slice(`${KEYS_COOKIE}=`.length);
-    expect(await readKeys(`${KEYS_COOKIE}=${seal}`, "YearningAsian")).toEqual({ anthropic: KEY });
+    expect(await readKeys(`${KEYS_COOKIE}=${seal}`, me())).toEqual({ anthropic: KEY });
 
     const listed = await GET(await request("GET", "/api/live/keys", undefined, { keys: seal }));
     const body = await listed.text();
@@ -170,7 +176,7 @@ describe("/api/live/keys", () => {
   });
 
   it("removes one key, and clears the cookie when none is left", async () => {
-    const both = await sealKeys("YearningAsian", { anthropic: KEY, openai: KEY });
+    const both = await sealKeys(me(), { anthropic: KEY, openai: KEY });
     const one = await DELETE(
       await request("DELETE", "/api/live/keys", { provider: "anthropic" }, { keys: both }),
     );
@@ -184,5 +190,13 @@ describe("/api/live/keys", () => {
       await request("DELETE", "/api/live/keys", { provider: "openai" }, { keys: rest }),
     );
     expect(none.headers.get("set-cookie")).toMatch(/^merge_desk_keys=; .*Max-Age=0/);
+  });
+
+  it("keys saved in an earlier sign-in don't open in a new one", async () => {
+    const earlier = await sealKeys({ login: "YearningAsian", exp: now - 1 }, { anthropic: KEY });
+    const response = await GET(
+      await request("GET", "/api/live/keys", undefined, { keys: earlier }),
+    );
+    expect((await response.json()).saved.anthropic).toBe(false);
   });
 });

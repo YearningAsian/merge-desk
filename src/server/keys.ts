@@ -10,9 +10,9 @@ import { SESSION_TTL_S, cookieHeader, isSecure, readCookie } from "@/server/sess
 // API, encrypted and signed with a key derived from SESSION_SECRET for this
 // purpose alone. The server opens it per request to make that request's
 // calls, and never stores, logs or returns a key: the browser only learns
-// which providers have one. The seal names the GitHub login it belongs to
-// and expires with the session, so it can't be replayed under another
-// sign-in or outlive the 8-hour session.
+// which providers have one. The seal names the GitHub login and the exact
+// sign-in session it was saved in, and ends with that session, so it can't
+// be opened under another login, a later sign-in, or after the session.
 
 type Env = Record<string, string | undefined>;
 
@@ -49,9 +49,12 @@ const password = (env: Env) =>
     .update("merge-desk:model-keys:v1")
     .digest("hex");
 
+// The sign-in session the keys belong to (from guardLive).
+export type KeySession = { login: string; exp: number };
+
 export async function readKeys(
   cookies: string | null,
-  login: string,
+  session: KeySession,
   options: { env?: Env; now?: number } = {},
 ): Promise<ModelKeys> {
   const seal = readCookie(cookies, KEYS_COOKIE);
@@ -64,7 +67,8 @@ export async function readKeys(
       }),
     );
     if (!data.success) return {};
-    if (data.data.login !== login || data.data.exp <= (options.now ?? Date.now())) return {};
+    if (data.data.login !== session.login || data.data.exp !== session.exp) return {};
+    if (data.data.exp <= (options.now ?? Date.now())) return {};
     return data.data.keys;
   } catch {
     return {};
@@ -72,13 +76,12 @@ export async function readKeys(
 }
 
 export async function sealKeys(
-  login: string,
+  session: KeySession,
   keys: ModelKeys,
-  options: { env?: Env; now?: number } = {},
+  options: { env?: Env } = {},
 ): Promise<string> {
-  const now = options.now ?? Date.now();
   return sealData(
-    { login, exp: now + SESSION_TTL_S * 1000, keys: ModelKeys.parse(keys) },
+    { login: session.login, exp: session.exp, keys: ModelKeys.parse(keys) },
     { password: password(options.env ?? process.env), ttl: SESSION_TTL_S },
   );
 }

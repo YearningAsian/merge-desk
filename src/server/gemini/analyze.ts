@@ -80,6 +80,7 @@ export function geminiAnalyst(client: StructuredClient): Analyst {
       system: SYSTEM,
       input: analyzePrompt(input),
       maxOutputTokens: 4_096,
+      signal: input.signal,
     });
     return value;
   };

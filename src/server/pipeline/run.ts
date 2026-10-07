@@ -17,6 +17,8 @@ export type Proposer = (input: {
   option: Option;
   steer?: string;
   retry?: { attempt: number; reason: string };
+  // Aborted by a cancel or the route's deadline; stops the model call.
+  signal?: AbortSignal;
 }) => Promise<Proposal>;
 
 export type RunInput = {
@@ -33,6 +35,8 @@ export type RunInput = {
   // Sees the scratch copy's merge once written, so the caller can sign
   // exactly what was checked (tree id and changed files) for Land.
   onApplied?: (applied: AppliedProposal) => void;
+  // Aborted by a cancel or the route's deadline; passed to every model call.
+  signal?: AbortSignal;
 };
 
 const ORDER: StepId[] = ["revisions", "propose", "write", "parse", "honor", "tests"];
@@ -98,6 +102,7 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
           option: input.option,
           steer: input.steer,
           retry,
+          signal: input.signal,
         });
         const outside = proposal.files.filter((file) => !input.conflictedPaths.includes(file.path));
         if (outside.length)

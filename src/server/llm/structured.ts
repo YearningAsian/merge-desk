@@ -125,7 +125,8 @@ export async function withProviderDeadline<T>(
     return await call(controller.signal);
   } catch (error) {
     if (error instanceof MalformedOutputError || error instanceof ProviderError) throw error;
-    if (controller.signal.aborted && !outer?.aborted)
+    if (outer?.aborted) throw new ProviderError(`Stopped before ${who} answered.`);
+    if (controller.signal.aborted)
       throw new ProviderError(`${who} did not answer within ${deadlineMs / 1000} s`);
     const status = (error as { status?: unknown }).status;
     throw providerFailure(who, typeof status === "number" ? status : undefined, words);

@@ -7,6 +7,7 @@ const env = { SESSION_SECRET: "q".repeat(48) };
 const KEY = "sk-or-v1-" + "a".repeat(48);
 const now = 1_800_000_000_000;
 const cookie = (seal: string) => `${KEYS_COOKIE}=${seal}`;
+const me = { login: "YearningAsian", exp: now + SESSION_TTL_S * 1000 };
 
 describe("model choices", () => {
   it("names a provider and a model of the provider's shape", () => {
@@ -46,30 +47,27 @@ describe("model choices", () => {
 
 describe("sealed model keys", () => {
   it("open only for the sign-in they were sealed for, until the session's end", async () => {
-    const seal = await sealKeys("YearningAsian", { openrouter: KEY }, { env, now });
+    const seal = await sealKeys(me, { openrouter: KEY }, { env });
     expect(seal).not.toContain(KEY);
-    expect(await readKeys(cookie(seal), "YearningAsian", { env, now })).toEqual({
+    expect(await readKeys(cookie(seal), me, { env, now })).toEqual({
       openrouter: KEY,
     });
-    expect(await readKeys(cookie(seal), "someone-else", { env, now })).toEqual({});
+    expect(await readKeys(cookie(seal), { ...me, login: "someone-else" }, { env, now })).toEqual(
+      {},
+    );
+    expect(await readKeys(cookie(seal), me, { env, now: me.exp })).toEqual({});
     expect(
-      await readKeys(cookie(seal), "YearningAsian", { env, now: now + SESSION_TTL_S * 1000 }),
-    ).toEqual({});
-    expect(
-      await readKeys(cookie(seal), "YearningAsian", {
-        env: { SESSION_SECRET: "r".repeat(48) },
-        now,
-      }),
+      await readKeys(cookie(seal), me, { env: { SESSION_SECRET: "r".repeat(48) }, now }),
     ).toEqual({});
   });
 
   it("refuse a tampered seal, and a session seal can't stand in for keys", async () => {
-    const seal = await sealKeys("YearningAsian", { openrouter: KEY }, { env, now });
+    const seal = await sealKeys(me, { openrouter: KEY }, { env });
     const tampered = seal.slice(0, -4) + (seal.endsWith("AAAA") ? "BBBB" : "AAAA");
-    expect(await readKeys(cookie(tampered), "YearningAsian", { env, now })).toEqual({});
+    expect(await readKeys(cookie(tampered), me, { env, now })).toEqual({});
     const session = await sealSession("YearningAsian", { env, now });
-    expect(await readKeys(cookie(session), "YearningAsian", { env, now })).toEqual({});
-    expect(await readKeys(`${SESSION_COOKIE}=${seal}`, "YearningAsian", { env, now })).toEqual({});
+    expect(await readKeys(cookie(session), me, { env, now })).toEqual({});
+    expect(await readKeys(`${SESSION_COOKIE}=${seal}`, me, { env, now })).toEqual({});
   });
 
   it("are one key-shaped token each, and say only which providers have one", () => {
@@ -91,5 +89,20 @@ describe("sealed model keys", () => {
     expect(keysCookie(null, {})).toBe(
       `${KEYS_COOKIE}=; Path=/api/live; Max-Age=0; HttpOnly; SameSite=Strict`,
     );
+  });
+
+  it("belong to the sign-in session that saved them: a new session can't open them", async () => {
+    const first = { login: "YearningAsian", exp: now + SESSION_TTL_S * 1000 };
+    const later = { login: "YearningAsian", exp: now + 2 * SESSION_TTL_S * 1000 };
+    const seal = await sealKeys(first, { openrouter: KEY }, { env });
+    expect(await readKeys(cookie(seal), first, { env, now })).toEqual({ openrouter: KEY });
+    expect(await readKeys(cookie(seal), later, { env, now })).toEqual({});
+    // A later save in the same session keeps that session's end.
+    const again = await sealKeys(first, { openrouter: KEY, openai: KEY }, { env });
+    expect(await readKeys(cookie(again), first, { env, now: now + 3_600_000 })).toEqual({
+      openrouter: KEY,
+      openai: KEY,
+    });
+    expect(await readKeys(cookie(again), first, { env, now: first.exp })).toEqual({});
   });
 });

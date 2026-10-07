@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelAnalysis } from "@/core/options";
 import { MalformedOutputError } from "@/server/errors";
-import { ModelProposal } from "@/server/gemini/propose";
+import { geminiAnalyst } from "@/server/gemini/analyze";
+import { ModelProposal, geminiProposer } from "@/server/gemini/propose";
 import { AnthropicClient } from "@/server/llm/anthropic";
 import { ModelChoiceError, planModel } from "@/server/llm/client";
 import { OpenAIClient } from "@/server/llm/openai";
 import { OpenRouterClient } from "@/server/llm/openrouter";
-import { ProviderError, strictJsonSchema } from "@/server/llm/structured";
+import { ProviderError, strictJsonSchema, type StructuredClient } from "@/server/llm/structured";
 
 // The bring-your-own-key clients, through the real Anthropic and OpenAI SDKs
 // with only fetch replaced: each request must go to the provider's own host
@@ -328,5 +329,51 @@ describe("choosing a model", () => {
       "Gemini (gemini-3.8-flash)",
     );
     expect(sent).toEqual([]);
+  });
+
+  describe("cancelling a call on your key", () => {
+    it("the analyst and the proposer hand the signal to the model call", async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      const client = {
+        model: "anthropic:claude-opus-5-5",
+        label: "Claude (claude-opus-5-5)",
+        structured: async <T>(req: {
+          signal?: AbortSignal;
+          schema: { parse: (v: unknown) => T };
+        }) => {
+          signals.push(req.signal);
+          throw new MalformedOutputError("stop here");
+        },
+      } as unknown as StructuredClient;
+      const controller = new AbortController();
+      await geminiAnalyst(client)({
+        files: [],
+        commits: { ours: [], theirs: [] },
+        older: "ours",
+        signal: controller.signal,
+      } as unknown as Parameters<ReturnType<typeof geminiAnalyst>>[0]).catch(() => undefined);
+      await geminiProposer(client, { files: [], intents: { ours: "a", theirs: "b" } })({
+        conflictedPaths: [],
+        option: "combine",
+        signal: controller.signal,
+      }).catch(() => undefined);
+      expect(signals).toEqual([controller.signal, controller.signal]);
+    });
+
+    it("stops an in-flight provider call at once and says it was stopped", async () => {
+      const create: ConstructorParameters<typeof AnthropicClient>[0] = (_body, options) =>
+        new Promise((_, reject) =>
+          options.signal.addEventListener("abort", () => reject(new Error("aborted"))),
+        );
+      const controller = new AbortController();
+      const started = Date.now();
+      const call = new AnthropicClient(create, "claude-opus-5-5", 60_000).structured({
+        ...request,
+        signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), 10);
+      await expect(call).rejects.toThrow("Stopped before Anthropic answered.");
+      expect(Date.now() - started).toBeLessThan(1_000);
+    });
   });
 });

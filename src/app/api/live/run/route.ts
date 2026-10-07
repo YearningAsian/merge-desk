@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   // Before any sandbox boots: a choice that needs a key nobody saved stops here.
   let plan: ModelPlan;
   try {
-    plan = planModel(body.data.model, await readKeys(request.headers.get("cookie"), guard.login));
+    plan = planModel(body.data.model, await readKeys(request.headers.get("cookie"), guard));
   } catch (error) {
     if (error instanceof ModelChoiceError) return refuse(400, error.message);
     throw error;
@@ -97,6 +97,7 @@ export async function POST(request: Request) {
   const events = runPipeline({
     runner: liveRunner(REPO, controller.signal),
     proposer: geminiProposer(client, analysis),
+    signal: controller.signal,
     revisions,
     option: chosen.kind,
     intents: analysis.intents,

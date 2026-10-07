@@ -30,6 +30,8 @@ export type AnalystInput = {
   older: OlderSide;
   branches?: { ours: string; theirs: string };
   retry?: { attempt: number; reason: string };
+  // Aborted by a cancel or the route's deadline; stops the model call.
+  signal?: AbortSignal;
 };
 export type Analyst = (input: AnalystInput) => Promise<ModelAnalysis>;
 
@@ -43,6 +45,8 @@ export type AnalyzeInput = {
   branches?: { ours: string; theirs: string };
   maxRetries?: number;
   now?: () => number;
+  // Aborted by a cancel or the route's deadline; passed to every model call.
+  signal?: AbortSignal;
 };
 
 const ORDER: AnalyzeStepId[] = ["prepare", "analyze"];
@@ -135,6 +139,7 @@ export async function* analyzePipeline(input: AnalyzeInput): AsyncGenerator<Anal
         older,
         branches: input.branches,
         retry,
+        signal: input.signal,
       });
       const options = resolveOptions(answer.options, {
         commits: prepared.commits,

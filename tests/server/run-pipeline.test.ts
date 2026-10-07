@@ -360,4 +360,25 @@ describe("signed run records", () => {
       verdict: "VERIFIED",
     });
   });
+
+  it("passes its signal to the proposal call, so a cancel or the route deadline stops it", async () => {
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    const proposer: Proposer = async (request) => {
+      received = request.signal;
+      return propose("combined")(request);
+    };
+    await collect(
+      runPipeline({
+        runner: fakeRunner(),
+        proposer,
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+        signal: controller.signal,
+      }),
+    );
+    expect(received).toBe(controller.signal);
+  });
 });

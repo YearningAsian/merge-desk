@@ -193,4 +193,22 @@ describe("signed analysis", () => {
     expect(verifyAnalysis(token, expected, { secret }).revisions).toEqual(revisions);
     expect(() => verifyAnalysis(token, { ...expected, pr: 2 }, { secret })).toThrow(SignatureError);
   });
+
+  it("passes its signal to the model call, so a cancel or the route deadline stops it", async () => {
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    const analyst: Analyst = async (input) => {
+      received = input.signal;
+      return good;
+    };
+    await collect(
+      analyzePipeline({
+        ...base,
+        runner: fakeRunner(prepared),
+        analyst,
+        signal: controller.signal,
+      }),
+    );
+    expect(received).toBe(controller.signal);
+  });
 });

@@ -158,6 +158,7 @@
 |---|---|---|---|---|
 | [#4](https://github.com/YearningAsian/merge-desk/pull/4) | 2.2 | yes | Original Sonnet 1-3; Codex 4; final fresh Sonnet 1-2 | Merged 2026-10-06 (5f4285b); main CI green |
 | [#5](https://github.com/YearningAsian/merge-desk/pull/5) | 2.3, 2.6 | yes | Fresh Sonnet 6.1 (0H 4M 3L), 6.2 (0H 1M 2L), 6.3 CLEAN; Codex not installed here | Merged by the learner 2026-10-06 (daa6731); main CI green; M2 closed by the live throttle test (a43bcc9) |
+| [#7](https://github.com/YearningAsian/merge-desk/pull/7) | 2.12 | yes (secrets, access, outbound calls) | Fresh Sonnet 7.1 running; Codex not installed here | Open 2026-10-07; local lint/typecheck/360 unit/29 e2e/build pass; no real provider key, so providers unverified live |
 
 Merge rule: CI green on the merged result, and a clean adversarial round for side-effect paths (anything that writes to GitHub or spends LLM budget). After every production deploy: `curl /api/health` and walk `/judge`.
 

@@ -2,7 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireEnv } from "@/server/env";
 import { MalformedOutputError } from "@/server/errors";
-import type { StructuredClient, StructuredRequest } from "@/server/llm/structured";
+import {
+  ProviderError,
+  type StructuredClient,
+  type StructuredRequest,
+} from "@/server/llm/structured";
 
 export type { StructuredRequest };
 
@@ -67,6 +71,8 @@ export class GeminiClient implements StructuredClient {
   }
 
   async structured<T>(request: StructuredRequest<T>): Promise<{ value: T; ms: number }> {
+    // A cancel that landed between calls: never start one.
+    if (request.signal?.aborted) throw new ProviderError("Stopped before Gemini answered.");
     const started = Date.now();
     const controller = new AbortController();
     const abort = () => controller.abort();

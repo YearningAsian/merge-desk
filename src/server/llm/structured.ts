@@ -117,6 +117,8 @@ export async function withProviderDeadline<T>(
   call: (signal: AbortSignal) => Promise<T>,
   words: { notFound?: string } = {},
 ): Promise<T> {
+  // A cancel that landed between calls: never start a paid call.
+  if (outer?.aborted) throw new ProviderError(`Stopped before ${who} answered.`);
   const controller = new AbortController();
   const abort = () => controller.abort();
   outer?.addEventListener("abort", abort, { once: true });

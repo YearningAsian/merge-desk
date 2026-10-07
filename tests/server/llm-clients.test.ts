@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelAnalysis } from "@/core/options";
 import { MalformedOutputError } from "@/server/errors";
 import { geminiAnalyst } from "@/server/gemini/analyze";
+import { GeminiClient } from "@/server/gemini/client";
 import { ModelProposal, geminiProposer } from "@/server/gemini/propose";
 import { AnthropicClient } from "@/server/llm/anthropic";
 import { ModelChoiceError, planModel } from "@/server/llm/client";
@@ -375,5 +376,27 @@ describe("choosing a model", () => {
       await expect(call).rejects.toThrow("Stopped before Anthropic answered.");
       expect(Date.now() - started).toBeLessThan(1_000);
     });
+  });
+
+  it("never starts a provider call once the signal is already aborted", async () => {
+    const create = vi.fn<ConstructorParameters<typeof AnthropicClient>[0]>();
+    await expect(
+      new AnthropicClient(create, "claude-opus-5-5").structured({
+        ...request,
+        signal: AbortSignal.abort(),
+      }),
+    ).rejects.toThrow("Stopped before Anthropic answered.");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("Gemini on the server's key doesn't start one either", async () => {
+    const create = vi.fn<ConstructorParameters<typeof GeminiClient>[0]>();
+    await expect(
+      new GeminiClient(create, "gemini-3.5-flash-lite").structured({
+        ...request,
+        signal: AbortSignal.abort(),
+      }),
+    ).rejects.toThrow("Stopped before Gemini answered.");
+    expect(create).not.toHaveBeenCalled();
   });
 });

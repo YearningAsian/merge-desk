@@ -36,6 +36,12 @@ export function isAllowedRepo(fullName: string, env: Env = process.env): boolean
 
 const present = (env: Env, name: string) => Boolean(env[name]?.trim());
 
+// The trusted dependency snapshot built by `npm run snapshot` (optional).
+export function depsSnapshotId(env: Env = process.env): string | null {
+  const id = env.DEPS_SNAPSHOT_ID?.trim();
+  return id && /^snap_[A-Za-z0-9]{1,64}$/.test(id) ? id : null;
+}
+
 export function integrationStatus(env: Env = process.env) {
   return {
     github: [
@@ -47,6 +53,7 @@ export function integrationStatus(env: Env = process.env) {
     gemini: present(env, "GEMINI_API_KEY"),
     sandbox: present(env, "VERCEL_OIDC_TOKEN"),
     session: (env.SESSION_SECRET?.trim().length ?? 0) >= MIN_SESSION_SECRET_LENGTH,
+    snapshot: depsSnapshotId(env) !== null,
   };
 }
 

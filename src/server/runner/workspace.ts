@@ -122,11 +122,12 @@ export async function runCheckedSuite(
   candidate: Shell,
   changedFiles: string[],
   expected: WorkspaceIntegrity | null,
+  options: SuiteOptions = {},
 ): Promise<TestResult> {
   let result: TestResult | undefined;
   try {
     await assertWorkspaceIntegrity(trusted, expected);
-    result = await runSuite(candidate, changedFiles);
+    result = await runSuite(candidate, changedFiles, options);
     await assertWorkspaceIntegrity(trusted, expected);
     return result;
   } catch (error) {
@@ -407,22 +408,37 @@ export async function parseFiles(shell: Shell, paths: string[]): Promise<ParseRe
   return results;
 }
 
-export async function runSuite(shell: Shell, changedFiles: string[]): Promise<TestResult> {
+// `dependencies`: the runner checked that this working copy's package.json
+// and package-lock.json are the ones its trusted dependency snapshot was
+// installed from. Only then does the app's own suite run.
+export type SuiteOptions = { dependencies?: boolean };
+
+export const NO_DEPENDENCIES =
+  "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.";
+
+export async function runSuite(
+  shell: Shell,
+  changedFiles: string[],
+  options: SuiteOptions = {},
+): Promise<TestResult> {
   const suite = chooseTestSuite(changedFiles);
   if (suite.id === "none")
     return { state: "not_run", suite: suite.label, exitCode: null, output: "", durationMs: 0 };
-  if (suite.id === "app") {
+  if (suite.id === "app" && !options.dependencies) {
     return {
       state: "not_run",
       suite: suite.label,
       exitCode: null,
-      output:
-        "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.",
+      output: NO_DEPENDENCIES,
       durationMs: 0,
     };
   }
   const started = Date.now();
-  const exit = await shell.exec("node", ["--test"], { cwd: suite.cwd, timeoutMs: TEST_LIMIT_MS });
+  const [command, ...args] = suite.command;
+  const exit = await shell.exec(command, args, {
+    cwd: suite.cwd === "." ? undefined : suite.cwd,
+    timeoutMs: TEST_LIMIT_MS,
+  });
   const durationMs = Date.now() - started;
   if (exit.timedOut) {
     return {

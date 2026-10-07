@@ -35,3 +35,15 @@ describe("GET /api/health", () => {
     expect((await health()).integrations.throttle).toBe(true);
   });
 });
+
+describe("GET /api/health: the trusted dependency snapshot", () => {
+  it("reports it only when a well-formed snapshot id is configured", async () => {
+    ready.mockResolvedValue(true);
+    vi.stubEnv("DEPS_SNAPSHOT_ID", "");
+    expect((await health()).integrations.snapshot).toBe(false);
+    vi.stubEnv("DEPS_SNAPSHOT_ID", "not a snapshot");
+    expect((await health()).integrations.snapshot).toBe(false);
+    vi.stubEnv("DEPS_SNAPSHOT_ID", "snap_7TjX2x4ZJt3Fa6UTIi4pBDVTqYOd");
+    expect((await health()).integrations.snapshot).toBe(true);
+  });
+});

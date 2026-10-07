@@ -1,6 +1,7 @@
 import { Writable } from "node:stream";
 import { posix } from "node:path";
 import { Sandbox, type SandboxUser } from "@vercel/sandbox";
+import { chooseTestSuite } from "@/server/guard";
 import type {
   AppliedProposal,
   ParseResult,
@@ -17,6 +18,7 @@ import {
   captureWorkspaceIntegrity,
   commitProposal,
   describeMerge,
+  NO_DEPENDENCIES,
   git,
   mergeIntoHead,
   parseFiles,
@@ -31,10 +33,31 @@ import {
 // its network to deny-all before any candidate file is written or any test
 // runs. It holds no GitHub token, model key or session secret. It stops in
 // dispose(), pass or fail, and times out on its own after two minutes.
+//
+// With a trusted dependency snapshot (`npm run snapshot`), a boot restores
+// it instead: main's dependencies installed with `npm ci --ignore-scripts`
+// into <cwd>/node_modules, outside the checkout, next to a marker naming the
+// package.json and package-lock.json they came from. The app's own suite
+// runs only when the merge's two files hash to exactly those.
 
 export const SANDBOX_IMAGE = "vercel/sandbox/node:24";
 export const SANDBOX_TIMEOUT_MS = 120_000;
 export const SANDBOX_TAGS = { app: "merge-desk" };
+export const DEPS_MARKER = ".merge-desk-deps.json";
+export const DEPS_FILES = ["package.json", "package-lock.json"] as const;
+
+// Trusted: run before any candidate code, in the checkout, with the marker's
+// absolute path. Prints "match" or the files that differ.
+const DEPS_MATCH = String.raw`
+const fs = require("node:fs");
+const { createHash } = require("node:crypto");
+const marker = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const differs = ["package.json", "package-lock.json"].filter((name) => {
+  const expected = marker && marker.files ? marker.files[name] : undefined;
+  return typeof expected !== "string" || createHash("sha256").update(fs.readFileSync(name)).digest("hex") !== expected;
+});
+process.stdout.write(differs.length ? "differs:" + differs.join(",") : "match");
+`;
 
 // Trusted server code checks every source/Git entry and every ancestor. A
 // read-only file owned by the test UID is insufficient: it could chmod it, or
@@ -84,7 +107,13 @@ export class SandboxRunner implements Runner {
   private integrity: WorkspaceIntegrity | null = null;
   private protectedSource = false;
 
-  constructor(private readonly options: { repoUrl: string; signal?: AbortSignal }) {}
+  constructor(
+    private readonly options: {
+      repoUrl: string;
+      signal?: AbortSignal;
+      dependencies?: { snapshotId: string };
+    },
+  ) {}
 
   private async timed<T>(label: string, work: () => Promise<T>): Promise<T> {
     const started = Date.now();
@@ -136,6 +165,7 @@ export class SandboxRunner implements Runner {
           PATH: "/usr/local/bin:/usr/bin:/bin",
           NODE_OPTIONS: "",
           NODE_PATH: "",
+          npm_config_update_notifier: "false", // the network is denied
           ...("homeDir" in context ? { HOME: context.homeDir, TMPDIR: context.homeDir } : {}),
         },
         stdout: sink((text) => {
@@ -189,23 +219,40 @@ export class SandboxRunner implements Runner {
       return;
     }
     await this.dispose();
-    this.sandbox = await this.timed("create sandbox and clone head", () =>
-      Sandbox.create({
-        source: { type: "git", url: this.options.repoUrl, revision: revisions.head },
-        image: SANDBOX_IMAGE,
-        persistent: false,
-        timeout: SANDBOX_TIMEOUT_MS,
-        resources: { vcpus: 2 },
-        tags: SANDBOX_TAGS,
-        signal: this.options.signal,
-      }),
+    const common = {
+      persistent: false,
+      timeout: SANDBOX_TIMEOUT_MS,
+      resources: { vcpus: 2 },
+      tags: SANDBOX_TAGS,
+      signal: this.options.signal,
+    };
+    const snapshot = this.options.dependencies?.snapshotId;
+    // A snapshot boot inherits its image and holds main's checkout, so it
+    // fetches the exact head as well as the base.
+    this.sandbox = await this.timed(
+      snapshot ? "create sandbox from the dependency snapshot" : "create sandbox and clone head",
+      () =>
+        snapshot
+          ? Sandbox.create({ source: { type: "snapshot", snapshotId: snapshot }, ...common })
+          : Sandbox.create({
+              source: { type: "git", url: this.options.repoUrl, revision: revisions.head },
+              image: SANDBOX_IMAGE,
+              ...common,
+            }),
     );
     this.nodeVersion = (await this.shell.exec("node", ["--version"])).stdout.trim() || null;
-    await this.timed("fetch exact base", async () => {
+    await this.timed(snapshot ? "fetch exact head and base" : "fetch exact base", async () => {
       const shallow = await git(this.shell, ["rev-parse", "--is-shallow-repository"]);
       if (shallow.stdout.trim() === "true")
         await git(this.shell, ["fetch", "--quiet", "--unshallow", "--no-tags", "origin"]);
-      await git(this.shell, ["fetch", "--quiet", "--no-tags", "origin", revisions.base]);
+      await git(this.shell, [
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        "origin",
+        ...(snapshot ? [revisions.head] : []),
+        revisions.base,
+      ]);
       await git(this.shell, ["checkout", "--quiet", "--detach", revisions.head]);
     });
     await this.timed("network deny-all", () =>
@@ -249,11 +296,25 @@ export class SandboxRunner implements Runner {
         output: "Refusing to run candidate code: the sandbox network is not denied.",
         durationMs: 0,
       };
+    const suite = chooseTestSuite(changedFiles);
+    if (suite.id === "app") {
+      const reason = await this.timed("check dependencies", () => this.dependencyMismatch());
+      if (reason)
+        return {
+          state: "not_run",
+          suite: suite.label,
+          exitCode: null,
+          output: reason,
+          durationMs: 0,
+        };
+    }
     this.candidateRan = true;
     try {
       const candidate = await this.timed("protect test source", () => this.protectSource());
       return this.timed("tests", () =>
-        runCheckedSuite(this.shell, candidate, changedFiles, this.integrity),
+        runCheckedSuite(this.shell, candidate, changedFiles, this.integrity, {
+          dependencies: suite.id === "app",
+        }),
       );
     } catch (error) {
       return {
@@ -264,6 +325,20 @@ export class SandboxRunner implements Runner {
         durationMs: 0,
       };
     }
+  }
+
+  // Null when this checkout's dependency files are exactly the ones the
+  // trusted snapshot installed; otherwise why the app's suite can't run.
+  // Runs as the trusted user before any candidate code.
+  private async dependencyMismatch(): Promise<string | null> {
+    if (!this.options.dependencies) return NO_DEPENDENCIES;
+    const marker = `${this.current().cwd.replace(/\/+$/, "")}/${DEPS_MARKER}`;
+    const result = await this.execute("node", ["-e", DEPS_MATCH, marker], { timeoutMs: 10_000 });
+    const answer = result.stdout.trim();
+    if (result.code === 0 && answer === "match") return null;
+    if (result.code === 0 && answer.startsWith("differs:"))
+      return `This merge changes ${answer.slice("differs:".length).split(",").join(" and ")}, so its dependencies aren't the ones the trusted snapshot installed. Dependency changes are held until a new snapshot is built from main.`;
+    return "Couldn't compare this merge's dependency files with the trusted dependency snapshot, so the app's tests didn't run.";
   }
 
   private async protectSource(): Promise<Shell> {

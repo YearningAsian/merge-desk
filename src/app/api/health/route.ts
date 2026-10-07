@@ -30,6 +30,7 @@ export async function GET() {
         sandbox: status.sandbox || throttle,
         throttle,
         recordings: recordingsPresent(),
+        snapshot: status.snapshot,
       },
     },
     { headers: { "cache-control": "no-store" } },

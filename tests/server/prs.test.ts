@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   listPulls,
   mergeableOf,
+  readPull,
   sortPulls,
   summarize,
   type PullSummary,
@@ -283,5 +284,67 @@ describe("pull request list", () => {
       at(4, "conflicting", "2026-10-05T10:00:00Z"),
     ]);
     expect(sorted.map((p) => p.number)).toEqual([4, 2, 3, 1]);
+  });
+});
+
+// Found by the dogfood run (PLAN 2.13): GitHub's pull.base.sha is the base
+// when the pull request was opened, not where the base branch is now. A
+// merge against it can miss a conflict, and the "base moved" guard can't
+// see the branch move.
+describe("the base commit is the base branch's current tip", () => {
+  const stale = "b".repeat(40);
+  const tip = "e".repeat(40);
+  const octokit = (getRef: ReturnType<typeof vi.fn>) => ({
+    pulls: { get: vi.fn().mockResolvedValue({ data: { ...pull(), state: "open" } }) },
+    git: { getRef },
+  });
+
+  it("reads it for analysis, runs, Land and the record", async () => {
+    const getRef = vi.fn().mockResolvedValue({ data: { object: { sha: tip } } });
+    const result = await readPull(octokit(getRef) as unknown as Octokit, REPO, 1);
+    expect(result.summary.base).toEqual({ ref: "demo/base", sha: tip });
+    expect(getRef).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: "YearningAsian",
+        repo: "merge-desk",
+        ref: "heads/demo/base",
+      }),
+    );
+  });
+
+  it("refuses to guess when the base branch can't be read", async () => {
+    const getRef = vi.fn().mockRejectedValue(new Error("Not Found"));
+    await expect(readPull(octokit(getRef) as unknown as Octokit, REPO, 1)).rejects.toThrow();
+  });
+
+  it("refuses an answer that isn't a full commit id", async () => {
+    const getRef = vi.fn().mockResolvedValue({ data: { object: { sha: "main" } } });
+    await expect(readPull(octokit(getRef) as unknown as Octokit, REPO, 1)).rejects.toThrow();
+  });
+
+  it("lists pull requests against the tip, and GitHub's value only if the tip can't be read", async () => {
+    const listed = pull();
+    const getRef = vi.fn().mockResolvedValue({ data: { object: { sha: tip } } });
+    const compare = vi.fn().mockResolvedValue({ data: { files: [] } });
+    const app = {
+      pulls: {
+        list: vi.fn().mockResolvedValue({ data: [listed] }),
+        get: vi.fn().mockResolvedValue({ data: listed }),
+      },
+      git: { getRef },
+      repos: { compareCommitsWithBasehead: compare },
+    };
+    const publicReads = {
+      repos: { getCombinedStatusForRef: vi.fn().mockRejectedValue(new Error("x")) },
+      checks: { listForRef: vi.fn().mockRejectedValue(new Error("x")) },
+    };
+    const read = () =>
+      listPulls(app as unknown as Octokit, REPO, publicReads as unknown as Octokit);
+    expect((await read()).pulls[0]!.base.sha).toBe(tip);
+    expect(compare).toHaveBeenCalledWith(
+      expect.objectContaining({ basehead: `${tip}...${listed.head.sha}` }),
+    );
+    getRef.mockRejectedValue(new Error("Not Found"));
+    expect((await read()).pulls[0]!.base.sha).toBe(stale);
   });
 });

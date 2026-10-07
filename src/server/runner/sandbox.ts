@@ -88,7 +88,8 @@ if (found) {
 
 // Trusted, as root: the snapshot's node_modules, its Vitest and the marker
 // must be owned by root and unwritable by group or others, so the test user
-// can't change them. Symbolic links are judged by the folder holding them.
+// can't change them. A symbolic link must land inside node_modules (npm's
+// .bin links do); the folder and the marker themselves must not be links.
 // Prints "trusted" or "writable:<path>".
 const DEPS_TRUSTED = String.raw`
 const fs = require("node:fs");
@@ -98,7 +99,10 @@ let entries = 0;
 function unsafe(full) {
   if (++entries > 500000) throw new Error("Too many dependency entries to check");
   const stat = fs.lstatSync(full);
-  if (stat.isSymbolicLink()) return null;
+  if (stat.isSymbolicLink()) {
+    const target = path.resolve(path.dirname(full), fs.readlinkSync(full));
+    return target === modules || target.startsWith(modules + "/") ? null : full;
+  }
   if (stat.uid !== 0 || stat.gid !== 0 || (stat.mode & 0o022)) return full;
   if (stat.isDirectory())
     for (const name of fs.readdirSync(full)) {
@@ -108,7 +112,8 @@ function unsafe(full) {
   return null;
 }
 if (!fs.lstatSync(vitest).isFile()) throw new Error("The snapshot has no Vitest");
-const found = unsafe(modules) || unsafe(marker);
+const linked = [modules, marker].find((entry) => fs.lstatSync(entry).isSymbolicLink());
+const found = linked || unsafe(modules) || unsafe(marker);
 process.stdout.write(found ? "writable:" + found : "trusted");
 `;
 
@@ -284,7 +289,7 @@ export class SandboxRunner implements Runner {
     const snapshot = this.options.dependencies?.snapshotId;
     // A snapshot boot inherits its image and holds main's checkout, so it
     // fetches the exact head as well as the base. If it can't be restored
-    // (expired, deleted), the run still boots from git, without the app's suite.
+    // (missing or expired), the run still boots from git, without the app's suite.
     if (snapshot) {
       try {
         this.sandbox = await this.timed("create sandbox from the dependency snapshot", () =>
@@ -293,8 +298,12 @@ export class SandboxRunner implements Runner {
         this.restored = true;
       } catch (error) {
         this.options.signal?.throwIfAborted();
-        const why = error instanceof Error ? error.message.slice(0, 120) : "unknown error";
-        this.snapshotFailure = `The trusted dependency snapshot couldn't be restored (${why}), so the app's tests didn't run.`;
+        // Only a missing or expired snapshot falls back; anything else (a
+        // limit, an outage) would fail the git boot too, so it stops here.
+        const status = (error as { response?: { status?: unknown } } | null)?.response?.status;
+        if (status !== 404 && status !== 410) throw error;
+        this.snapshotFailure =
+          "The trusted dependency snapshot is missing or expired, so the app's tests didn't run.";
       }
     }
     if (!this.sandbox)

@@ -41,4 +41,16 @@ describe("snapshotReady", () => {
     await snapshotReady({ env, now: new Date(when.getTime() + 30_000), get });
     expect(get).toHaveBeenCalledTimes(1);
   });
+
+  // Review 8.2 L4: concurrent health checks share one request.
+  it("asks once for concurrent checks", async () => {
+    const when = at();
+    let release: (value: { status: string }) => void = () => undefined;
+    const get = vi.fn(() => new Promise<{ status: string }>((resolve) => (release = resolve)));
+    const first = snapshotReady({ env, now: when, get });
+    const second = snapshotReady({ env, now: when, get });
+    release({ status: "created" });
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+    expect(get).toHaveBeenCalledTimes(1);
+  });
 });

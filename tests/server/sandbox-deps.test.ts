@@ -14,14 +14,21 @@ import { DEPS_MARKER, SandboxRunner } from "@/server/runner/sandbox";
 const state = vi.hoisted(() => ({
   sandbox: null as unknown,
   created: [] as Array<Record<string, unknown>>,
-  failSnapshot: false,
+  // The HTTP status the snapshot restore fails with (the SDK's APIError).
+  failSnapshot: null as number | null,
+  onSnapshotCreate: null as (() => void) | null,
 }));
 vi.mock("@vercel/sandbox", () => ({
   Sandbox: {
     create: async (params: Record<string, unknown>) => {
       state.created.push(params);
-      if (state.failSnapshot && (params.source as { type?: string })?.type === "snapshot")
-        throw new Error("Snapshot not found");
+      if ((params.source as { type?: string })?.type === "snapshot") {
+        state.onSnapshotCreate?.();
+        if (state.failSnapshot)
+          throw Object.assign(new Error("Snapshot snap_trusted: internal detail"), {
+            response: { status: state.failSnapshot },
+          });
+      }
       return state.sandbox;
     },
   },
@@ -42,7 +49,14 @@ vi.mock("@/server/runner/workspace", async (original) => {
   };
 });
 
-type Entry = { directory?: boolean; content?: string; mode: number; uid: number; gid: number };
+type Entry = {
+  directory?: boolean;
+  content?: string;
+  link?: string;
+  mode: number;
+  uid: number;
+  gid: number;
+};
 type Command = {
   cmd: string;
   args?: string[];
@@ -160,9 +174,9 @@ class FakeSandbox {
           return {
             ...entry,
             size: Buffer.byteLength(entry.content ?? ""),
-            isFile: () => !entry.directory,
+            isFile: () => !entry.directory && !entry.link,
             isDirectory: () => !!entry.directory,
-            isSymbolicLink: () => false,
+            isSymbolicLink: () => !!entry.link,
           };
         };
         runInNewContext(args[1]!, {
@@ -171,6 +185,7 @@ class FakeSandbox {
               ? {
                   lstatSync: stat,
                   statSync: stat,
+                  readlinkSync: (path: string) => entryAt(path).link!,
                   readFileSync: (path: string, encoding?: string) => {
                     const content = entryAt(path).content!;
                     return encoding ? content : Buffer.from(content);
@@ -218,7 +233,8 @@ beforeEach(() => {
   sandbox = new FakeSandbox();
   state.sandbox = sandbox;
   state.created = [];
-  state.failSnapshot = false;
+  state.failSnapshot = null;
+  state.onSnapshotCreate = null;
 });
 
 async function applied(dependencies?: { snapshotId: string }) {
@@ -330,6 +346,23 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
     ],
     ["a writable marker", () => (sandbox.entries.get(`/vercel/${DEPS_MARKER}`)!.mode = 0o666)],
     ["no Vitest at all", () => sandbox.entries.delete(VITEST)],
+    // Review 8.2 L2: a link is judged by where it lands.
+    [
+      "a link that leaves the trusted folder",
+      () =>
+        sandbox.entries.set(
+          "/vercel/node_modules/vitest/escape.mjs",
+          root(0o777, { link: "/home/merge-desk-tests/escape.mjs" }),
+        ),
+    ],
+    [
+      "a marker that is a link",
+      () =>
+        sandbox.entries.set(
+          `/vercel/${DEPS_MARKER}`,
+          root(0o777, { link: "/tmp/marker.json", content: "{}" }),
+        ),
+    ],
   ])("never runs the tests when the trusted dependencies have %s", async (_name, setup) => {
     const result = await tested(setup);
     expect(result.state).toBe("not_run");
@@ -338,7 +371,7 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
 
   // Review 8.1 M1: an expired or deleted snapshot must not stop every run.
   it("falls back to a git boot when the snapshot can't be restored, without the app's tests", async () => {
-    state.failSnapshot = true;
+    state.failSnapshot = 404;
     const runner = await trusted();
     try {
       expect(state.created.map((params) => (params.source as { type: string }).type)).toEqual([
@@ -348,15 +381,52 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
       expect(state.created[1]!.image).toBe("vercel/sandbox/node:24");
       const app = await runner.runTests([LAND]);
       expect(app.state).toBe("not_run");
-      expect(app.output).toMatch(/couldn't be restored/);
+      expect(app.output).toMatch(/missing or expired/);
+      expect(app.output).not.toMatch(/internal detail/);
       expect(testRuns()).toEqual([]);
     } finally {
       await runner.dispose();
     }
   });
 
+  it("follows a link that stays inside the trusted folder", async () => {
+    const result = await tested(() => {
+      sandbox.entries.set("/vercel/node_modules/.bin", root(0o755, { directory: true }));
+      sandbox.entries.set(
+        "/vercel/node_modules/.bin/vitest",
+        root(0o777, { link: "../vitest/vitest.mjs" }),
+      );
+    });
+    expect(result.state).toBe("passed");
+  });
+
+  // Review 8.2 L3: only a missing or expired snapshot falls back to git.
+  it.each([429, 500])(
+    "does not spend a second sandbox when the restore fails with %i",
+    async (status) => {
+      state.failSnapshot = status;
+      await expect(trusted()).rejects.toThrow();
+      expect(state.created).toHaveLength(1);
+    },
+  );
+
+  it("an aborted request does not start a git boot", async () => {
+    const controller = new AbortController();
+    state.failSnapshot = 404;
+    state.onSnapshotCreate = () => controller.abort();
+    const runner = new SandboxRunner({
+      repoUrl: "https://github.com/YearningAsian/merge-desk.git",
+      dependencies: { snapshotId: "snap_trusted" },
+      signal: controller.signal,
+    });
+    await expect(
+      runner.applyProposal({ head: HEAD, base: BASE }, [{ path: LAND, content: "x" }]),
+    ).rejects.toThrow();
+    expect(state.created).toHaveLength(1);
+  });
+
   it("still runs the playground's tests after that fallback", async () => {
-    state.failSnapshot = true;
+    state.failSnapshot = 404;
     const runner = await trusted();
     try {
       const result = await runner.runTests(["playground/src/api.js"]);

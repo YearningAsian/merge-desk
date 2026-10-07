@@ -13,6 +13,7 @@ import { AnalyzeEvent, type Analysis } from "@/core/events";
 import type { RunRecord } from "@/core/run";
 import { signAnalysis } from "@/server/pipeline/analyze";
 import { signRun } from "@/server/pipeline/run";
+import { installationOctokit } from "@/server/github/app";
 import { SESSION_COOKIE, sealSession } from "@/server/session";
 
 vi.mock("@/server/github/app", () => ({
@@ -204,5 +205,85 @@ describe("POST /api/live/land and /api/live/record", () => {
       action: "held",
     });
     expect(response.status).toBe(409);
+  });
+});
+
+// Review 10.1: readPull reads the base branch's tip (git refs), which needs
+// contents:read on the token, and a base it can't read is named as such.
+describe("analyze and run read the base branch", () => {
+  const octokit = vi.mocked(installationOctokit);
+  const signedIn = async (path: string, body: unknown) =>
+    new Request(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: {
+        cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+        origin: "http://localhost:3000",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  beforeEach(() => {
+    process.env.RUNNER = "local"; // no sandbox, so no daily count to read
+    delete process.env.VERCEL;
+  });
+
+  it("asks for a token that can read the base branch's ref", async () => {
+    octokit.mockRejectedValueOnce(Object.assign(new Error("down"), { status: 500 }));
+    expect((await POST(await signedIn("/api/live/analyze", { pr: 1 }))).status).toBe(503);
+    expect(octokit).toHaveBeenLastCalledWith(
+      "YearningAsian/merge-desk",
+      expect.objectContaining({ pull_requests: "read", contents: "read" }),
+    );
+
+    const drop = readFileSync(
+      join(import.meta.dirname, "../e2e/fixtures/analyze-drop.ndjson"),
+      "utf8",
+    )
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => AnalyzeEvent.parse(JSON.parse(line)))
+      .flatMap((event) => ("type" in event && event.ok ? [event.analysis] : []))[0] as Analysis;
+    const token = signAnalysis(drop, { user: "YearningAsian", secret: SECRET });
+    octokit.mockRejectedValueOnce(Object.assign(new Error("down"), { status: 500 }));
+    const run = await RUN(
+      await signedIn("/api/live/run", { pr: drop.pr, token, option: drop.options[0]!.kind }),
+    );
+    expect(run.status).toBe(503);
+    expect(octokit).toHaveBeenLastCalledWith(
+      "YearningAsian/merge-desk",
+      expect.objectContaining({ pull_requests: "read", contents: "read" }),
+    );
+  });
+
+  it("names a base branch it can't read instead of calling the pull request missing", async () => {
+    octokit.mockResolvedValueOnce({
+      pulls: {
+        get: async () => ({
+          data: {
+            number: 10,
+            title: "x",
+            html_url: "https://github.com/YearningAsian/merge-desk/pull/10",
+            updated_at: "2026-10-07T10:00:00Z",
+            user: { login: "YearningAsian" },
+            labels: [],
+            state: "open",
+            head: {
+              ref: "feat/x",
+              sha: "a".repeat(40),
+              repo: { full_name: "YearningAsian/merge-desk" },
+            },
+            base: { ref: "release/old", sha: "b".repeat(40) },
+          },
+        }),
+      },
+      git: {
+        getRef: async () => {
+          throw Object.assign(new Error("Not Found"), { status: 404 });
+        },
+      },
+    } as never);
+    const response = await POST(await signedIn("/api/live/analyze", { pr: 10 }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/base branch release\/old/);
   });
 });

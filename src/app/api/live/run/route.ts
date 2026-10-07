@@ -80,7 +80,8 @@ export async function POST(request: Request) {
 
   let octokit;
   try {
-    octokit = await installationOctokit(REPO, { pull_requests: "read" });
+    // contents:read for the base branch's ref (readPull reads its tip).
+    octokit = await installationOctokit(REPO, { pull_requests: "read", contents: "read" });
   } catch (error) {
     return (error as { status?: number }).status === 404
       ? refuse(503, "GitHub can't see the repository: is the Merge Desk app installed on it?")

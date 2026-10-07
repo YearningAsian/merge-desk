@@ -6,7 +6,7 @@ import { geminiAnalyst } from "@/server/gemini/analyze";
 import { readKeys } from "@/server/keys";
 import { ModelChoiceError, planModel, type ModelPlan } from "@/server/llm/client";
 import { installationOctokit } from "@/server/github/app";
-import { readPull } from "@/server/github/prs";
+import { BaseBranchError, readPull } from "@/server/github/prs";
 import { analyzePipeline, signAnalysis } from "@/server/pipeline/analyze";
 import { liveRunner, usesSandbox } from "@/server/runner";
 import { guardLive } from "@/server/session";
@@ -52,7 +52,8 @@ export async function POST(request: Request) {
   // in doesn't install it), not a missing pull request, so it is asked apart.
   let octokit;
   try {
-    octokit = await installationOctokit(REPO, { pull_requests: "read" });
+    // contents:read for the base branch's ref (readPull reads its tip).
+    octokit = await installationOctokit(REPO, { pull_requests: "read", contents: "read" });
   } catch (error) {
     const status = (error as { status?: number }).status;
     return status === 404
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
   try {
     pull = await readPull(octokit, REPO, body.data.pr);
   } catch (error) {
+    if (error instanceof BaseBranchError) return refuse(409, error.message);
     const status = (error as { status?: number }).status;
     return status === 404
       ? refuse(404, `Pull request #${body.data.pr} wasn't found.`)

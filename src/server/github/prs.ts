@@ -309,12 +309,22 @@ async function filesOnBothSides(
 // updated, not where the base branch is now (found by the dogfood run). A
 // merge against it can miss a conflict, and a guard comparing it can't see
 // the base move, so every decision reads the branch's current tip.
+export class BaseBranchError extends Error {}
+
 async function baseTip(octokit: Octokit, repo: string, ref: string): Promise<string> {
   const { owner, name } = splitRepo(repo);
-  const { data } = await octokit.git.getRef({ owner, repo: name, ref: `heads/${ref}` });
-  const sha = (data as { object?: { sha?: unknown } }).object?.sha;
-  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha))
-    throw new Error(`Couldn't read the tip of ${ref}`);
+  const unreadable = () =>
+    new BaseBranchError(`The base branch ${ref} can't be read: was it deleted or renamed?`);
+  let data: unknown;
+  try {
+    ({ data } = await octokit.git.getRef({ owner, repo: name, ref: `heads/${ref}` }));
+  } catch (error) {
+    // A missing branch is named as such; anything else is GitHub being away.
+    if ((error as { status?: number }).status === 404) throw unreadable();
+    throw error;
+  }
+  const sha = (data as { object?: { sha?: unknown } } | null)?.object?.sha;
+  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha)) throw unreadable();
   return sha;
 }
 

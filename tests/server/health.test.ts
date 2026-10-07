@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/health/route";
 
 const ready = vi.hoisted(() => vi.fn());
+const snapshot = vi.hoisted(() => vi.fn());
 vi.mock("@/server/throttle", () => ({ throttleReady: ready }));
+vi.mock("@/server/deps-snapshot", () => ({ snapshotReady: snapshot }));
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -37,13 +39,11 @@ describe("GET /api/health", () => {
 });
 
 describe("GET /api/health: the trusted dependency snapshot", () => {
-  it("reports it only when a well-formed snapshot id is configured", async () => {
+  it("reports only what the snapshot check found", async () => {
     ready.mockResolvedValue(true);
-    vi.stubEnv("DEPS_SNAPSHOT_ID", "");
+    snapshot.mockResolvedValue(false);
     expect((await health()).integrations.snapshot).toBe(false);
-    vi.stubEnv("DEPS_SNAPSHOT_ID", "not a snapshot");
-    expect((await health()).integrations.snapshot).toBe(false);
-    vi.stubEnv("DEPS_SNAPSHOT_ID", "snap_7TjX2x4ZJt3Fa6UTIi4pBDVTqYOd");
+    snapshot.mockResolvedValue(true);
     expect((await health()).integrations.snapshot).toBe(true);
   });
 });

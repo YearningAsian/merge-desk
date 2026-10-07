@@ -9,7 +9,7 @@ import { checkWritableBranch } from "@/core/scope";
 
 export type TestSuite =
   | { id: "playground"; cwd: "playground"; command: ["node", "--test"]; label: string }
-  | { id: "app"; cwd: "."; command: ["npm", "run", "test:core"]; label: string }
+  | { id: "app"; cwd: "."; label: string }
   | { id: "none"; label: string };
 
 const isUnderPlayground = (path: string) =>
@@ -26,7 +26,7 @@ export function chooseTestSuite(changedFiles: string[]): TestSuite {
       label: "node --test (playground)",
     };
   }
-  return { id: "app", cwd: ".", command: ["npm", "run", "test:core"], label: "npm run test:core" };
+  return { id: "app", cwd: ".", label: "vitest run (the app's unit tests)" };
 }
 
 export type LandCheck = { ok: true } | { ok: false; reason: string };

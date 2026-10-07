@@ -408,10 +408,10 @@ export async function parseFiles(shell: Shell, paths: string[]): Promise<ParseRe
   return results;
 }
 
-// `dependencies`: the runner checked that this working copy's package.json
-// and package-lock.json are the ones its trusted dependency snapshot was
-// installed from. Only then does the app's own suite run.
-export type SuiteOptions = { dependencies?: boolean };
+// `vitest`: the absolute path of the trusted dependency snapshot's Vitest,
+// given only after the runner checked this working copy may use it. The
+// app's own suite runs only with it, started directly, never through npm.
+export type SuiteOptions = { vitest?: string };
 
 export const NO_DEPENDENCIES =
   "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.";
@@ -424,7 +424,7 @@ export async function runSuite(
   const suite = chooseTestSuite(changedFiles);
   if (suite.id === "none")
     return { state: "not_run", suite: suite.label, exitCode: null, output: "", durationMs: 0 };
-  if (suite.id === "app" && !options.dependencies) {
+  if (suite.id === "app" && !options.vitest) {
     return {
       state: "not_run",
       suite: suite.label,
@@ -434,11 +434,15 @@ export async function runSuite(
     };
   }
   const started = Date.now();
-  const [command, ...args] = suite.command;
-  const exit = await shell.exec(command, args, {
-    cwd: suite.cwd === "." ? undefined : suite.cwd,
-    timeoutMs: TEST_LIMIT_MS,
-  });
+  const exit =
+    suite.id === "app"
+      ? await shell.exec("node", [options.vitest!, "run", "--configLoader", "runner"], {
+          timeoutMs: TEST_LIMIT_MS,
+        })
+      : await shell.exec(suite.command[0], suite.command.slice(1), {
+          cwd: suite.cwd,
+          timeoutMs: TEST_LIMIT_MS,
+        });
   const durationMs = Date.now() - started;
   if (exit.timedOut) {
     return {

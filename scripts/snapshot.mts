@@ -1,5 +1,6 @@
 // Builds the trusted dependency snapshot the sandbox needs to run the app's
-// own unit tests (`npm run test:core`). Run by a person, never by Merge Desk.
+// own unit tests (its Vitest, as `npm run test:core` would). Run by a person,
+// never by Merge Desk.
 //
 //   npm run snapshot
 //
@@ -7,8 +8,10 @@
 // update main), installs exactly that package-lock.json with
 // `npm ci --ignore-scripts` into <cwd>/node_modules, outside the checkout,
 // and writes a marker with the sha256 of the package.json and
-// package-lock.json it installed. A run uses the snapshot only when the
-// merge's two files hash to the marker's; anything else is held. Prints the
+// package-lock.json it installed. Both are then owned by root and unwritable
+// by anyone else, so a run's test user can't change them (the runner checks).
+// A run uses the snapshot only when the merge's two files hash to the
+// marker's; anything else is held. Prints the
 // snapshot id to set as DEPS_SNAPSHOT_ID (here and in the Vercel project).
 // The boot is tagged like every live boot, so it counts toward the day.
 
@@ -40,7 +43,7 @@ const sandbox = await Sandbox.create({
   tags: SANDBOX_TAGS,
 });
 
-async function run(cmd: string, args: string[], cwd: string) {
+async function run(cmd: string, args: string[], cwd: string, sudo = false) {
   let output = "";
   const sink = new Writable({
     write(chunk: Buffer | string, _encoding, done) {
@@ -52,6 +55,7 @@ async function run(cmd: string, args: string[], cwd: string) {
     cmd,
     args,
     cwd,
+    sudo,
     env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: "/tmp/merge-desk-npm", NODE_OPTIONS: "" },
     stdout: sink,
     stderr: sink,
@@ -102,6 +106,14 @@ try {
       ),
     },
   ]);
+  const trusted = [`${home}/node_modules`, `${home}/${DEPS_MARKER}`];
+  await run(
+    "chown",
+    ["--recursive", "--no-dereference", "root:root", "--", ...trusted],
+    home,
+    true,
+  );
+  await run("chmod", ["--recursive", "go-w", "--", ...trusted], home, true);
   const snapshot = await sandbox.snapshot({ expiration: EXPIRATION_MS });
   snapshotId = snapshot.snapshotId;
 } catch (error) {

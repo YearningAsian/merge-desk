@@ -47,6 +47,13 @@ function beforeUpdate(signal?: AbortSignal) {
   }
 }
 
+// The suite that passed, as the run's tests step named it.
+function testsThatPassed(record: RunRecord) {
+  const tests = record.checks.find((check) => check.step === "tests" && check.state === "passed");
+  const suite = tests?.detail?.split(": ")[0]?.replace(/\s+/g, " ").trim().slice(0, 80);
+  return suite ? `${suite} passes` : "the tests pass";
+}
+
 export function landMessage(
   record: RunRecord,
   refs: { head: string; base: string },
@@ -58,7 +65,7 @@ export function landMessage(
     `Merge ${refs.base} into ${refs.head} (Merge Desk)`,
     "",
     `${OPTION_LABELS[record.option]}${description ? `: ${description}` : ""}`,
-    "Checked on a scratch copy: it parses, the choice is honored, and the tests pass.",
+    `Checked on a scratch copy: it parses, the choice is honored, and ${testsThatPassed(record)}.`,
     `Landed by @${login} with Merge Desk.`,
   ].join("\n");
 }

@@ -112,6 +112,10 @@ export class GeminiClient implements StructuredClient {
         ),
         deadline,
       ]);
+    } catch (error) {
+      // A cancel mid-call: say so in our words, not the SDK's.
+      if (request.signal?.aborted) throw new ProviderError("Stopped before Gemini answered.");
+      throw error;
     } finally {
       clearTimeout(timer);
       request.signal?.removeEventListener("abort", abort);

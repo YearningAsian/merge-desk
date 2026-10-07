@@ -399,4 +399,20 @@ describe("choosing a model", () => {
     ).rejects.toThrow("Stopped before Gemini answered.");
     expect(create).not.toHaveBeenCalled();
   });
+
+  it("a cancel while Gemini is answering says it was stopped, not the SDK's words", async () => {
+    const create: ConstructorParameters<typeof GeminiClient>[0] = (_body, options) =>
+      new Promise((_, reject) =>
+        options.fetchOptions.signal.addEventListener("abort", () =>
+          reject(new Error("Request was aborted.")),
+        ),
+      );
+    const controller = new AbortController();
+    const call = new GeminiClient(create, "gemini-3.5-flash-lite").structured({
+      ...request,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 10);
+    await expect(call).rejects.toThrow("Stopped before Gemini answered.");
+  });
 });

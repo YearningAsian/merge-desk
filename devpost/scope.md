@@ -55,7 +55,7 @@ The same flow works on a laptop screen.
 - **Expo React Native app with a downloadable Android APK**, built once the web app works end to end (learner: "This will be made obviously once the full app itself works"). Same backend as the web app.
 - Many repositories, sign-in with GitHub for any user, notifications when a conflict appears.
 - A git merge driver for the terminal, so `git merge` uses the same checks.
-- More AI providers, with fallback.
+- More AI providers, with fallback. *(Partly pulled in by the learner, 2026-10-07: live mode's Settings can use Claude, GPT or any OpenRouter model on the user's own key; no automatic fallback. Built to each provider's documented API and not yet verified with a real key.)*
 - A replay test over real historical merges to measure how often an unchecked AI merge drops an intent.
 
 ## Explicitly Cut

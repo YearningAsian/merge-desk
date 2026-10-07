@@ -122,18 +122,18 @@
 
 | # | Row | File(s) | Owner | Status | Notes |
 |---|---|---|---|---|---|
-| 4.1 | Stills of every judge page (phone + desktop) | `docs/stills/raw/` | A | ⬜ | |
+| 4.1 | Stills of every judge page (phone + desktop) | `docs/stills/raw/` | A | ✅ | 2026-10-07: 29 stills of `/`, `/demo`, `/judge`, `/api/stats` at 1440 and 390 px from production (no overflow or console errors on app pages) plus 8 production journey shots; `docs/stills/raw/NOTES.md` |
 | 4.2 | Brand kit: thumbnail, B-roll, poster | `docs/stills/generated/`, `docs/presentation/` | A | ⬜ | |
 | 4.3 | Video footage captured (real UI) | `docs/video/raw/` | A | ⬜ | |
 | 4.4 | Video edited and uploaded | `docs/video/EDIT.md` | A | ⬜ | Link in FACTS `demo.videoUrl` |
-| 4.5 | Gallery (3-6 images) with captions | `docs/stills/GALLERY.md` | A | ⬜ | |
+| 4.5 | Gallery (3-6 images) with captions | `docs/stills/GALLERY.md` | A | 🟡 | 2026-10-07: five real captures picked and captioned; 3:2 crops still to make |
 
 ### Phase 5: Submit
 
 | # | Row | File(s) | Owner | Status | Notes |
 |---|---|---|---|---|---|
 | 5.1 | FACTS locked (rerun provenance commands) | `docs/FACTS.json` | A | ⬜ | |
-| 5.2 | Writeup drafted, rewritten in the team's voice | `docs/submission-draft.md` | A | ⬜ | |
+| 5.2 | Writeup drafted, rewritten in the team's voice | `docs/submission-draft.md` | A | 🟡 | 2026-10-07: full agent draft at the learner's direction (numbers from FACTS only; BYOK providers not mentioned); pitch and video plan drafted (`docs/pitch.md`, `docs/video/EDIT.md`); learner to read and adjust |
 | 5.3 | Claims audit clean (`check_claims.py --strict` + review in claims mode) | n/a | B | ⬜ | |
 | 5.4 | **H:** every portal submitted and reload-verified | n/a | A | ⬜ | |
 | 5.5 | Pitch rehearsed; expo pack ready | `docs/pitch.md` | both | ⬜ | |

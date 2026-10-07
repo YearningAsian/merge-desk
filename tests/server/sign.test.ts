@@ -61,11 +61,12 @@ describe("sign and verify", () => {
     expect(() => verify(wrong, expected, Body, { secret, now })).toThrow(/wrong shape/);
   });
 
-  it("refuses demo mode's token like any other unsigned one", () => {
-    for (const kind of ["analysis", "result"] as const)
-      expect(() => verify(DEMO_TOKEN, { ...expected, kind }, Body, { secret, now })).toThrow(
-        SignatureError,
-      );
+  it("refuses demo mode's tokens like any other unsigned one", () => {
+    for (const token of [DEMO_TOKEN, `${DEMO_TOKEN}:1:combine:0`, `${DEMO_TOKEN}:1:combine:1`])
+      for (const kind of ["analysis", "result"] as const)
+        expect(() => verify(token, { ...expected, kind }, Body, { secret, now })).toThrow(
+          SignatureError,
+        );
   });
 
   it("needs a long enough secret", () => {

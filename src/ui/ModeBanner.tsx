@@ -15,9 +15,9 @@ export function ModeBanner({ capturedAt, onReset }: { capturedAt: string; onRese
       <div className="min-w-0 flex-1 leading-snug">
         <p className="text-[13px] font-semibold text-ink">Demo: recorded from a real run</p>
         <p className="hidden text-[12.5px] text-muted sm:block">
-          Real Gemini answers, sandbox checks and test output from{" "}
-          {day.format(new Date(capturedAt))}, replayed at their original pace. Nothing is written to
-          GitHub.
+          Real Gemini answers, sandbox checks, test output and Lands from{" "}
+          {day.format(new Date(capturedAt))}, replayed at their original pace. The demo itself
+          writes nothing to GitHub.
         </p>
       </div>
       <Button onClick={onReset} className="h-11 md:h-8">

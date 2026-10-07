@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { Recording, recordedAnalysis } from "@/core/recording";
+import { Recording, recordedAnalysis, recordingGaps } from "@/core/recording";
 import { PullList } from "@/core/pulls";
 
 // Real captured data (tests/e2e/fixtures) shaped as a demo recording.
@@ -14,9 +14,18 @@ const lines = (name: string) =>
 const prs = PullList.parse(JSON.parse(readFileSync(join(FIXTURES, "prs.json"), "utf8")));
 const pull = prs.pulls.find((item) => item.head.ref === "demo/clean/rename")!;
 
+const run = (option: string, events: unknown[], steer: string | null = null) => ({
+  option,
+  steer,
+  events,
+  held: null as unknown,
+  discarded: null as unknown,
+  land: null as unknown,
+});
+
 function clean() {
   return {
-    v: 1,
+    v: 2,
     scenario: "clean",
     capturedAt: "2026-10-06T22:00:00.000Z",
     runner: "sandbox",
@@ -28,7 +37,7 @@ function clean() {
     },
     pull,
     analysis: lines("analyze-clean.ndjson"),
-    runs: [{ option: "combine", events: lines("run-clean.ndjson") }],
+    runs: [run("combine", lines("run-clean.ndjson"))],
   };
 }
 
@@ -67,7 +76,9 @@ describe("demo recordings", () => {
   it("only records options the analysis offered, once each", () => {
     const twice = clean();
     twice.runs.push(twice.runs[0]!);
-    expect(issues(twice)).toContain("Each option is recorded at most once.");
+    expect(issues(twice)).toContain(
+      "Each option is recorded at most once, plus at most one steered retry.",
+    );
 
     const drop = Recording.parse(clean());
     const offered = recordedAnalysis(drop).options.map((option) => option.kind);
@@ -76,7 +87,7 @@ describe("demo recordings", () => {
     );
     if (missing) {
       const notOffered = clean();
-      notOffered.runs.push({ option: missing, events: notOffered.runs[0]!.events });
+      notOffered.runs.push(run(missing, notOffered.runs[0]!.events));
       expect(issues(notOffered)).toContain(`${missing} wasn't offered by the analysis.`);
     }
   });
@@ -86,7 +97,7 @@ describe("demo recordings", () => {
     const analysisEvent = recording.analysis.at(-1) as { analysis: { options: unknown[] } };
     const options = analysisEvent.analysis.options as Array<{ kind: string; recommended: boolean }>;
     const notRecommended = options.find((option) => !option.recommended)!;
-    recording.runs = [{ option: notRecommended.kind, events: recording.runs[0]!.events }];
+    recording.runs = [run(notRecommended.kind, recording.runs[0]!.events)];
     expect(issues(recording)).toContain("The recommended option must be recorded.");
   });
 
@@ -112,5 +123,56 @@ describe("demo recordings", () => {
     const events = backwards.runs[0]!.events;
     backwards.runs[0]!.events = [events[0]!, { ...events[1]!, t: 99_999 }, ...events.slice(2)];
     expect(issues(backwards)).toContain("Event times must not go backwards.");
+  });
+
+  it("keeps a steered retry next to the run it retries", () => {
+    const orphan = clean();
+    orphan.runs = [run("combine", orphan.runs[0]!.events, "keep the old call")];
+    expect(issues(orphan)).toContain("combine: a steered retry needs the run it retries.");
+
+    const steered = clean();
+    steered.runs.push(run("combine", steered.runs[0]!.events, "keep the old call"));
+    expect(issues(steered)).toEqual([]);
+  });
+});
+
+// The committed recordings: real writes, checked for shape and completeness.
+const committed = (id: string) =>
+  Recording.parse(
+    JSON.parse(readFileSync(join(process.cwd(), "demo", "recordings", `${id}.json`), "utf8")),
+  );
+
+describe("committed demo recordings", () => {
+  it("are complete: every option, steered retry, hold, discard and Land", () => {
+    for (const id of ["clean", "held", "drop"])
+      expect(recordingGaps(committed(id)), id).toEqual([]);
+  });
+
+  it("only hold a held run, only land a verified one, at the landed commit", () => {
+    const recording = committed("drop");
+    const verified = recording.runs.find((item) => item.land)!;
+    const held = recording.runs.find((item) => item.held)!;
+
+    const holdOnVerified = structuredClone(recording);
+    holdOnVerified.runs.find((item) => item.land)!.held = held.held;
+    expect(issues(holdOnVerified)).toContain(`${verified.option}: only a held run records a hold.`);
+
+    const landOnHeld = structuredClone(recording);
+    landOnHeld.runs.find((item) => item.held && !item.steer)!.land = verified.land;
+    expect(issues(landOnHeld).join(" | ")).toMatch(/only a verified run lands/);
+
+    const elsewhere = structuredClone(recording);
+    const land = elsewhere.runs.find((item) => item.land)!.land!;
+    land.pull = { ...land.pull, head: { ...land.pull.head, sha: "0".repeat(40) } };
+    expect(issues(elsewhere).join(" | ")).toMatch(/head is the landed commit/);
+  });
+
+  it("names what a demo would miss", () => {
+    const recording = committed("held");
+    recording.runs = recording.runs.filter((item) => !item.steer);
+    recording.runs[0]!.discarded = null;
+    const gaps = recordingGaps(recording);
+    expect(gaps).toContain(`${recording.runs[0]!.option}: discard not recorded`);
+    expect(gaps.some((gap) => gap.endsWith("held, no steered retry recorded"))).toBe(true);
   });
 });

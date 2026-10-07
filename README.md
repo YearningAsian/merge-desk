@@ -12,9 +12,9 @@ Production is deployed at https://merge-desk-swart.vercel.app (from `main`, deli
 
 ## Try the demo
 
-Open `/demo`, or `/judge` for a short guided tour. No sign-in and no keys: the desk replays real runs recorded from the three seeded demo pull requests (#1 verified, #2 held, #6 a chosen drop), with Gemini's actual answers, the sandbox's actual checks and test output, at their original pace. Every option each analysis offered was recorded, so the slider never lands on something the demo can't play. Demo mode sends no requests and writes nothing; **Reset** starts it over. Landing and steering need live mode.
+Open `/demo`, or `/judge` for a short guided tour. No sign-in and no keys: the desk replays real work recorded on the three seeded demo pull requests (#1 verified, #2 held, #6 a chosen drop) at its original pace. That is Gemini's actual answers, the sandbox's actual checks and test output, a steered retry of every held option, the holds and discards written to each pull request's decision record, and a real Land of every verified run (each Land was reset afterwards, so the conflicts are back). Every option each analysis offered was recorded, so the demo never reaches a button it can't play. Demo mode itself sends no requests and writes nothing; **Reset** starts it over.
 
-The recordings live in [`demo/recordings/`](demo/recordings) and carry no signatures, so they can't authorize anything. `npm run record` re-captures them through the same pipeline live mode uses (it needs the live configuration, and every sandbox boot counts against the daily throttle); `npm run recordings:check` validates them; `npm run facts` re-measures the demo numbers in [`docs/FACTS.json`](docs/FACTS.json), and a unit test fails if the two disagree.
+The recordings live in [`demo/recordings/`](demo/recordings) and carry no signatures, so they can't authorize anything. `npm run record` re-captures them through live mode's own route handlers: it needs the live configuration, lands on the demo pull requests and resets them with `npm run demo:reset`, and every sandbox boot counts against the daily throttle; `npm run recordings:check` validates them; `npm run facts` re-measures the demo numbers in [`docs/FACTS.json`](docs/FACTS.json), and a unit test fails if the two disagree.
 
 ## Local workflow
 

@@ -5,8 +5,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { Recording, SCENARIOS } from "@/core/recording";
 
 // Demo mode, signed out, against the production build: the committed
-// recordings play back at their original pace, and the page makes no API
-// request at all (nothing to sign, nothing written). Runs take 11 to 15 s.
+// recordings play back at their original pace (runs, steering, the decision
+// record and real Lands), and the page makes no API request at all (nothing
+// to sign, nothing written). Runs take 10 to 13 s.
 
 const recordings = Object.fromEntries(
   SCENARIOS.map((id) => [
@@ -55,7 +56,7 @@ test("demo: three recorded pull requests under the demo banner, no sign-in", asy
   await page.goto("/demo");
   const banner = page.getByRole("region", { name: "Demo mode" });
   await expect(banner.getByText("Demo: recorded from a real run")).toBeVisible();
-  await expect(banner.getByText("Nothing is written to GitHub.", { exact: false })).toBeVisible();
+  await expect(banner.getByText("writes nothing to GitHub", { exact: false })).toBeVisible();
   await expect(banner.getByRole("button", { name: "Reset" })).toBeVisible();
   const list = page.getByRole("navigation", { name: "Pull requests" });
   await expect(list.getByRole("button", { name: /\[Demo\]/ })).toHaveCount(3);
@@ -65,21 +66,36 @@ test("demo: three recorded pull requests under the demo banner, no sign-in", asy
   expect(calls).toEqual([]);
 });
 
-test("demo: held, then the next option, with steering kept for live mode", async ({ page }) => {
+const landOf = (id: (typeof SCENARIOS)[number], option: string) =>
+  recordings[id].runs.find((run) => run.option === option && run.land)!.land!;
+
+test("demo: held and recorded, steered with the recorded line, then the next option", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const calls = apiCalls(page);
   await page.goto(`/demo?pr=${pr("held")}`);
   const detail = page.getByRole("article");
-  await expect(detail.getByRole("region", { name: "GitHub snapshot when recorded" })).toBeVisible();
+  await expect(detail.getByRole("region", { name: "Current GitHub snapshot" })).toBeVisible();
   await detail.getByRole("button", { name: "Run checks" }).click(PLAYBACK);
   const held = detail.getByRole("group", { name: "Result: HELD" });
   await expect(held).toBeVisible(PLAYBACK);
   await expect(held.getByText("Held at tests", { exact: false })).toBeVisible();
   await expect(held.getByText(/failed \(exit 1/).first()).toBeVisible();
-  await expect(held.getByText("works in live mode only", { exact: false })).toBeVisible();
-  await expect(held.getByRole("textbox")).toHaveCount(0);
+  await expect(held.getByText("Recorded on the pull request.")).toBeVisible(PLAYBACK);
   await expect(page).toHaveTitle(`HELD #${pr("held")} | Merge Desk`);
   await shot(page, "demo-held-1440");
+
+  // Steering replays the real steered retry: the choice-honored check
+  // catches what Gemini left out.
+  const line = recordings.held.runs.find((run) => run.option === "combine" && run.steer)!.steer!;
+  const field = held.getByRole("textbox", { name: /Steer and retry/ });
+  await expect(field).toHaveValue(line);
+  await expect(field).toHaveAttribute("readonly", "");
+  await held.getByRole("button", { name: "Retry" }).click();
+  await expect(detail.getByText(`Steered: "${line}"`)).toBeVisible();
+  await expect(held.getByText(/MISSING/).first()).toBeVisible(PLAYBACK);
+  await shot(page, "demo-steered-1440");
 
   // The suggestion moves the slider; its recorded run plays too.
   await held.getByRole("button", { name: /^Try / }).click();
@@ -92,25 +108,41 @@ test("demo: held, then the next option, with steering kept for live mode", async
   expect(calls).toEqual([]);
 });
 
-test("demo: the clean pull request is VERIFIED and Land explains live mode", async ({ page }) => {
+test("demo: the clean pull request is VERIFIED and Land replays the real Land", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const calls = apiCalls(page);
+  const land = landOf("clean", "combine");
   await page.goto(`/demo?pr=${pr("clean")}`);
   const detail = page.getByRole("article");
   await detail.getByRole("button", { name: "Run checks" }).click(PLAYBACK);
   const verified = detail.getByRole("group", { name: "Result: VERIFIED" });
   await expect(verified).toBeVisible(PLAYBACK);
   await expect(verified.getByText(/theirs: .*, present/)).toBeVisible();
-  await expect(verified.getByText("Live mode only.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Land/ })).toHaveCount(0);
-  await expect(detail.getByRole("heading", { name: /Record/ })).toHaveCount(0);
-  await shot(page, "demo-verified-1440");
+  await expect(
+    verified.getByText("Does not merge into demo/base.", { exact: false }),
+  ).toBeVisible();
+  await verified.getByRole("button", { name: `Land: push merge commit to ${land.branch}` }).click();
+  const done = detail.getByRole("group", { name: "Land: LANDED" });
+  await expect(done).toBeVisible(PLAYBACK);
+  await expect(
+    done.getByRole("link", { name: new RegExp(`${land.commit.slice(0, 7)} on`) }),
+  ).toHaveAttribute("href", `https://github.com/YearningAsian/merge-desk/commit/${land.commit}`);
+  await expect(done.getByText("Recorded on the pull request.")).toBeVisible();
+  await expect(detail.getByText("1 on the pull request")).toBeVisible();
+  // The list shows the pull request as GitHub listed it after the Land.
+  const list = page.getByRole("navigation", { name: "Pull requests" });
+  await expect(list.getByText("Needs resolution", { exact: true })).toHaveCount(2);
+  await shot(page, "demo-landed-1440");
+  await noSeriousAxe(page);
   expect(calls).toEqual([]);
 });
 
-test("demo: a chosen drop is confirmed, then VERIFIED as dropped", async ({ page }) => {
+test("demo: a chosen drop is confirmed, VERIFIED as dropped, and lands", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const calls = apiCalls(page);
+  const land = landOf("drop", "keep_ours");
   await page.goto(`/demo?pr=${pr("drop")}`);
   const detail = page.getByRole("article");
   await expect(detail.getByRole("slider", { name: "Resolution" })).toBeVisible(PLAYBACK);
@@ -120,22 +152,36 @@ test("demo: a chosen drop is confirmed, then VERIFIED as dropped", async ({ page
   const verified = detail.getByRole("group", { name: "Result: VERIFIED" });
   await expect(verified).toBeVisible(PLAYBACK);
   await expect(verified.getByText(/dropped as chosen/)).toBeVisible();
+  await verified.getByRole("button", { name: `Land: push merge commit to ${land.branch}` }).click();
+  await expect(detail.getByRole("group", { name: "Land: LANDED" })).toBeVisible(PLAYBACK);
+  await expect(detail.getByText("1 on the pull request")).toBeVisible();
   await shot(page, "demo-drop-1440");
   expect(calls).toEqual([]);
 });
 
-test("demo: Reset starts every pull request over", async ({ page }) => {
+test("demo: Reset starts every pull request over, even after a Land", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  const land = landOf("clean", "combine");
   await page.goto(`/demo?pr=${pr("clean")}`);
   const detail = page.getByRole("article");
   await detail.getByRole("button", { name: "Run checks" }).click(PLAYBACK);
+  await detail
+    .getByRole("button", { name: `Land: push merge commit to ${land.branch}` })
+    .click(PLAYBACK);
+  await expect(detail.getByRole("group", { name: "Land: LANDED" })).toBeVisible(PLAYBACK);
   await page.getByRole("button", { name: "Reset" }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("article")).toHaveCount(0);
   const list = page.getByRole("navigation", { name: "Pull requests" });
   await expect(list.getByText("Needs resolution", { exact: true })).toHaveCount(3);
   await expect(page.getByText("Demo reset.", { exact: false })).toBeAttached();
-  // The cancelled playback never finishes later.
+  await page.goto(`/demo?pr=${pr("clean")}`);
+  await expect(
+    page.getByRole("article").getByText("Nothing recorded yet.", { exact: false }),
+  ).toBeAttached();
+  // A cancelled playback never finishes later.
+  await page.getByRole("button", { name: "Run checks" }).click(PLAYBACK);
+  await page.getByRole("button", { name: "Reset" }).click();
   await page.waitForTimeout(1_000);
   await expect(page).toHaveTitle("Demo | Merge Desk");
 });

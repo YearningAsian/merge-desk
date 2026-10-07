@@ -20,6 +20,7 @@ const day = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC
 const capturedOn = day.format(new Date(heldRun!.capturedAt));
 const model = recordedAnalysis(heldRun!).model;
 const inSandbox = [cleanRun, heldRun, dropRun].every((item) => item!.runner === "sandbox");
+const steerLine = heldRun!.runs.find((run) => run.option === "combine" && run.steer)!.steer;
 const { metrics, demo } = facts;
 const REPO_URL = demo.repoUrl;
 
@@ -29,8 +30,9 @@ const stops = [
     recording: heldRun!,
     steps: [
       "Press Run checks on the recommended option, Combine both.",
-      "Gemini's merge parses and keeps what both sides changed, but the repository's real tests fail: code and tests outside the conflicted file still call the old signature. The result is HELD, with the failing check, the tests' own output and nothing pushed.",
-      "Try the other options from the slider. Each one is held too, because each fails a real test.",
+      "Gemini's merge parses and keeps what both sides changed, but the repository's real tests fail: code outside the conflicted file still calls the old signature. The result is HELD, with the failing check and the tests' own output. Nothing is pushed, and the hold is written to the pull request's decision record.",
+      `Steer and retry with the recorded line, "${steerLine}". This time Gemini's merge leaves out lines from both sides, and the choice-honored check catches it: ours and theirs MISSING, HELD again.`,
+      "The other options on the slider are held too.",
     ],
   },
   {
@@ -38,7 +40,7 @@ const stops = [
     recording: cleanRun!,
     steps: [
       "Run Combine both. It parses, both branches' changes are present, and the tests pass: VERIFIED.",
-      "Below the result, Land says what live mode would do: push this merge commit to the pull request's own branch, never to its base.",
+      "Press Land. This replays a real Land: the merge commit went onto the pull request's own branch, never its base, the decision record gained an entry, and GitHub then reported the pull request could merge. The branch was reset afterwards so the demo can start over.",
     ],
   },
   {
@@ -46,7 +48,8 @@ const stops = [
     recording: dropRun!,
     steps: [
       "Move the slider to Keep ours, drop theirs. Merge Desk names whose work is dropped and asks you to hold the button (or press Ctrl+Enter) to confirm.",
-      'The run is VERIFIED with theirs "dropped as chosen". Gemini recommended combining here, and that verifies too: each option is checked against what it says it keeps.',
+      'The run is VERIFIED with theirs "dropped as chosen". Land it, and the decision record lists the dropped commits so the work can be recovered.',
+      "Gemini recommended combining here, and that verifies too: each option is checked against what it says it keeps.",
     ],
   },
 ];
@@ -143,13 +146,19 @@ export default function JudgePage() {
             <Code>{model}</Code>) proposed each resolution, and{" "}
             {inSandbox ? "a Vercel Sandbox" : "a scratch copy on the developer's laptop"} merged the
             branches with git, applied the proposal and ran the tests with <Code>node --test</Code>.
-            That is {metrics.demoRecordedRuns} recorded runs, {metrics.demoRecordedVerified}{" "}
-            VERIFIED and {metrics.demoRecordedHeld} HELD, each taking {metrics.demoRunSecondsMin} to{" "}
-            {metrics.demoRunSecondsMax} seconds from start to verdict.
+            That is {metrics.demoRecordedRuns} recorded runs ({metrics.demoRecordedSteered} of them
+            steered retries), {metrics.demoRecordedVerified} VERIFIED and {metrics.demoRecordedHeld}{" "}
+            HELD, each taking {metrics.demoRunSecondsMin} to {metrics.demoRunSecondsMax} seconds
+            from start to verdict.
           </li>
           <li>
-            The demo sends no requests and writes nothing. Live mode runs the same pipeline on real
-            pull requests and can Land; it accepts only the owner&apos;s GitHub account.
+            Every verified run was landed for real: {metrics.demoRecordedLands} Lands on the demo
+            pull requests&apos; own branches, each recorded on the pull request and then reset so
+            the conflict is back. Holds and discards were written to the same decision records.
+          </li>
+          <li>
+            The demo itself sends no requests and writes nothing. Live mode runs the same pipeline
+            on real pull requests; it accepts only the owner&apos;s GitHub account.
           </li>
           <li>
             VERIFIED means exactly those checks passed. It is evidence, not a proof that a merge is

@@ -1,7 +1,7 @@
 {
-  "v": 1,
+  "v": 2,
   "scenario": "clean",
-  "capturedAt": "2026-10-06T21:58:38.441Z",
+  "capturedAt": "2026-10-07T02:56:24.578Z",
   "runner": "sandbox",
   "source": {
     "repo": "YearningAsian/merge-desk",
@@ -38,7 +38,7 @@
         "state": "none",
         "items": [],
         "reason": "No checks were reported for this head. Required checks were not verified.",
-        "observedAt": "2026-10-06T21:58:37.836Z"
+        "observedAt": "2026-10-07T02:56:23.053Z"
       }
     },
     "fork": false,
@@ -54,7 +54,7 @@
       "state": "queued"
     },
     {
-      "t": 1,
+      "t": 0,
       "step": "analyze",
       "state": "queued"
     },
@@ -64,24 +64,24 @@
       "state": "running"
     },
     {
-      "t": 4157,
+      "t": 3976,
       "step": "prepare",
       "state": "passed",
       "detail": "1 conflicted file: playground/src/api.js · ours 1 commits · theirs 3 commits"
     },
     {
-      "t": 4157,
+      "t": 3976,
       "step": "analyze",
       "state": "running"
     },
     {
-      "t": 5725,
+      "t": 5649,
       "step": "analyze",
       "state": "passed",
-      "detail": "ours: renamed fetchUser to getUser and added a deprecated alias\ntheirs: added retry logic for HTTP 429 status codes"
+      "detail": "ours: renamed fetchUser to getUser and added a deprecated alias\ntheirs: added retry logic on HTTP 429 to fetchUser"
     },
     {
-      "t": 5725,
+      "t": 5649,
       "type": "analysis",
       "ok": true,
       "analysis": {
@@ -104,15 +104,15 @@
         ],
         "intents": {
           "ours": "renamed fetchUser to getUser and added a deprecated alias",
-          "theirs": "added retry logic for HTTP 429 status codes"
+          "theirs": "added retry logic on HTTP 429 to fetchUser"
         },
         "options": [
           {
             "kind": "combine",
             "label": "Combine both",
-            "summary": "Renames the function to getUser with a deprecated fetchUser alias while retaining HTTP 429 retry logic",
+            "summary": "Renames the function to getUser while keeping the retry logic and a deprecated fetchUser alias.",
             "recommended": true,
-            "reason": "This is the best choice because it combines the rename and deprecation with the new retry capability.",
+            "reason": "This is the best choice because it preserves both the architectural rename and the new bugfix/feature without losing code.",
             "keeps": [
               {
                 "side": "ours",
@@ -152,9 +152,9 @@
           {
             "kind": "keep_ours",
             "label": "Keep ours, drop theirs",
-            "summary": "Renames the function to getUser with a deprecated fetchUser alias, dropping retry logic",
+            "summary": "Keeps the rename to getUser and drops the HTTP 429 retry logic from theirs.",
             "recommended": false,
-            "reason": "Pick this only if the retry feature should be deferred or applied to the new getUser function separately.",
+            "reason": "Pick this if you prefer to discard the retry addition and only want the rename changes.",
             "keeps": [
               {
                 "side": "ours",
@@ -193,9 +193,9 @@
           {
             "kind": "keep_theirs",
             "label": "Keep theirs, drop ours",
-            "summary": "Keeps fetchUser with HTTP 429 retries, dropping the rename and deprecation",
+            "summary": "Keeps the fetchUser name with the retry logic and drops the rename and alias from ours.",
             "recommended": false,
-            "reason": "Pick this if the API rename is no longer desired and the existing function name must be preserved.",
+            "reason": "Pick this if you want to keep the original function name and drop the rename refactor.",
             "keeps": [
               {
                 "side": "theirs",
@@ -286,115 +286,116 @@
   "runs": [
     {
       "option": "combine",
+      "steer": null,
       "events": [
         {
-          "t": 0,
+          "t": 1,
           "step": "revisions",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "propose",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "write",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "parse",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "honor",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "tests",
           "state": "queued"
         },
         {
-          "t": 0,
+          "t": 2,
           "step": "revisions",
           "state": "running"
         },
         {
-          "t": 718,
+          "t": 546,
           "step": "revisions",
           "state": "passed",
           "detail": "head df6c107 · base a41f224"
         },
         {
-          "t": 718,
+          "t": 546,
           "step": "propose",
           "state": "running"
         },
         {
-          "t": 2162,
+          "t": 1942,
           "step": "propose",
           "state": "passed",
-          "detail": "Gemini (gemini-3.5-flash-lite): Combine getUser rename, deprecated alias, and HTTP 429 retry logic"
+          "detail": "Gemini (gemini-3.5-flash-lite): combines the getUser rename with the 429 retry logic"
         },
         {
-          "t": 2162,
+          "t": 1942,
           "step": "write",
           "state": "running"
         },
         {
-          "t": 7824,
+          "t": 7275,
           "step": "write",
           "state": "passed",
           "detail": "6 files differ from the head: playground/src/api.js, playground/src/billing.js, playground/src/money.js, playground/test/billing.test.js, playground/test/money-rounding.test.js, playground/test/retry.test.js"
         },
         {
-          "t": 7824,
+          "t": 7275,
           "step": "parse",
           "state": "running"
         },
         {
-          "t": 7968,
+          "t": 7411,
           "step": "parse",
           "state": "passed",
           "detail": "playground/src/api.js: node --check"
         },
         {
-          "t": 7968,
+          "t": 7411,
           "step": "honor",
           "state": "running"
         },
         {
-          "t": 7973,
+          "t": 7422,
           "step": "honor",
           "state": "passed",
-          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, present\ntheirs: added retry logic for HTTP 429 status codes, present",
-          "log": "Combine both: inside the conflicts, every line either side changed must be in the result, with the other side's renames applied; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic for HTTP 429 status codes\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, present\ntheirs: added retry logic on HTTP 429 to fetchUser, present",
+          "log": "Combine both: inside the conflicts, every line either side changed must be in the result, with the other side's renames applied; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic on HTTP 429 to fetchUser\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
         },
         {
-          "t": 7973,
+          "t": 7422,
           "step": "tests",
           "state": "running"
         },
         {
-          "t": 11195,
+          "t": 10295,
           "step": "tests",
           "state": "passed",
-          "detail": "node --test (playground): passed (exit 0, 746 ms)",
-          "log": "✔ getUser returns the user (1.831709ms)\n✔ fetchUser still works as a deprecated alias (0.165767ms)\n✔ displayName uses the user's name (0.207045ms)\n✔ chargeCustomer charges a positive amount (0.85702ms)\n✔ chargeCustomer refuses a zero amount (0.432551ms)\n✔ chargeCustomer records the currency (0.148496ms)\n✔ chargeMonthly charges the plan price (0.15529ms)\n✔ toCents rounds 19.99 to 1999 cents (5.237809ms)\n✔ toCents rounds 0.29 to 29 cents (0.54954ms)\n✔ toCents converts whole dollars (0.832813ms)\n✔ fetchUser retries after HTTP 429 (0.974094ms)\n✔ fetchUser gives up after two retries (0.547768ms)\nℹ tests 12\nℹ suites 0\nℹ pass 12\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 285.041894\n"
+          "detail": "node --test (playground): passed (exit 0, 451 ms)",
+          "log": "✔ getUser returns the user (1.177986ms)\n✔ fetchUser still works as a deprecated alias (0.152409ms)\n✔ displayName uses the user's name (0.197499ms)\n✔ chargeCustomer charges a positive amount (0.721254ms)\n✔ chargeCustomer refuses a zero amount (0.382103ms)\n✔ chargeCustomer records the currency (0.126147ms)\n✔ chargeMonthly charges the plan price (0.13224ms)\n✔ toCents rounds 19.99 to 1999 cents (0.774063ms)\n✔ toCents rounds 0.29 to 29 cents (0.143786ms)\n✔ toCents converts whole dollars (0.681146ms)\n✔ fetchUser retries after HTTP 429 (0.825732ms)\n✔ fetchUser gives up after two retries (0.471253ms)\nℹ tests 12\nℹ suites 0\nℹ pass 12\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 257.23896\n"
         },
         {
-          "t": 12387,
+          "t": 11470,
           "type": "result",
           "verdict": "VERIFIED",
           "failed": [],
           "summary": [
             "ours: renamed fetchUser to getUser and added a deprecated alias, present",
-            "theirs: added retry logic for HTTP 429 status codes, present"
+            "theirs: added retry logic on HTTP 429 to fetchUser, present"
           ],
-          "description": "Combine getUser rename, deprecated alias, and HTTP 429 retry logic",
+          "description": "combines the getUser rename with the 429 retry logic",
           "changedFiles": [
             "playground/src/api.js",
             "playground/src/billing.js",
@@ -405,10 +406,136 @@
           ],
           "patch": "diff --git a/playground/src/api.js b/playground/src/api.js\nindex a8a329d..0b26e30 100644\n--- a/playground/src/api.js\n+++ b/playground/src/api.js\n@@ -2,8 +2,12 @@\n \n const API_ROOT = \"https://api.example.test\";\n \n-export async function getUser(id, { fetchImpl = globalThis.fetch } = {}) {\n-  const response = await fetchImpl(`${API_ROOT}/users/${id}`);\n+export async function getUser(id, { fetchImpl = globalThis.fetch, retries = 2 } = {}) {\n+  const url = `${API_ROOT}/users/${id}`;\n+  let response = await fetchImpl(url);\n+  for (let attempt = 0; response.status === 429 && attempt < retries; attempt += 1) {\n+    response = await fetchImpl(url);\n+  }\n   if (!response.ok) {\n     throw new Error(`getUser failed with ${response.status}`);\n   }\ndiff --git a/playground/src/billing.js b/playground/src/billing.js\nindex 43b23b6..c72dc38 100644\n--- a/playground/src/billing.js\n+++ b/playground/src/billing.js\n@@ -1,12 +1,16 @@\n // Billing helpers for the Merge Desk demo scenarios.\n \n-export function chargeCustomer(customerId, amountCents) {\n+export function chargeCustomer({ customerId, amountCents, currency = \"usd\" }) {\n   if (!Number.isInteger(amountCents) || amountCents <= 0) {\n     throw new RangeError(\"amountCents must be a positive integer\");\n   }\n-  return { customerId, amountCents, currency: \"usd\", status: \"charged\" };\n+  return { customerId, amountCents, currency, status: \"charged\" };\n }\n \n export function chargeMonthly(customer) {\n-  return chargeCustomer(customer.id, customer.planCents);\n+  return chargeCustomer({\n+    customerId: customer.id,\n+    amountCents: customer.planCents,\n+    currency: customer.currency,\n+  });\n }\ndiff --git a/playground/src/money.js b/playground/src/money.js\nindex 6e93b62..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,5 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n export function toCents(dollars) {\n-  return Math.floor(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/billing.test.js b/playground/test/billing.test.js\nindex 42bf724..1b790bb 100644\n--- a/playground/test/billing.test.js\n+++ b/playground/test/billing.test.js\n@@ -3,11 +3,15 @@ import assert from \"node:assert/strict\";\n import { chargeCustomer, chargeMonthly } from \"../src/billing.js\";\n \n test(\"chargeCustomer charges a positive amount\", () => {\n-  assert.equal(chargeCustomer(\"c1\", 1200).status, \"charged\");\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 1200 }).status, \"charged\");\n });\n \n test(\"chargeCustomer refuses a zero amount\", () => {\n-  assert.throws(() => chargeCustomer(\"c1\", 0), RangeError);\n+  assert.throws(() => chargeCustomer({ customerId: \"c1\", amountCents: 0 }), RangeError);\n+});\n+\n+test(\"chargeCustomer records the currency\", () => {\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 500, currency: \"eur\" }).currency, \"eur\");\n });\n \n test(\"chargeMonthly charges the plan price\", () => {\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\ndiff --git a/playground/test/retry.test.js b/playground/test/retry.test.js\nnew file mode 100644\nindex 0000000..9923f34\n--- /dev/null\n+++ b/playground/test/retry.test.js\n@@ -0,0 +1,26 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { fetchUser } from \"../src/api.js\";\n+\n+function fakeFetch(statuses) {\n+  let calls = 0;\n+  const fetchImpl = async () => {\n+    const status = statuses[Math.min(calls, statuses.length - 1)];\n+    calls += 1;\n+    return { status, ok: status >= 200 && status < 300, json: async () => ({ id: 7, name: \"Ada\" }) };\n+  };\n+  return { fetchImpl, calls: () => calls };\n+}\n+\n+test(\"fetchUser retries after HTTP 429\", async () => {\n+  const fake = fakeFetch([429, 200]);\n+  const user = await fetchUser(7, { fetchImpl: fake.fetchImpl });\n+  assert.equal(user.name, \"Ada\");\n+  assert.equal(fake.calls(), 2);\n+});\n+\n+test(\"fetchUser gives up after two retries\", async () => {\n+  const fake = fakeFetch([429, 429, 429, 429]);\n+  await assert.rejects(fetchUser(7, { fetchImpl: fake.fetchImpl }), /429/);\n+  assert.equal(fake.calls(), 3);\n+});\n"
         }
-      ]
+      ],
+      "held": null,
+      "discarded": {
+        "ms": 4377,
+        "entry": {
+          "id": "2026-10-07T02:56:44.613Z:combine:discarded",
+          "action": "discarded",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:56:45.227Z",
+          "option": "combine",
+          "reason": "This is the best choice because it preserves both the architectural rename and the new bugfix/feature without losing code.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "passed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "land": {
+        "ms": 6763,
+        "commit": "393147f9f0eae5e84d5fc6d4c67ed670ef5d6419",
+        "branch": "demo/clean/rename",
+        "mergeable": "conflicting",
+        "record": {
+          "ok": true
+        },
+        "entry": {
+          "id": "2026-10-07T02:56:44.613Z:combine:landed",
+          "action": "landed",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:58:21.329Z",
+          "option": "combine",
+          "reason": "This is the best choice because it preserves both the architectural rename and the new bugfix/feature without losing code.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "passed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": "393147f9f0eae5e84d5fc6d4c67ed670ef5d6419",
+          "dropped": null
+        },
+        "pull": {
+          "number": 1,
+          "title": "[Demo] Rename fetchUser to getUser",
+          "author": "YearningAsian",
+          "url": "https://github.com/YearningAsian/merge-desk/pull/1",
+          "draft": false,
+          "head": {
+            "ref": "demo/clean/rename",
+            "sha": "393147f9f0eae5e84d5fc6d4c67ed670ef5d6419",
+            "repo": "YearningAsian/merge-desk"
+          },
+          "base": {
+            "ref": "demo/base",
+            "sha": "a41f224f7a69b10eabb38387d237110019ac4f25"
+          },
+          "demo": true,
+          "mergeable": "mergeable",
+          "readiness": {
+            "state": "unknown",
+            "githubState": "clean",
+            "checkedHead": "393147f9f0eae5e84d5fc6d4c67ed670ef5d6419",
+            "reasons": [
+              "No checks were reported for this head. Required checks were not verified.",
+              "Complete merge readiness is unverified. Check GitHub for current rules and your merge permission."
+            ],
+            "checks": {
+              "state": "none",
+              "items": [],
+              "reason": "No checks were reported for this head. Required checks were not verified.",
+              "observedAt": "2026-10-07T02:58:26.159Z"
+            }
+          },
+          "fork": false,
+          "filesBothSides": null,
+          "updatedAt": "2026-10-07T02:58:23Z"
+        }
+      }
     },
     {
       "option": "keep_ours",
+      "steer": null,
       "events": [
         {
           "t": 0,
@@ -446,70 +573,70 @@
           "state": "running"
         },
         {
-          "t": 688,
+          "t": 329,
           "step": "revisions",
           "state": "passed",
           "detail": "head df6c107 · base a41f224"
         },
         {
-          "t": 688,
+          "t": 329,
           "step": "propose",
           "state": "running"
         },
         {
-          "t": 2067,
+          "t": 1731,
           "step": "propose",
           "state": "passed",
-          "detail": "Gemini (gemini-3.5-flash-lite): Keep ours (rename fetchUser to getUser and add deprecated alias)"
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep ours: use getUser with deprecated fetchUser alias"
         },
         {
-          "t": 2067,
+          "t": 1731,
           "step": "write",
           "state": "running"
         },
         {
-          "t": 9312,
+          "t": 6499,
           "step": "write",
           "state": "passed",
           "detail": "5 files differ from the head: playground/src/billing.js, playground/src/money.js, playground/test/billing.test.js, playground/test/money-rounding.test.js, playground/test/retry.test.js"
         },
         {
-          "t": 9312,
+          "t": 6499,
           "step": "parse",
           "state": "running"
         },
         {
-          "t": 10368,
+          "t": 6610,
           "step": "parse",
           "state": "passed",
           "detail": "playground/src/api.js: node --check"
         },
         {
-          "t": 10368,
+          "t": 6610,
           "step": "honor",
           "state": "running"
         },
         {
-          "t": 10370,
+          "t": 6613,
           "step": "honor",
           "state": "passed",
-          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, present\ntheirs: added retry logic for HTTP 429 status codes, dropped as chosen",
-          "log": "Keep ours: inside the conflicts the result must match ours and none of theirs; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic for HTTP 429 status codes\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  }\n}"
+          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, present\ntheirs: added retry logic on HTTP 429 to fetchUser, dropped as chosen",
+          "log": "Keep ours: inside the conflicts the result must match ours and none of theirs; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"present\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic on HTTP 429 to fetchUser\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  }\n}"
         },
         {
-          "t": 10370,
+          "t": 6613,
           "step": "tests",
           "state": "running"
         },
         {
-          "t": 13403,
+          "t": 9645,
           "step": "tests",
           "state": "failed",
-          "detail": "node --test (playground): failed (exit 1, 421 ms)",
-          "log": "✔ getUser returns the user (1.065519ms)\n✔ fetchUser still works as a deprecated alias (0.216822ms)\n✔ displayName uses the user's name (0.192055ms)\n✔ chargeCustomer charges a positive amount (0.83705ms)\n✔ chargeCustomer refuses a zero amount (0.409334ms)\n✔ chargeCustomer records the currency (0.143459ms)\n✔ chargeMonthly charges the plan price (0.179965ms)\n✔ toCents rounds 19.99 to 1999 cents (0.697881ms)\n✔ toCents rounds 0.29 to 29 cents (0.142832ms)\n✔ toCents converts whole dollars (0.652219ms)\n✖ fetchUser retries after HTTP 429 (0.852224ms)\n✖ fetchUser gives up after two retries (1.068257ms)\nℹ tests 12\nℹ suites 0\nℹ pass 10\nℹ fail 2\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 250.688115\n\n✖ failing tests:\n\ntest at test/retry.test.js:15:1\n✖ fetchUser retries after HTTP 429 (0.852224ms)\n  Error: getUser failed with 429\n      at getUser (file:///vercel/merge-desk/playground/src/api.js:8:11)\n      at async TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/retry.test.js:17:16)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/retry.test.js:22:1\n✖ fetchUser gives up after two retries (1.068257ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 3\n  \n      at TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/retry.test.js:25:10)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 3,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+          "detail": "node --test (playground): failed (exit 1, 400 ms)",
+          "log": "✔ getUser returns the user (1.085854ms)\n✔ fetchUser still works as a deprecated alias (0.144053ms)\n✔ displayName uses the user's name (0.192644ms)\n✔ chargeCustomer charges a positive amount (0.799611ms)\n✔ chargeCustomer refuses a zero amount (0.410432ms)\n✔ chargeCustomer records the currency (0.142748ms)\n✔ chargeMonthly charges the plan price (0.153502ms)\n✔ toCents rounds 19.99 to 1999 cents (0.757186ms)\n✔ toCents rounds 0.29 to 29 cents (0.168161ms)\n✔ toCents converts whole dollars (0.736734ms)\n✖ fetchUser retries after HTTP 429 (0.831415ms)\n✖ fetchUser gives up after two retries (1.080314ms)\nℹ tests 12\nℹ suites 0\nℹ pass 10\nℹ fail 2\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 252.981448\n\n✖ failing tests:\n\ntest at test/retry.test.js:15:1\n✖ fetchUser retries after HTTP 429 (0.831415ms)\n  Error: getUser failed with 429\n      at getUser (file:///vercel/merge-desk/playground/src/api.js:8:11)\n      at async TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/retry.test.js:17:16)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/retry.test.js:22:1\n✖ fetchUser gives up after two retries (1.080314ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 3\n  \n      at TestContext.<anonymous> (file:///vercel/merge-desk/playground/test/retry.test.js:25:10)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 3,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
         },
         {
-          "t": 14561,
+          "t": 10844,
           "type": "result",
           "verdict": "HELD",
           "failed": [
@@ -517,9 +644,9 @@
           ],
           "summary": [
             "ours: renamed fetchUser to getUser and added a deprecated alias, present",
-            "theirs: added retry logic for HTTP 429 status codes, dropped as chosen"
+            "theirs: added retry logic on HTTP 429 to fetchUser, dropped as chosen"
           ],
-          "description": "Keep ours (rename fetchUser to getUser and add deprecated alias)",
+          "description": "Keep ours: use getUser with deprecated fetchUser alias",
           "changedFiles": [
             "playground/src/billing.js",
             "playground/src/money.js",
@@ -529,10 +656,94 @@
           ],
           "patch": "diff --git a/playground/src/billing.js b/playground/src/billing.js\nindex 43b23b6..c72dc38 100644\n--- a/playground/src/billing.js\n+++ b/playground/src/billing.js\n@@ -1,12 +1,16 @@\n // Billing helpers for the Merge Desk demo scenarios.\n \n-export function chargeCustomer(customerId, amountCents) {\n+export function chargeCustomer({ customerId, amountCents, currency = \"usd\" }) {\n   if (!Number.isInteger(amountCents) || amountCents <= 0) {\n     throw new RangeError(\"amountCents must be a positive integer\");\n   }\n-  return { customerId, amountCents, currency: \"usd\", status: \"charged\" };\n+  return { customerId, amountCents, currency, status: \"charged\" };\n }\n \n export function chargeMonthly(customer) {\n-  return chargeCustomer(customer.id, customer.planCents);\n+  return chargeCustomer({\n+    customerId: customer.id,\n+    amountCents: customer.planCents,\n+    currency: customer.currency,\n+  });\n }\ndiff --git a/playground/src/money.js b/playground/src/money.js\nindex 6e93b62..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,5 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n export function toCents(dollars) {\n-  return Math.floor(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/billing.test.js b/playground/test/billing.test.js\nindex 42bf724..1b790bb 100644\n--- a/playground/test/billing.test.js\n+++ b/playground/test/billing.test.js\n@@ -3,11 +3,15 @@ import assert from \"node:assert/strict\";\n import { chargeCustomer, chargeMonthly } from \"../src/billing.js\";\n \n test(\"chargeCustomer charges a positive amount\", () => {\n-  assert.equal(chargeCustomer(\"c1\", 1200).status, \"charged\");\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 1200 }).status, \"charged\");\n });\n \n test(\"chargeCustomer refuses a zero amount\", () => {\n-  assert.throws(() => chargeCustomer(\"c1\", 0), RangeError);\n+  assert.throws(() => chargeCustomer({ customerId: \"c1\", amountCents: 0 }), RangeError);\n+});\n+\n+test(\"chargeCustomer records the currency\", () => {\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 500, currency: \"eur\" }).currency, \"eur\");\n });\n \n test(\"chargeMonthly charges the plan price\", () => {\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\ndiff --git a/playground/test/retry.test.js b/playground/test/retry.test.js\nnew file mode 100644\nindex 0000000..9923f34\n--- /dev/null\n+++ b/playground/test/retry.test.js\n@@ -0,0 +1,26 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { fetchUser } from \"../src/api.js\";\n+\n+function fakeFetch(statuses) {\n+  let calls = 0;\n+  const fetchImpl = async () => {\n+    const status = statuses[Math.min(calls, statuses.length - 1)];\n+    calls += 1;\n+    return { status, ok: status >= 200 && status < 300, json: async () => ({ id: 7, name: \"Ada\" }) };\n+  };\n+  return { fetchImpl, calls: () => calls };\n+}\n+\n+test(\"fetchUser retries after HTTP 429\", async () => {\n+  const fake = fakeFetch([429, 200]);\n+  const user = await fetchUser(7, { fetchImpl: fake.fetchImpl });\n+  assert.equal(user.name, \"Ada\");\n+  assert.equal(fake.calls(), 2);\n+});\n+\n+test(\"fetchUser gives up after two retries\", async () => {\n+  const fake = fakeFetch([429, 429, 429, 429]);\n+  await assert.rejects(fetchUser(7, { fetchImpl: fake.fetchImpl }), /429/);\n+  assert.equal(fake.calls(), 3);\n+});\n"
         }
-      ]
+      ],
+      "held": {
+        "ms": 4345,
+        "entry": {
+          "id": "2026-10-07T02:57:01.393Z:keep_ours:held",
+          "action": "held",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:02.338Z",
+          "option": "keep_ours",
+          "reason": "Pick this if you prefer to discard the retry addition and only want the rename changes.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "passed"
+            },
+            {
+              "step": "tests",
+              "state": "failed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "discarded": {
+        "ms": 4056,
+        "entry": {
+          "id": "2026-10-07T02:57:01.393Z:keep_ours:discarded",
+          "action": "discarded",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:06.724Z",
+          "option": "keep_ours",
+          "reason": "Pick this if you prefer to discard the retry addition and only want the rename changes.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "passed"
+            },
+            {
+              "step": "tests",
+              "state": "failed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "land": null
     },
     {
-      "option": "keep_theirs",
+      "option": "keep_ours",
+      "steer": "Keep the old call working too.",
       "events": [
         {
           "t": 0,
@@ -550,90 +761,300 @@
           "state": "queued"
         },
         {
-          "t": 1,
+          "t": 0,
           "step": "parse",
           "state": "queued"
         },
         {
-          "t": 1,
+          "t": 0,
           "step": "honor",
           "state": "queued"
         },
         {
-          "t": 1,
+          "t": 0,
           "step": "tests",
           "state": "queued"
         },
         {
-          "t": 1,
+          "t": 0,
           "step": "revisions",
           "state": "running"
         },
         {
-          "t": 393,
+          "t": 372,
           "step": "revisions",
           "state": "passed",
           "detail": "head df6c107 · base a41f224"
         },
         {
-          "t": 393,
+          "t": 372,
           "step": "propose",
           "state": "running"
         },
         {
-          "t": 1965,
+          "t": 1907,
           "step": "propose",
           "state": "passed",
-          "detail": "Gemini (gemini-3.5-flash-lite): Keeps theirs (retry logic for HTTP 429) and drops ours."
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep ours (getUser rename and alias), incorporating the retry logic from theirs into getUser."
         },
         {
-          "t": 1965,
+          "t": 1907,
           "step": "write",
           "state": "running"
         },
         {
-          "t": 8721,
+          "t": 6648,
           "step": "write",
           "state": "passed",
           "detail": "6 files differ from the head: playground/src/api.js, playground/src/billing.js, playground/src/money.js, playground/test/billing.test.js, playground/test/money-rounding.test.js, playground/test/retry.test.js"
         },
         {
-          "t": 8721,
+          "t": 6648,
           "step": "parse",
           "state": "running"
         },
         {
-          "t": 8910,
+          "t": 6788,
           "step": "parse",
           "state": "passed",
           "detail": "playground/src/api.js: node --check"
         },
         {
-          "t": 8910,
+          "t": 6788,
           "step": "honor",
           "state": "running"
         },
         {
-          "t": 8912,
+          "t": 6793,
           "step": "honor",
           "state": "failed",
-          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, dropped as chosen\ntheirs: added retry logic for HTTP 429 status codes, present\noutside the conflicts: 4 lines changed in playground/src/api.js\nplayground/src/api.js: 2 lines not from either side",
-          "log": "Keep theirs: inside the conflicts the result must match theirs and none of ours; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic for HTTP 429 status codes\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, MISSING (1 line)\ntheirs: added retry logic on HTTP 429 to fetchUser, LEAKED into the result (6 lines) although it was dropped\nplayground/src/api.js: 1 line both sides kept are missing",
+          "log": "Keep ours: inside the conflicts the result must match ours and none of theirs; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"missing\",\n    \"lines\": [\n      \"export async function getUser ( id , { fetchImpl = globalThis . fetch } = { } ) {\"\n    ]\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic on HTTP 429 to fetchUser\",\n    \"status\": \"leaked\",\n    \"lines\": [\n      \"export async function getUser ( id , { fetchImpl = globalThis . fetch , retries = 2 } = { } ) {\",\n      \"const url = ` $ { API_ROOT } / users / $ { id } ` ;\",\n      \"let response = await fetchImpl ( url ) ;\",\n      \"for ( let attempt = 0 ; response . status = = = 429 & & attempt < retries ; attempt + = 1 ) {\",\n      \"response = await fetchImpl ( url ) ;\",\n      \"}\"\n    ]\n  }\n}"
         },
         {
-          "t": 8912,
+          "t": 6793,
           "step": "tests",
           "state": "running"
         },
         {
-          "t": 11892,
+          "t": 9729,
           "step": "tests",
-          "state": "failed",
-          "detail": "node --test (playground): failed (exit 1, 389 ms)",
-          "log": "file:///vercel/merge-desk/playground/test/api.test.js:3\nimport { displayName, fetchUser, getUser } from \"../src/api.js\";\n                                 ^^^^^^^\nSyntaxError: The requested module '../src/api.js' does not provide an export named 'getUser'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async node:internal/modules/esm/loader:643:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v24.19.0\n✖ test/api.test.js (44.594048ms)\n✔ chargeCustomer charges a positive amount (0.800654ms)\n✔ chargeCustomer refuses a zero amount (0.383215ms)\n✔ chargeCustomer records the currency (0.133865ms)\n✔ chargeMonthly charges the plan price (0.144847ms)\n✔ toCents rounds 19.99 to 1999 cents (0.825015ms)\n✔ toCents rounds 0.29 to 29 cents (0.154895ms)\n✔ toCents converts whole dollars (0.759347ms)\n✔ fetchUser retries after HTTP 429 (0.849054ms)\n✔ fetchUser gives up after two retries (0.509437ms)\nℹ tests 10\nℹ suites 0\nℹ pass 9\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 250.201584\n\n✖ failing tests:\n\ntest at test/api.test.js:1:1\n✖ test/api.test.js (44.594048ms)\n  'test failed'\n"
+          "state": "passed",
+          "detail": "node --test (playground): passed (exit 0, 422 ms)",
+          "log": "✔ getUser returns the user (1.10777ms)\n✔ fetchUser still works as a deprecated alias (0.150495ms)\n✔ displayName uses the user's name (0.203297ms)\n✔ chargeCustomer charges a positive amount (0.846172ms)\n✔ chargeCustomer refuses a zero amount (0.440648ms)\n✔ chargeCustomer records the currency (0.149726ms)\n✔ chargeMonthly charges the plan price (0.154081ms)\n✔ toCents rounds 19.99 to 1999 cents (0.699587ms)\n✔ toCents rounds 0.29 to 29 cents (0.140474ms)\n✔ toCents converts whole dollars (0.705666ms)\n✔ fetchUser retries after HTTP 429 (0.908509ms)\n✔ fetchUser gives up after two retries (0.548765ms)\nℹ tests 12\nℹ suites 0\nℹ pass 12\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 276.591678\n"
         },
         {
-          "t": 13153,
+          "t": 10888,
+          "type": "result",
+          "verdict": "HELD",
+          "failed": [
+            "honor"
+          ],
+          "summary": [
+            "ours: renamed fetchUser to getUser and added a deprecated alias, MISSING (1 line)",
+            "theirs: added retry logic on HTTP 429 to fetchUser, LEAKED into the result (6 lines) although it was dropped",
+            "playground/src/api.js: 1 line both sides kept are missing"
+          ],
+          "description": "Keep ours (getUser rename and alias), incorporating the retry logic from theirs into getUser.",
+          "changedFiles": [
+            "playground/src/api.js",
+            "playground/src/billing.js",
+            "playground/src/money.js",
+            "playground/test/billing.test.js",
+            "playground/test/money-rounding.test.js",
+            "playground/test/retry.test.js"
+          ],
+          "patch": "diff --git a/playground/src/api.js b/playground/src/api.js\nindex a8a329d..0b26e30 100644\n--- a/playground/src/api.js\n+++ b/playground/src/api.js\n@@ -2,8 +2,12 @@\n \n const API_ROOT = \"https://api.example.test\";\n \n-export async function getUser(id, { fetchImpl = globalThis.fetch } = {}) {\n-  const response = await fetchImpl(`${API_ROOT}/users/${id}`);\n+export async function getUser(id, { fetchImpl = globalThis.fetch, retries = 2 } = {}) {\n+  const url = `${API_ROOT}/users/${id}`;\n+  let response = await fetchImpl(url);\n+  for (let attempt = 0; response.status === 429 && attempt < retries; attempt += 1) {\n+    response = await fetchImpl(url);\n+  }\n   if (!response.ok) {\n     throw new Error(`getUser failed with ${response.status}`);\n   }\ndiff --git a/playground/src/billing.js b/playground/src/billing.js\nindex 43b23b6..c72dc38 100644\n--- a/playground/src/billing.js\n+++ b/playground/src/billing.js\n@@ -1,12 +1,16 @@\n // Billing helpers for the Merge Desk demo scenarios.\n \n-export function chargeCustomer(customerId, amountCents) {\n+export function chargeCustomer({ customerId, amountCents, currency = \"usd\" }) {\n   if (!Number.isInteger(amountCents) || amountCents <= 0) {\n     throw new RangeError(\"amountCents must be a positive integer\");\n   }\n-  return { customerId, amountCents, currency: \"usd\", status: \"charged\" };\n+  return { customerId, amountCents, currency, status: \"charged\" };\n }\n \n export function chargeMonthly(customer) {\n-  return chargeCustomer(customer.id, customer.planCents);\n+  return chargeCustomer({\n+    customerId: customer.id,\n+    amountCents: customer.planCents,\n+    currency: customer.currency,\n+  });\n }\ndiff --git a/playground/src/money.js b/playground/src/money.js\nindex 6e93b62..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,5 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n export function toCents(dollars) {\n-  return Math.floor(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/billing.test.js b/playground/test/billing.test.js\nindex 42bf724..1b790bb 100644\n--- a/playground/test/billing.test.js\n+++ b/playground/test/billing.test.js\n@@ -3,11 +3,15 @@ import assert from \"node:assert/strict\";\n import { chargeCustomer, chargeMonthly } from \"../src/billing.js\";\n \n test(\"chargeCustomer charges a positive amount\", () => {\n-  assert.equal(chargeCustomer(\"c1\", 1200).status, \"charged\");\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 1200 }).status, \"charged\");\n });\n \n test(\"chargeCustomer refuses a zero amount\", () => {\n-  assert.throws(() => chargeCustomer(\"c1\", 0), RangeError);\n+  assert.throws(() => chargeCustomer({ customerId: \"c1\", amountCents: 0 }), RangeError);\n+});\n+\n+test(\"chargeCustomer records the currency\", () => {\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 500, currency: \"eur\" }).currency, \"eur\");\n });\n \n test(\"chargeMonthly charges the plan price\", () => {\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\ndiff --git a/playground/test/retry.test.js b/playground/test/retry.test.js\nnew file mode 100644\nindex 0000000..9923f34\n--- /dev/null\n+++ b/playground/test/retry.test.js\n@@ -0,0 +1,26 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { fetchUser } from \"../src/api.js\";\n+\n+function fakeFetch(statuses) {\n+  let calls = 0;\n+  const fetchImpl = async () => {\n+    const status = statuses[Math.min(calls, statuses.length - 1)];\n+    calls += 1;\n+    return { status, ok: status >= 200 && status < 300, json: async () => ({ id: 7, name: \"Ada\" }) };\n+  };\n+  return { fetchImpl, calls: () => calls };\n+}\n+\n+test(\"fetchUser retries after HTTP 429\", async () => {\n+  const fake = fakeFetch([429, 200]);\n+  const user = await fetchUser(7, { fetchImpl: fake.fetchImpl });\n+  assert.equal(user.name, \"Ada\");\n+  assert.equal(fake.calls(), 2);\n+});\n+\n+test(\"fetchUser gives up after two retries\", async () => {\n+  const fake = fakeFetch([429, 429, 429, 429]);\n+  await assert.rejects(fetchUser(7, { fetchImpl: fake.fetchImpl }), /429/);\n+  assert.equal(fake.calls(), 3);\n+});\n"
+        }
+      ],
+      "held": {
+        "ms": 4571,
+        "entry": {
+          "id": "2026-10-07T02:57:22.414Z:keep_ours:held",
+          "action": "held",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:23.055Z",
+          "option": "keep_ours",
+          "reason": "Pick this if you prefer to discard the retry addition and only want the rename changes.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "discarded": {
+        "ms": 5948,
+        "entry": {
+          "id": "2026-10-07T02:57:22.414Z:keep_ours:discarded",
+          "action": "discarded",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:27.966Z",
+          "option": "keep_ours",
+          "reason": "Pick this if you prefer to discard the retry addition and only want the rename changes.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "land": null
+    },
+    {
+      "option": "keep_theirs",
+      "steer": null,
+      "events": [
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "propose",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "write",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "parse",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "honor",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "tests",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "running"
+        },
+        {
+          "t": 447,
+          "step": "revisions",
+          "state": "passed",
+          "detail": "head df6c107 · base a41f224"
+        },
+        {
+          "t": 447,
+          "step": "propose",
+          "state": "running"
+        },
+        {
+          "t": 1958,
+          "step": "propose",
+          "state": "passed",
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep theirs: use theirs' fetchUser with retry logic"
+        },
+        {
+          "t": 1958,
+          "step": "write",
+          "state": "running"
+        },
+        {
+          "t": 7297,
+          "step": "write",
+          "state": "passed",
+          "detail": "6 files differ from the head: playground/src/api.js, playground/src/billing.js, playground/src/money.js, playground/test/billing.test.js, playground/test/money-rounding.test.js, playground/test/retry.test.js"
+        },
+        {
+          "t": 7297,
+          "step": "parse",
+          "state": "running"
+        },
+        {
+          "t": 7425,
+          "step": "parse",
+          "state": "passed",
+          "detail": "playground/src/api.js: node --check"
+        },
+        {
+          "t": 7425,
+          "step": "honor",
+          "state": "running"
+        },
+        {
+          "t": 7427,
+          "step": "honor",
+          "state": "failed",
+          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, dropped as chosen\ntheirs: added retry logic on HTTP 429 to fetchUser, present\noutside the conflicts: 4 lines changed in playground/src/api.js\nplayground/src/api.js: 2 lines not from either side",
+          "log": "Keep theirs: inside the conflicts the result must match theirs and none of ours; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic on HTTP 429 to fetchUser\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+        },
+        {
+          "t": 7427,
+          "step": "tests",
+          "state": "running"
+        },
+        {
+          "t": 11052,
+          "step": "tests",
+          "state": "failed",
+          "detail": "node --test (playground): failed (exit 1, 441 ms)",
+          "log": "file:///vercel/merge-desk/playground/test/api.test.js:3\nimport { displayName, fetchUser, getUser } from \"../src/api.js\";\n                                 ^^^^^^^\nSyntaxError: The requested module '../src/api.js' does not provide an export named 'getUser'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async node:internal/modules/esm/loader:643:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v24.19.0\n✖ test/api.test.js (39.789366ms)\n✔ chargeCustomer charges a positive amount (0.844828ms)\n✔ chargeCustomer refuses a zero amount (0.420633ms)\n✔ chargeCustomer records the currency (0.148854ms)\n✔ chargeMonthly charges the plan price (0.151145ms)\n✔ toCents rounds 19.99 to 1999 cents (0.756346ms)\n✔ toCents rounds 0.29 to 29 cents (0.166109ms)\n✔ toCents converts whole dollars (0.726188ms)\n✔ fetchUser retries after HTTP 429 (0.838775ms)\n✔ fetchUser gives up after two retries (0.463863ms)\nℹ tests 10\nℹ suites 0\nℹ pass 9\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 244.61478\n\n✖ failing tests:\n\ntest at test/api.test.js:1:1\n✖ test/api.test.js (39.789366ms)\n  'test failed'\n"
+        },
+        {
+          "t": 12236,
           "type": "result",
           "verdict": "HELD",
           "failed": [
@@ -642,11 +1063,11 @@
           ],
           "summary": [
             "ours: renamed fetchUser to getUser and added a deprecated alias, dropped as chosen",
-            "theirs: added retry logic for HTTP 429 status codes, present",
+            "theirs: added retry logic on HTTP 429 to fetchUser, present",
             "outside the conflicts: 4 lines changed in playground/src/api.js",
             "playground/src/api.js: 2 lines not from either side"
           ],
-          "description": "Keeps theirs (retry logic for HTTP 429) and drops ours.",
+          "description": "Keep theirs: use theirs' fetchUser with retry logic",
           "changedFiles": [
             "playground/src/api.js",
             "playground/src/billing.js",
@@ -657,7 +1078,301 @@
           ],
           "patch": "diff --git a/playground/src/api.js b/playground/src/api.js\nindex a8a329d..7da3a20 100644\n--- a/playground/src/api.js\n+++ b/playground/src/api.js\n@@ -2,18 +2,19 @@\n \n const API_ROOT = \"https://api.example.test\";\n \n-export async function getUser(id, { fetchImpl = globalThis.fetch } = {}) {\n-  const response = await fetchImpl(`${API_ROOT}/users/${id}`);\n+export async function fetchUser(id, { fetchImpl = globalThis.fetch, retries = 2 } = {}) {\n+  const url = `${API_ROOT}/users/${id}`;\n+  let response = await fetchImpl(url);\n+  for (let attempt = 0; response.status === 429 && attempt < retries; attempt += 1) {\n+    response = await fetchImpl(url);\n+  }\n   if (!response.ok) {\n-    throw new Error(`getUser failed with ${response.status}`);\n+    throw new Error(`fetchUser failed with ${response.status}`);\n   }\n   return response.json();\n }\n \n-/** @deprecated Renamed to getUser; kept so existing callers keep working. */\n-export const fetchUser = getUser;\n-\n export async function displayName(id, options) {\n-  const user = await getUser(id, options);\n+  const user = await fetchUser(id, options);\n   return user.name ?? `user ${id}`;\n }\ndiff --git a/playground/src/billing.js b/playground/src/billing.js\nindex 43b23b6..c72dc38 100644\n--- a/playground/src/billing.js\n+++ b/playground/src/billing.js\n@@ -1,12 +1,16 @@\n // Billing helpers for the Merge Desk demo scenarios.\n \n-export function chargeCustomer(customerId, amountCents) {\n+export function chargeCustomer({ customerId, amountCents, currency = \"usd\" }) {\n   if (!Number.isInteger(amountCents) || amountCents <= 0) {\n     throw new RangeError(\"amountCents must be a positive integer\");\n   }\n-  return { customerId, amountCents, currency: \"usd\", status: \"charged\" };\n+  return { customerId, amountCents, currency, status: \"charged\" };\n }\n \n export function chargeMonthly(customer) {\n-  return chargeCustomer(customer.id, customer.planCents);\n+  return chargeCustomer({\n+    customerId: customer.id,\n+    amountCents: customer.planCents,\n+    currency: customer.currency,\n+  });\n }\ndiff --git a/playground/src/money.js b/playground/src/money.js\nindex 6e93b62..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,5 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n export function toCents(dollars) {\n-  return Math.floor(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/billing.test.js b/playground/test/billing.test.js\nindex 42bf724..1b790bb 100644\n--- a/playground/test/billing.test.js\n+++ b/playground/test/billing.test.js\n@@ -3,11 +3,15 @@ import assert from \"node:assert/strict\";\n import { chargeCustomer, chargeMonthly } from \"../src/billing.js\";\n \n test(\"chargeCustomer charges a positive amount\", () => {\n-  assert.equal(chargeCustomer(\"c1\", 1200).status, \"charged\");\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 1200 }).status, \"charged\");\n });\n \n test(\"chargeCustomer refuses a zero amount\", () => {\n-  assert.throws(() => chargeCustomer(\"c1\", 0), RangeError);\n+  assert.throws(() => chargeCustomer({ customerId: \"c1\", amountCents: 0 }), RangeError);\n+});\n+\n+test(\"chargeCustomer records the currency\", () => {\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 500, currency: \"eur\" }).currency, \"eur\");\n });\n \n test(\"chargeMonthly charges the plan price\", () => {\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\ndiff --git a/playground/test/retry.test.js b/playground/test/retry.test.js\nnew file mode 100644\nindex 0000000..9923f34\n--- /dev/null\n+++ b/playground/test/retry.test.js\n@@ -0,0 +1,26 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { fetchUser } from \"../src/api.js\";\n+\n+function fakeFetch(statuses) {\n+  let calls = 0;\n+  const fetchImpl = async () => {\n+    const status = statuses[Math.min(calls, statuses.length - 1)];\n+    calls += 1;\n+    return { status, ok: status >= 200 && status < 300, json: async () => ({ id: 7, name: \"Ada\" }) };\n+  };\n+  return { fetchImpl, calls: () => calls };\n+}\n+\n+test(\"fetchUser retries after HTTP 429\", async () => {\n+  const fake = fakeFetch([429, 200]);\n+  const user = await fetchUser(7, { fetchImpl: fake.fetchImpl });\n+  assert.equal(user.name, \"Ada\");\n+  assert.equal(fake.calls(), 2);\n+});\n+\n+test(\"fetchUser gives up after two retries\", async () => {\n+  const fake = fakeFetch([429, 429, 429, 429]);\n+  await assert.rejects(fetchUser(7, { fetchImpl: fake.fetchImpl }), /429/);\n+  assert.equal(fake.calls(), 3);\n+});\n"
         }
-      ]
+      ],
+      "held": {
+        "ms": 4710,
+        "entry": {
+          "id": "2026-10-07T02:57:46.845Z:keep_theirs:held",
+          "action": "held",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:47.740Z",
+          "option": "keep_theirs",
+          "reason": "Pick this if you want to keep the original function name and drop the rename refactor.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "failed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "discarded": {
+        "ms": 4029,
+        "entry": {
+          "id": "2026-10-07T02:57:46.845Z:keep_theirs:discarded",
+          "action": "discarded",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:57:52.514Z",
+          "option": "keep_theirs",
+          "reason": "Pick this if you want to keep the original function name and drop the rename refactor.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "failed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "land": null
+    },
+    {
+      "option": "keep_theirs",
+      "steer": "Keep the old call working too.",
+      "events": [
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "propose",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "write",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "parse",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "honor",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "tests",
+          "state": "queued"
+        },
+        {
+          "t": 0,
+          "step": "revisions",
+          "state": "running"
+        },
+        {
+          "t": 321,
+          "step": "revisions",
+          "state": "passed",
+          "detail": "head df6c107 · base a41f224"
+        },
+        {
+          "t": 321,
+          "step": "propose",
+          "state": "running"
+        },
+        {
+          "t": 1701,
+          "step": "propose",
+          "state": "passed",
+          "detail": "Gemini (gemini-3.5-flash-lite): Keep fetchUser with retry logic from theirs, and add the deprecated getUser alias from ours"
+        },
+        {
+          "t": 1701,
+          "step": "write",
+          "state": "running"
+        },
+        {
+          "t": 6787,
+          "step": "write",
+          "state": "passed",
+          "detail": "6 files differ from the head: playground/src/api.js, playground/src/billing.js, playground/src/money.js, playground/test/billing.test.js, playground/test/money-rounding.test.js, playground/test/retry.test.js"
+        },
+        {
+          "t": 6787,
+          "step": "parse",
+          "state": "running"
+        },
+        {
+          "t": 6888,
+          "step": "parse",
+          "state": "passed",
+          "detail": "playground/src/api.js: node --check"
+        },
+        {
+          "t": 6888,
+          "step": "honor",
+          "state": "running"
+        },
+        {
+          "t": 6890,
+          "step": "honor",
+          "state": "failed",
+          "detail": "ours: renamed fetchUser to getUser and added a deprecated alias, dropped as chosen\ntheirs: added retry logic on HTTP 429 to fetchUser, present\noutside the conflicts: 3 lines changed in playground/src/api.js\nplayground/src/api.js: 3 lines not from either side",
+          "log": "Keep theirs: inside the conflicts the result must match theirs and none of ours; outside them, nothing may change.\n\n{\n  \"ours\": {\n    \"intent\": \"renamed fetchUser to getUser and added a deprecated alias\",\n    \"status\": \"dropped\",\n    \"lines\": []\n  },\n  \"theirs\": {\n    \"intent\": \"added retry logic on HTTP 429 to fetchUser\",\n    \"status\": \"present\",\n    \"lines\": []\n  }\n}"
+        },
+        {
+          "t": 6890,
+          "step": "tests",
+          "state": "running"
+        },
+        {
+          "t": 9768,
+          "step": "tests",
+          "state": "passed",
+          "detail": "node --test (playground): passed (exit 0, 441 ms)",
+          "log": "✔ getUser returns the user (1.190182ms)\n✔ fetchUser still works as a deprecated alias (0.153145ms)\n✔ displayName uses the user's name (0.194348ms)\n✔ chargeCustomer charges a positive amount (0.822578ms)\n✔ chargeCustomer refuses a zero amount (0.40785ms)\n✔ chargeCustomer records the currency (0.154152ms)\n✔ chargeMonthly charges the plan price (0.154565ms)\n✔ toCents rounds 19.99 to 1999 cents (0.707088ms)\n✔ toCents rounds 0.29 to 29 cents (0.142289ms)\n✔ toCents converts whole dollars (0.708485ms)\n✔ fetchUser retries after HTTP 429 (0.81395ms)\n✔ fetchUser gives up after two retries (0.507063ms)\nℹ tests 12\nℹ suites 0\nℹ pass 12\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 255.61152\n"
+        },
+        {
+          "t": 10968,
+          "type": "result",
+          "verdict": "HELD",
+          "failed": [
+            "honor"
+          ],
+          "summary": [
+            "ours: renamed fetchUser to getUser and added a deprecated alias, dropped as chosen",
+            "theirs: added retry logic on HTTP 429 to fetchUser, present",
+            "outside the conflicts: 3 lines changed in playground/src/api.js",
+            "playground/src/api.js: 3 lines not from either side"
+          ],
+          "description": "Keep fetchUser with retry logic from theirs, and add the deprecated getUser alias from ours",
+          "changedFiles": [
+            "playground/src/api.js",
+            "playground/src/billing.js",
+            "playground/src/money.js",
+            "playground/test/billing.test.js",
+            "playground/test/money-rounding.test.js",
+            "playground/test/retry.test.js"
+          ],
+          "patch": "diff --git a/playground/src/api.js b/playground/src/api.js\nindex a8a329d..3d71ef9 100644\n--- a/playground/src/api.js\n+++ b/playground/src/api.js\n@@ -2,18 +2,22 @@\n \n const API_ROOT = \"https://api.example.test\";\n \n-export async function getUser(id, { fetchImpl = globalThis.fetch } = {}) {\n-  const response = await fetchImpl(`${API_ROOT}/users/${id}`);\n+export async function fetchUser(id, { fetchImpl = globalThis.fetch, retries = 2 } = {}) {\n+  const url = `${API_ROOT}/users/${id}`;\n+  let response = await fetchImpl(url);\n+  for (let attempt = 0; response.status === 429 && attempt < retries; attempt += 1) {\n+    response = await fetchImpl(url);\n+  }\n   if (!response.ok) {\n-    throw new Error(`getUser failed with ${response.status}`);\n+    throw new Error(`fetchUser failed with ${response.status}`);\n   }\n   return response.json();\n }\n \n /** @deprecated Renamed to getUser; kept so existing callers keep working. */\n-export const fetchUser = getUser;\n+export const getUser = fetchUser;\n \n export async function displayName(id, options) {\n-  const user = await getUser(id, options);\n+  const user = await fetchUser(id, options);\n   return user.name ?? `user ${id}`;\n }\ndiff --git a/playground/src/billing.js b/playground/src/billing.js\nindex 43b23b6..c72dc38 100644\n--- a/playground/src/billing.js\n+++ b/playground/src/billing.js\n@@ -1,12 +1,16 @@\n // Billing helpers for the Merge Desk demo scenarios.\n \n-export function chargeCustomer(customerId, amountCents) {\n+export function chargeCustomer({ customerId, amountCents, currency = \"usd\" }) {\n   if (!Number.isInteger(amountCents) || amountCents <= 0) {\n     throw new RangeError(\"amountCents must be a positive integer\");\n   }\n-  return { customerId, amountCents, currency: \"usd\", status: \"charged\" };\n+  return { customerId, amountCents, currency, status: \"charged\" };\n }\n \n export function chargeMonthly(customer) {\n-  return chargeCustomer(customer.id, customer.planCents);\n+  return chargeCustomer({\n+    customerId: customer.id,\n+    amountCents: customer.planCents,\n+    currency: customer.currency,\n+  });\n }\ndiff --git a/playground/src/money.js b/playground/src/money.js\nindex 6e93b62..6f31441 100644\n--- a/playground/src/money.js\n+++ b/playground/src/money.js\n@@ -1,5 +1,5 @@\n // Money helpers for the Merge Desk demo scenarios.\n \n export function toCents(dollars) {\n-  return Math.floor(dollars * 100);\n+  return Math.round((dollars + Number.EPSILON) * 100);\n }\ndiff --git a/playground/test/billing.test.js b/playground/test/billing.test.js\nindex 42bf724..1b790bb 100644\n--- a/playground/test/billing.test.js\n+++ b/playground/test/billing.test.js\n@@ -3,11 +3,15 @@ import assert from \"node:assert/strict\";\n import { chargeCustomer, chargeMonthly } from \"../src/billing.js\";\n \n test(\"chargeCustomer charges a positive amount\", () => {\n-  assert.equal(chargeCustomer(\"c1\", 1200).status, \"charged\");\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 1200 }).status, \"charged\");\n });\n \n test(\"chargeCustomer refuses a zero amount\", () => {\n-  assert.throws(() => chargeCustomer(\"c1\", 0), RangeError);\n+  assert.throws(() => chargeCustomer({ customerId: \"c1\", amountCents: 0 }), RangeError);\n+});\n+\n+test(\"chargeCustomer records the currency\", () => {\n+  assert.equal(chargeCustomer({ customerId: \"c1\", amountCents: 500, currency: \"eur\" }).currency, \"eur\");\n });\n \n test(\"chargeMonthly charges the plan price\", () => {\ndiff --git a/playground/test/money-rounding.test.js b/playground/test/money-rounding.test.js\nnew file mode 100644\nindex 0000000..e2bb48c\n--- /dev/null\n+++ b/playground/test/money-rounding.test.js\n@@ -0,0 +1,11 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { toCents } from \"../src/money.js\";\n+\n+test(\"toCents rounds 19.99 to 1999 cents\", () => {\n+  assert.equal(toCents(19.99), 1999);\n+});\n+\n+test(\"toCents rounds 0.29 to 29 cents\", () => {\n+  assert.equal(toCents(0.29), 29);\n+});\ndiff --git a/playground/test/retry.test.js b/playground/test/retry.test.js\nnew file mode 100644\nindex 0000000..9923f34\n--- /dev/null\n+++ b/playground/test/retry.test.js\n@@ -0,0 +1,26 @@\n+import { test } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { fetchUser } from \"../src/api.js\";\n+\n+function fakeFetch(statuses) {\n+  let calls = 0;\n+  const fetchImpl = async () => {\n+    const status = statuses[Math.min(calls, statuses.length - 1)];\n+    calls += 1;\n+    return { status, ok: status >= 200 && status < 300, json: async () => ({ id: 7, name: \"Ada\" }) };\n+  };\n+  return { fetchImpl, calls: () => calls };\n+}\n+\n+test(\"fetchUser retries after HTTP 429\", async () => {\n+  const fake = fakeFetch([429, 200]);\n+  const user = await fetchUser(7, { fetchImpl: fake.fetchImpl });\n+  assert.equal(user.name, \"Ada\");\n+  assert.equal(fake.calls(), 2);\n+});\n+\n+test(\"fetchUser gives up after two retries\", async () => {\n+  const fake = fakeFetch([429, 429, 429, 429]);\n+  await assert.rejects(fetchUser(7, { fetchImpl: fake.fetchImpl }), /429/);\n+  assert.equal(fake.calls(), 3);\n+});\n"
+        }
+      ],
+      "held": {
+        "ms": 4137,
+        "entry": {
+          "id": "2026-10-07T02:58:08.132Z:keep_theirs:held",
+          "action": "held",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:58:08.841Z",
+          "option": "keep_theirs",
+          "reason": "Pick this if you want to keep the original function name and drop the rename refactor.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "discarded": {
+        "ms": 3911,
+        "entry": {
+          "id": "2026-10-07T02:58:08.132Z:keep_theirs:discarded",
+          "action": "discarded",
+          "who": "YearningAsian",
+          "at": "2026-10-07T02:58:13.185Z",
+          "option": "keep_theirs",
+          "reason": "Pick this if you want to keep the original function name and drop the rename refactor.",
+          "checks": [
+            {
+              "step": "revisions",
+              "state": "passed"
+            },
+            {
+              "step": "propose",
+              "state": "passed"
+            },
+            {
+              "step": "write",
+              "state": "passed"
+            },
+            {
+              "step": "parse",
+              "state": "passed"
+            },
+            {
+              "step": "honor",
+              "state": "failed"
+            },
+            {
+              "step": "tests",
+              "state": "passed"
+            }
+          ],
+          "head": "df6c107561c4dbe0caf18ba287d2a98af5355eaf",
+          "base": "a41f224f7a69b10eabb38387d237110019ac4f25",
+          "commit": null,
+          "dropped": null
+        }
+      },
+      "land": null
     }
   ]
 }

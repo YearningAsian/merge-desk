@@ -4,7 +4,7 @@ import type { RecordEntry } from "@/core/record";
 import type { PullList } from "@/core/pulls";
 
 // The only difference between demo and live mode: where the desk's data
-// comes from. Live calls the API routes; demo (slice 7) replays recordings.
+// comes from. Live calls the API routes; demo replays recordings of them.
 export interface DataSource {
   mode: "live" | "demo";
   listPullRequests(signal?: AbortSignal): Promise<PullList>;
@@ -16,6 +16,9 @@ export interface DataSource {
     pr: number,
     signal?: AbortSignal,
   ): Promise<{ entries: RecordEntry[]; note: string | null }>;
+  // The one line a held option can be steered with, when the source can only
+  // replay a recorded steered run (demo). Absent: any line can be sent.
+  steerFor?(pr: number, option: Option): string | undefined;
 }
 
 // What the browser sends to run an option: the analysis token the server

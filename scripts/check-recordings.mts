@@ -1,14 +1,22 @@
 // Validates demo/recordings/{clean,held,drop}.json: each one passes the
 // recording schema (no signatures, a finished analysis, one verdict per run,
 // revisions bound to the pull request), belongs to its scenario's demo
-// branch, and records every option its analysis offered, so the demo never
-// lands on an option it can't play back. Exits non-zero on any problem.
+// branch, and is complete (core/recording recordingGaps): every offered
+// option, a steered retry of every held run, every hold and discard write,
+// and a real Land of every verified run. So the demo never reaches a button
+// it can't play back. Exits non-zero on any problem.
 //
 //   npm run recordings:check
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Recording, SCENARIOS, recordedAnalysis, recordedResult } from "@/core/recording";
+import {
+  Recording,
+  SCENARIOS,
+  recordedAnalysis,
+  recordedResult,
+  recordingGaps,
+} from "@/core/recording";
 import { ROOT, loadDemoConfig } from "./lib/git.mts";
 
 const config = loadDemoConfig();
@@ -33,14 +41,14 @@ for (const id of SCENARIOS) {
   prs.add(recording.source.pr);
 
   const analysis = recordedAnalysis(recording);
-  const recorded = new Set(recording.runs.map((run) => run.option));
-  for (const option of analysis.options)
-    if (!recorded.has(option.kind)) problems.push(`${file}: ${option.kind} offered, not recorded`);
+  for (const gap of recordingGaps(recording)) problems.push(`${file}: ${gap}`);
 
   const runs = recording.runs
     .map((run) => {
       const result = recordedResult(run);
-      return `${run.option} ${result.verdict} ${(result.t / 1000).toFixed(1)} s`;
+      const steered = run.steer ? " (steered)" : "";
+      const landed = run.land ? `, LANDED ${run.land.commit.slice(0, 7)}` : "";
+      return `${run.option}${steered} ${result.verdict} ${(result.t / 1000).toFixed(1)} s${landed}`;
     })
     .join(", ");
   console.log(`${id}: #${recording.source.pr} (${recording.runner}, ${analysis.model}): ${runs}`);

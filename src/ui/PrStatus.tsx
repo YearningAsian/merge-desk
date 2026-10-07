@@ -4,16 +4,7 @@ import { Button } from "@/ui/primitives/button";
 
 // File conflicts describe the tree. Merge readiness also depends on checks,
 // reviews, repository rules and the viewer's authority. Never equate them.
-// In demo mode this is the snapshot taken when the run was recorded.
-export function PrStatus({
-  pull,
-  repo,
-  recorded = false,
-}: {
-  pull: PullSummary;
-  repo: string;
-  recorded?: boolean;
-}) {
+export function PrStatus({ pull, repo }: { pull: PullSummary; repo: string }) {
   const readiness = pull.readiness?.checkedHead === pull.head.sha ? pull.readiness : undefined;
   const conflicts = { mergeable: "None", conflicting: "Present", checking: "Checking" }[
     pull.mergeable
@@ -28,14 +19,9 @@ export function PrStatus({
     : "UNKNOWN";
   return (
     <section
-      aria-label={recorded ? "GitHub snapshot when recorded" : "Current GitHub snapshot"}
+      aria-label="Current GitHub snapshot"
       className="mb-4 space-y-3 border-y border-hair py-3 text-[13px]"
     >
-      {recorded ? (
-        <p className="text-[12.5px] text-muted">
-          GitHub snapshot when this run was recorded. The pull request may have changed since.
-        </p>
-      ) : null}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <p>
           File conflicts: <strong>{conflicts}</strong>
@@ -49,8 +35,7 @@ export function PrStatus({
           className="h-11 md:ml-auto md:h-9"
         >
           <a href={pull.url} target="_blank" rel="noreferrer">
-            {recorded ? "Open on GitHub" : "Review and merge on GitHub"}{" "}
-            <ExternalLink aria-hidden className="size-3.5" />
+            Review and merge on GitHub <ExternalLink aria-hidden className="size-3.5" />
           </a>
         </Button>
       </div>

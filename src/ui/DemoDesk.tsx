@@ -9,12 +9,12 @@ import { Providers } from "@/ui/providers";
 import { recordedSource } from "@/ui/sources/recorded";
 
 // Demo mode: the same desk as live mode, reading recordings of real runs.
-// Reset remounts the desk with a fresh query cache, which also cancels any
-// playback in progress, and drops the open pull request from the address.
+// Reset remounts the session with a new source (no Lands, no record entries)
+// and a fresh query cache, which also cancels any playback in progress, and
+// drops the open pull request from the address.
 export function DemoDesk({ recordings, repo }: { recordings: Recording[]; repo: string }) {
-  const source = useMemo(() => recordedSource(recordings), [recordings]);
-  const capturedAt = recordings.map((recording) => recording.capturedAt).sort()[0]!;
   const [epoch, setEpoch] = useState(0);
+  const capturedAt = recordings.map((recording) => recording.capturedAt).sort()[0]!;
 
   useEffect(() => {
     if (epoch > 0) document.getElementById("main")?.focus();
@@ -34,9 +34,19 @@ export function DemoDesk({ recordings, repo }: { recordings: Recording[]; repo: 
         {epoch > 0 ? "Demo reset. Every pull request is back to its starting state." : ""}
       </p>
       <Providers key={epoch}>
-        <Desk source={source} repo={repo} />
-        <DeskOverlays demo />
+        <DemoSession recordings={recordings} repo={repo} />
       </Providers>
+    </>
+  );
+}
+
+// One demo session, from first click to Reset.
+function DemoSession({ recordings, repo }: { recordings: Recording[]; repo: string }) {
+  const source = useMemo(() => recordedSource(recordings), [recordings]);
+  return (
+    <>
+      <Desk source={source} repo={repo} />
+      <DeskOverlays demo />
     </>
   );
 }

@@ -21,6 +21,8 @@ const labels: Record<keyof typeof measured, string> = {
   demoRecordedRuns: "recorded demo runs",
   demoRecordedVerified: "recorded runs VERIFIED",
   demoRecordedHeld: "recorded runs HELD",
+  demoRecordedSteered: "recorded steered retries",
+  demoRecordedLands: "real Lands recorded on demo pull requests, each reset afterwards",
   demoRunSecondsMin: "fastest recorded run, seconds from start to verdict",
   demoRunSecondsMax: "slowest recorded run, seconds from start to verdict",
 };

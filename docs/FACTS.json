@@ -2,26 +2,30 @@
   "$comment": "Single source of truth for public numbers. Fill metrics only from a measuring command and record that command in provenance under the same key. headline lists metric keys the README must state verbatim (tests/facts.test.ts). integrationsClaimed lists /api/health keys the copy relies on; integrationAliases maps a health key to vendor names used in copy (e.g. db: [MongoDB, Atlas]) so check_claims.py can catch unbacked mentions. Example: metrics.listingsScanned = 1662, provenance.listingsScanned = 'python ml/harvest.py --count (2026-09-26)'.",
   "projectName": "Merge Desk",
   "tagline": "AI-proposed merge conflict resolutions that land only when both sides' intent survives and the tests pass.",
-  "asOf": "2026-10-06",
+  "asOf": "2026-10-07",
   "metrics": {
     "studyProjects": 143,
     "studyConflictsNeedingLogicPct": 75.23,
     "studyBugLikelihoodMultiplier": 2,
-    "demoRecordedRuns": 9,
+    "demoRecordedRuns": 15,
     "demoRecordedVerified": 3,
-    "demoRecordedHeld": 6,
-    "demoRunSecondsMin": 11.2,
-    "demoRunSecondsMax": 14.6
+    "demoRecordedHeld": 12,
+    "demoRunSecondsMin": 10.3,
+    "demoRunSecondsMax": 12.2,
+    "demoRecordedSteered": 6,
+    "demoRecordedLands": 3
   },
   "provenance": {
     "studyProjects": "cited, not measured by us: Brindescu, Ahmed, Jensen, Sarma. An empirical investigation into merge conflicts and their effect on software quality. Empirical Software Engineering, 2019. doi:10.1007/s10664-019-09735-4 (abstract, read 2026-10-04)",
     "studyConflictsNeedingLogicPct": "cited, not measured by us: Brindescu, Ahmed, Jensen, Sarma. An empirical investigation into merge conflicts and their effect on software quality. Empirical Software Engineering, 2019. doi:10.1007/s10664-019-09735-4 (abstract, read 2026-10-04)",
     "studyBugLikelihoodMultiplier": "cited, not measured by us: Brindescu, Ahmed, Jensen, Sarma. An empirical investigation into merge conflicts and their effect on software quality. Empirical Software Engineering, 2019. doi:10.1007/s10664-019-09735-4 (abstract, read 2026-10-04)",
-    "demoRecordedRuns": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-06 by npm run record (2026-10-06)",
-    "demoRecordedVerified": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-06 by npm run record (2026-10-06)",
-    "demoRecordedHeld": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-06 by npm run record (2026-10-06)",
-    "demoRunSecondsMin": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-06 by npm run record (2026-10-06)",
-    "demoRunSecondsMax": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-06 by npm run record (2026-10-06)"
+    "demoRecordedRuns": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRecordedVerified": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRecordedHeld": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRunSecondsMin": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRunSecondsMax": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRecordedSteered": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)",
+    "demoRecordedLands": "npm run facts: counted from demo/recordings/*.json, captured 2026-10-07 by npm run record (2026-10-07)"
   },
   "headline": [],
   "labels": {
@@ -32,7 +36,9 @@
     "demoRecordedVerified": "recorded runs VERIFIED",
     "demoRecordedHeld": "recorded runs HELD",
     "demoRunSecondsMin": "fastest recorded run, seconds from start to verdict",
-    "demoRunSecondsMax": "slowest recorded run, seconds from start to verdict"
+    "demoRunSecondsMax": "slowest recorded run, seconds from start to verdict",
+    "demoRecordedSteered": "recorded steered retries",
+    "demoRecordedLands": "real Lands recorded on demo pull requests, each reset afterwards"
   },
   "integrationsClaimed": [],
   "integrationAliases": {},

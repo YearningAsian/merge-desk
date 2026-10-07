@@ -18,7 +18,6 @@ import { loadAnalyses, saveAnalyses } from "@/ui/cache";
 import { chosenModel, openOverlay, shortcutTarget, useSettings } from "@/ui/settings";
 import type { DataSource, LandOutcome } from "@/ui/sources/types";
 import {
-  DemoLand,
   LandAction,
   LandResult,
   RecordSection,
@@ -409,7 +408,6 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         Object.keys(state.analyses).some((key) => key.startsWith(`${selected.number}:`))
       }
       model={demo ? undefined : chosenModel(settings)}
-      recorded={demo}
       detailsOpen={detailsOpen}
       onDetailsOpen={setDetailsOpen}
       onAnalyze={() => void analyze(selected)}
@@ -433,7 +431,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
           <RunSection
             analysis={selectedDone.analysis}
             canRun={Boolean(selectedDone.token)}
-            canSteer={!demo}
+            fixedSteer={source.steerFor?.(selected.number, selectedDone.option)}
             option={selectedDone.option}
             run={selectedRun}
             pr={selected.number}
@@ -452,13 +450,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
             discardBlocked={selectedUnconfirmed || blocksStartingOver(selectedLand)}
             pushUnconfirmed={selectedUnconfirmed}
             landing={
-              demo &&
               selectedRun?.status === "done" &&
-              selectedRun.result.verdict === "VERIFIED" ? (
-                <DemoLand branch={selected.head.ref} base={selected.base.ref} />
-              ) : selectedRun?.status === "done" &&
-                selectedRun.result.verdict === "VERIFIED" &&
-                selectedRun.result.token ? (
+              selectedRun.result.verdict === "VERIFIED" &&
+              selectedRun.result.token ? (
                 <>
                   <LandAction
                     branch={selected.head.ref}
@@ -510,7 +504,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
         ) : null
       }
       record={
-        !demo && (selected.mergeable !== "mergeable" || landed[selected.number]) ? (
+        selected.mergeable !== "mergeable" || landed[selected.number] ? (
           <RecordSection source={source} pr={selected.number} />
         ) : null
       }

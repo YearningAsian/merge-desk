@@ -105,7 +105,7 @@
 | 2.9 | Later: replay eval on real historical merges (unchecked AI vs gated) | `eval/**` | A | ⬜ | 2.1 | Deferred by approved PRD; no measured headline until this is actually built |
 | 2.10 | Later: git merge driver sharing the pure core | `cli/**` | B | ⬜ | 2.1 | Deferred by approved PRD; outside this web POC |
 | 2.11 | Demo acts out every action from recorded real writes (Land, decision record, hold, discard, steer) | `scripts/record.mts`, `src/core/recording.ts`, `src/ui/**` | A | ✅ | 2.7 | Done 2026-10-07 (fe90f73), production dpl_Gfm32xmsXxT2hnDrdWpDzmBAmmbo: recordings v2 via live route handlers, 15 runs (6 steered), 3 real Lands (393147f #1, c759708 and 51f92c4 #6) each reset; steered retries show the choice-honored check catching MISSING/LEAKED for real; 331 unit, 28 e2e local, 8 demo journeys on production; health recordings true, no error logs |
-| 2.12 | Settings: bring your own model key (Claude, GPT and others), kept secure | `src/server/**`, `src/ui/**` | A | ⬜ | 2.11 | 2026-10-07 requested by the learner; cost and security design to agree before building (scope change, rule 7 review) |
+| 2.12 | Settings: bring your own model key (Claude, GPT, OpenRouter), kept secure | `src/server/**`, `src/ui/**` | A | 🟡 | 2.11 | 2026-10-07 claimed (Claude Opus 5.5), learner go: live mode only (allowlisted account); keys sealed in an httpOnly cookie bound to the session, never stored, logged or returned; fixed provider hosts only; Gemini checks unchanged. No test keys: built and unit-tested against documented APIs, unverified live, so not claimed in copy until a real call passes. Branch + PR + separate-model review (rule 7) |
 
 ### Phase 3: Freeze and harden
 

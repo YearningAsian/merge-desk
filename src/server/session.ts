@@ -33,14 +33,14 @@ export function readCookie(header: string | null, name: string): string | null {
 export function cookieHeader(
   name: string,
   value: string,
-  options: { maxAge: number; secure: boolean; path?: string },
+  options: { maxAge: number; secure: boolean; path?: string; sameSite?: "Lax" | "Strict" },
 ): string {
   return [
     `${name}=${value}`,
     `Path=${options.path ?? "/"}`,
     `Max-Age=${options.maxAge}`,
     "HttpOnly",
-    "SameSite=Lax",
+    `SameSite=${options.sameSite ?? "Lax"}`,
     ...(options.secure ? ["Secure"] : []),
   ].join("; ");
 }

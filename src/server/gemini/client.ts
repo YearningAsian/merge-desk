@@ -2,6 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireEnv } from "@/server/env";
 import { MalformedOutputError } from "@/server/errors";
+import type { StructuredClient, StructuredRequest } from "@/server/llm/structured";
+
+export type { StructuredRequest };
 
 // One structured Gemini call through the Interactions API: nothing stored on
 // Google's side, a JSON schema derived from the same Zod schema that then
@@ -29,14 +32,6 @@ export type CreateInteraction = (
   options: { timeout: number; maxRetries: number; fetchOptions: { signal: AbortSignal } },
 ) => Promise<InteractionLike>;
 
-export type StructuredRequest<T> = {
-  schema: z.ZodType<T>;
-  system: string;
-  input: string;
-  maxOutputTokens?: number;
-  signal?: AbortSignal;
-};
-
 export function modelId(env: Record<string, string | undefined> = process.env): string {
   return env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 }
@@ -47,12 +42,16 @@ export function jsonSchemaFor(schema: z.ZodType): object {
   return json;
 }
 
-export class GeminiClient {
+export class GeminiClient implements StructuredClient {
+  readonly label: string;
+
   constructor(
     private readonly create: CreateInteraction,
     readonly model: string,
     private readonly deadlineMs = CALL_DEADLINE_MS,
-  ) {}
+  ) {
+    this.label = `Gemini (${model})`;
+  }
 
   // `model` comes from the browser (Settings), so it must already have been
   // checked against MODEL_CHOICES; without it the server default is used.

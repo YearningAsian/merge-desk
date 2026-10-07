@@ -1,10 +1,11 @@
 import { z } from "zod";
 import type { Analysis, RunEvent } from "@/core/events";
-import { ModelId } from "@/core/models";
+import { ModelChoice } from "@/core/models";
 import { OptionKind } from "@/core/options";
 import type { RunCheck, RunRecord } from "@/core/run";
 import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
-import { GeminiClient } from "@/server/gemini/client";
+import { readKeys } from "@/server/keys";
+import { ModelChoiceError, planModel, type ModelPlan } from "@/server/llm/client";
 import { geminiProposer } from "@/server/gemini/propose";
 import { installationOctokit } from "@/server/github/app";
 import { readPull } from "@/server/github/prs";
@@ -28,7 +29,7 @@ const Body = z.object({
   token: z.string().min(1).max(2_000_000),
   option: OptionKind,
   steer: z.string().trim().max(200).optional(),
-  model: ModelId.optional(),
+  model: ModelChoice.optional(),
 });
 
 const refuse = (status: number, error: string) =>
@@ -62,6 +63,15 @@ export async function POST(request: Request) {
   const chosen = analysis.options.find((option) => option.kind === body.data.option);
   if (!chosen) return refuse(400, "That option wasn't offered for this analysis.");
 
+  // Before any sandbox boots: a choice that needs a key nobody saved stops here.
+  let plan: ModelPlan;
+  try {
+    plan = planModel(body.data.model, await readKeys(request.headers.get("cookie"), guard.login));
+  } catch (error) {
+    if (error instanceof ModelChoiceError) return refuse(400, error.message);
+    throw error;
+  }
+
   // Every live analysis or run boots a sandbox; the day's count gates it.
   if (usesSandbox()) {
     const admission = await admitLiveWork({ signal: request.signal });
@@ -77,7 +87,7 @@ export async function POST(request: Request) {
       : refuse(503, "GitHub isn't reachable right now. Try again.");
   }
 
-  const client = GeminiClient.fromEnv(process.env, body.data.model);
+  const client = plan();
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), DEADLINE_MS);
   request.signal.addEventListener("abort", () => controller.abort(), { once: true });

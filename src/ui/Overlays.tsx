@@ -2,11 +2,10 @@
 
 import { Keyboard, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-import { MODEL_CHOICES } from "@/core/models";
+import { ModelSettings } from "@/ui/ModelSettings";
 import { Button } from "@/ui/primitives/button";
 import { Dialog, DialogContent } from "@/ui/primitives/dialog";
 import { Kbd } from "@/ui/primitives/kbd";
-import { RadioGroup, RadioGroupItem } from "@/ui/primitives/radio-group";
 import { Switch } from "@/ui/primitives/switch";
 import {
   onOverlay,
@@ -93,46 +92,11 @@ function SettingsBody({ settings, demo }: { settings: Settings; demo: boolean })
   const field = (name: string) => `${id}-${name}`;
   return (
     <div className="divide-y divide-hair px-5">
-      {demo ? null : (
-        <fieldset className="py-3">
-          <legend className="text-[13px] font-medium text-ink">Gemini model</legend>
-          <p className="mt-0.5 text-[12px] text-muted">
-            Used for new analyses. An existing analysis keeps the model it was made with until you
-            analyze again.
-          </p>
-          <RadioGroup
-            aria-label="Gemini model"
-            value={settings.model}
-            onValueChange={(model) => updateSettings({ model: model as Settings["model"] })}
-            className="mt-2.5 gap-1"
-          >
-            {[
-              { id: "server", label: "Server default", note: "Whatever this server is set to." },
-              ...MODEL_CHOICES,
-            ].map((choice) => (
-              <label
-                key={choice.id}
-                htmlFor={field(`model-${choice.id}`)}
-                className="flex cursor-pointer items-start gap-2.5 rounded-[6px] px-2 py-1.5 hover:bg-ink/[0.03]"
-              >
-                <RadioGroupItem
-                  id={field(`model-${choice.id}`)}
-                  value={choice.id}
-                  className="mt-0.5"
-                />
-                <span className="min-w-0">
-                  <span className="block text-[13px] text-ink">{choice.label}</span>
-                  <span className="block text-[12px] text-muted">{choice.note}</span>
-                </span>
-              </label>
-            ))}
-          </RadioGroup>
-        </fieldset>
-      )}
+      {demo ? null : <ModelSettings settings={settings} />}
 
       <Row
         label="Analyze when a pull request opens"
-        hint="Off: nothing is sent to Gemini until you press Analyze."
+        hint="Off: nothing is sent to the model until you press Analyze."
         htmlFor={field("auto")}
       >
         <Switch

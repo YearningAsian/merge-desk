@@ -58,7 +58,7 @@ export function landMessage(
     `Merge ${refs.base} into ${refs.head} (Merge Desk)`,
     "",
     `${OPTION_LABELS[record.option]}${description ? `: ${description}` : ""}`,
-    "Checked on a scratch copy: it parses, the choice is honored, and the tests pass.",
+    `Checked on a scratch copy of ${record.proposeModel.replace(/\s+/g, " ").trim()}'s proposal: it parses, the choice is honored, and the tests pass.`,
     `Landed by @${login} with Merge Desk.`,
   ].join("\n");
 }

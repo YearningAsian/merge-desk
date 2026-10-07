@@ -104,6 +104,8 @@
 | 2.8 | FACTS measured with provenance | `docs/FACTS.json` | A | ✅ | 2.5 | Done 2026-10-06 (e19f9e3): five demo numbers from `npm run facts` with provenance; a unit test fails if FACTS and the recordings disagree; served by production `/api/stats`. Relock at 5.1 |
 | 2.9 | Later: replay eval on real historical merges (unchecked AI vs gated) | `eval/**` | A | ⬜ | 2.1 | Deferred by approved PRD; no measured headline until this is actually built |
 | 2.10 | Later: git merge driver sharing the pure core | `cli/**` | B | ⬜ | 2.1 | Deferred by approved PRD; outside this web POC |
+| 2.11 | Demo acts out every action from recorded real writes (Land, decision record, hold, discard, steer) | `scripts/record.mts`, `src/core/recording.ts`, `src/ui/**` | A | 🟡 | 2.7 | 2026-10-07 claimed (Claude Opus 5.5) from the learner's slice 6/7 feedback: no "live mode only" swaps; real Lands on demo PRs #1 and #6 approved, each followed by `npm run demo:reset`; steering recorded with one fixed line per held option |
+| 2.12 | Settings: bring your own model key (Claude, GPT and others), kept secure | `src/server/**`, `src/ui/**` | A | ⬜ | 2.11 | 2026-10-07 requested by the learner; cost and security design to agree before building (scope change, rule 7 review) |
 
 ### Phase 3: Freeze and harden
 

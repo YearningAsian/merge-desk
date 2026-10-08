@@ -11,7 +11,7 @@
 -
 - Not checked:
 
-`npm run verify` passed on head:
+`node scripts/verify.mts` passed on head:
 
 ## Review
 

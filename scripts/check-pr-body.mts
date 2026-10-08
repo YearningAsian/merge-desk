@@ -1,8 +1,3 @@
-// Merge gate for pull requests into main (PLAN "Merge gate"). The description
-// must carry a verify-this verdict for its claims and the review round's verdict.
-//
-// Usage: PR_BODY="..." node scripts/check-pr-body.mts
-
 export function checkPrBody(body: string | undefined): string[] {
   const lines = (body ?? "")
     .replace(/<!--[\s\S]*?-->/g, "")

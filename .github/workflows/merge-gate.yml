@@ -1,7 +1,5 @@
 name: merge gate
 
-# PLAN "Merge gate": a pull request into main shows its verify-this verdicts and
-# its review verdict in the description. Editing the description re-runs only this.
 on:
   pull_request:
     branches: [main]

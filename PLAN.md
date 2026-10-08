@@ -117,7 +117,7 @@
 | 3.3 | Live abuse checks on production (replay land, double land, forged PR number, oversized file, prompt injection in code comments) | n/a | B | ⬜ | |
 | 3.4 | Truth sweep: PLAN = code = live site | `PLAN.md` | A | ⬜ | |
 | 3.5 | Claims dry run (`check_claims.py`) | n/a | A | ⬜ | |
-| 3.6 | Codebase audit (ponytail-audit with verify-this repros) and the merge gate (`npm run verify`, verdicts in the PR description) | `PLAN.md`, `.github/**`, `scripts/**`, `src/**` | B | 🟡 | 2026-10-08 11:40 claimed (Claude Opus 5.5): four-area audit running, baseline on main lint/typecheck/412 tests/build green |
+| 3.6 | Codebase audit (ponytail-audit with verify-this repros) and the merge gate (`scripts/verify.mts`, verdicts in the PR description) | `PLAN.md`, `.github/**`, `scripts/**`, `src/**` | B | 🟡 | 2026-10-08 11:40 claimed (Claude Opus 5.5): four-area audit running, baseline on main lint/typecheck/412 tests/build green |
 
 ### Phase 4: Assets
 
@@ -170,7 +170,7 @@
 
 Every pull request into `main` clears steps 1 to 4 before it merges, and step 5 follows every deploy. CI enforces step 1, and checks that steps 3 and 4 are recorded in the description; step 2 is the builder's own pass.
 
-1. **Build check.** `npm run verify` passes locally on the final head, and CI's `web` and `hygiene` jobs are green on the merged result. `verify` is the single command for format, lint, typecheck, unit tests, recordings, playground tests and build.
+1. **Build check.** `node scripts/verify.mts` passes locally on the final head, and CI's `web` and `hygiene` jobs are green on the merged result. It is the single command for format, lint, typecheck, unit tests, recordings, playground tests and build. A change to `package.json` or `package-lock.json` also needs `npm run snapshot` and a new `DEPS_SNAPSHOT_ID` before the next live run, or the sandbox runs without the app's own tests.
 2. **Author hygiene.** Before the last commit, the builder runs `deslop` and `no-comments` (pstack) on the diff: no AI filler, no comment that only restates the code.
 3. **Claims proved (verify-this).** Each user-visible claim in the description is one falsifiable line that starts with `VERIFIED`, with its evidence: a test that fails on `main` and passes on the head, or a command and its output. `NOT VERIFIED` and `INCONCLUSIVE` block the merge. What could not be checked goes on a `Not checked:` line and stays out of the claims.
 4. **Review verdict.** A fresh reviewer (a different model when one is available) runs `ponytail-review` on every pull request, and the `hackathon-adversarial-review` Code mode as well on side-effect paths (writes to GitHub, spends model or sandbox budget, touches access). The description's `Review:` line names the model and round and says `Ship` and, where it applies, `CLEAN ROUND`. Full reports stay in `.review/round-<n>.md`.

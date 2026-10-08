@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   web:
-    name: web (npm run verify)
+    name: web (scripts/verify.mts)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +28,7 @@ jobs:
           cache: npm
       - run: npm install --global npm@12.2.0
       - run: npm ci
-      # The same command agents and the PR template run locally (PLAN "Merge gate").
-      - run: npm run verify
+      - run: node scripts/verify.mts
 
   hygiene:
     name: hygiene (em dash, secrets)

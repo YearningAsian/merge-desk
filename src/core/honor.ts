@@ -36,6 +36,8 @@ export type FileReport = {
   ambiguous: string[];
   unexpected: string[];
   lostShared: string[];
+  // Keep only: every kept line is there, but not in git's own checkout order.
+  misplaced: boolean;
   sides: Record<Side, SideReport>;
 };
 
@@ -222,6 +224,7 @@ function failedFile(file: FileVersions, intents: Record<Side, string>, error: st
     ambiguous: [],
     unexpected: [],
     lostShared: [],
+    misplaced: false,
     sides: emptySides(intents),
   };
 }
@@ -308,7 +311,7 @@ function checkFile(file: FileVersions, option: Option, intents: Record<Side, str
       : { intent: intents[dropped], status: "dropped", lines: [] };
   } else unexpected.push(...leaked);
 
-  const ok =
+  const linesOk =
     outside.ok &&
     !ambiguous.length &&
     !unexpected.length &&
@@ -316,6 +319,18 @@ function checkFile(file: FileVersions, option: Option, intents: Record<Side, str
     (["ours", "theirs"] as Side[]).every(
       (side) => sides[side].status === "present" || sides[side].status === "dropped",
     );
+  // Keeping a side means git's own checkout of it, line for line: the lines
+  // above are a bag, which accepts an access check moved below its grant.
+  const keep: Side | null =
+    option === "combine" ? null : option === "keep_ours" ? "ours" : "theirs";
+  const misplaced =
+    linesOk &&
+    keep !== null &&
+    normalizedLines(resultLines).join("\n") !==
+      normalizedLines(
+        segments.flatMap((segment) => (segment.kind === "clean" ? segment.lines : segment[keep])),
+      ).join("\n");
+  const ok = linesOk && !misplaced;
 
   return {
     path: file.path,
@@ -326,6 +341,7 @@ function checkFile(file: FileVersions, option: Option, intents: Record<Side, str
     ambiguous,
     unexpected,
     lostShared,
+    misplaced,
     sides,
   };
 }
@@ -373,6 +389,8 @@ export function checkChoiceHonored(input: HonorInput): HonorResult {
       summary.push(`${file.path}: ${lines(file.unexpected.length)} not from either side`);
     if (file.lostShared.length)
       summary.push(`${file.path}: ${lines(file.lostShared.length)} both sides kept are missing`);
+    if (file.misplaced)
+      summary.push(`${file.path}: the kept side's lines are all there, but not in its order`);
   }
   if (!files.length) summary.push("no conflicted files to check");
 

@@ -213,3 +213,46 @@ describe("fails closed", () => {
     expect(check("combine", { ours: "a", theirs: "b" }).ok).toBe(false);
   });
 });
+
+describe("keep one side means git's own checkout of it", () => {
+  const INTENTS = { ours: "ours intent", theirs: "theirs intent" };
+  const versions = (base: string, ours: string, theirs: string) => ({
+    path: "x.js",
+    base,
+    ours,
+    theirs,
+    merged: gitMergeFile(ours, base, theirs),
+  });
+
+  it("holds ours' access check moved below the grant, though every line is still there", () => {
+    const f = versions(
+      "export function access(user) {\n  check(user);\n  return deny();\n}\n",
+      "export function access(user) {\n  if (!user.admin) return deny();\n  grant(user);\n  return ok();\n}\n",
+      'export function access(user) {\n  check(user, "strict");\n  return deny("strict");\n}\n',
+    );
+    const kept = resolveWith(f.merged, "ours");
+    expect(check("keep_ours", INTENTS, { ...f, result: kept }).ok).toBe(true);
+
+    const reordered = kept.replace(
+      "  if (!user.admin) return deny();\n  grant(user);\n",
+      "  grant(user);\n  if (!user.admin) return deny();\n",
+    );
+    const result = check("keep_ours", INTENTS, { ...f, result: reordered });
+    expect(result.ok).toBe(false);
+    expect(result.summary).toContain(
+      "x.js: the kept side's lines are all there, but not in its order",
+    );
+  });
+
+  it("holds a value swapped between two conflicts", () => {
+    const base =
+      'function a() {\n  return "a0";\n}\nconst s1 = 1;\nconst s2 = 2;\nconst s3 = 3;\nfunction b() {\n  return "b0";\n}\n';
+    const f = versions(
+      base,
+      base.replace('"a0"', '"x"').replace('"b0"', '"y"'),
+      base.replace('"a0"', '"y"').replace('"b0"', '"z"'),
+    );
+    const swapped = base.replace('"a0"', '"y"').replace('"b0"', '"x"');
+    expect(check("keep_ours", INTENTS, { ...f, result: swapped }).ok).toBe(false);
+  });
+});

@@ -2,7 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { TooltipProvider } from "@/ui/primitives/tooltip";
 
 // Fetched data lives in TanStack Query. Nothing that spends quota or writes
 // is retried automatically; reads refetch when the window regains focus.
@@ -16,9 +15,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
-  return (
-    <QueryClientProvider client={client}>
-      <TooltipProvider>{children}</TooltipProvider>
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

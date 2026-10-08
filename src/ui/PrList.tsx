@@ -8,6 +8,7 @@ import { Badge } from "@/ui/primitives/badge";
 import { Kbd } from "@/ui/primitives/kbd";
 import { Reveal } from "@/ui/primitives/reveal";
 import { SHORT_LABELS } from "@/ui/resolution";
+import { getSettings } from "@/ui/settings";
 import { cn } from "@/ui/utils";
 
 // The left column: conflicting pull requests first, the ones that can merge
@@ -116,7 +117,7 @@ export function PrList({
   // or a dialog is open.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || !getSettings().shortcuts) return;
       if (event.key !== "j" && event.key !== "k") return;
       const target = event.target as HTMLElement | null;
       if (target?.closest(EDITABLE) || root.current?.contains(target)) return;
@@ -128,10 +129,11 @@ export function PrList({
   });
 
   const onRowKey = (event: React.KeyboardEvent) => {
-    if (event.key === "ArrowDown" || event.key === "j") {
+    const letters = getSettings().shortcuts;
+    if (event.key === "ArrowDown" || (letters && event.key === "j")) {
       event.preventDefault();
       move(1);
-    } else if (event.key === "ArrowUp" || event.key === "k") {
+    } else if (event.key === "ArrowUp" || (letters && event.key === "k")) {
       event.preventDefault();
       move(-1);
     }

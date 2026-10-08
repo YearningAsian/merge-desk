@@ -398,7 +398,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   };
 
   const detail = selected ? (
+    // Keyed so a steer line, open sections or a shown merge never follow you to another pull request.
     <PrDetail
+      key={selected.number}
       pull={selected}
       repo={repo}
       titleId={`pr-title-${selected.number}`}

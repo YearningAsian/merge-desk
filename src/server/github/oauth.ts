@@ -1,4 +1,5 @@
 import { requireEnv } from "@/server/env";
+import { keepAlive } from "@/server/keep-alive";
 
 // "Sign in with GitHub" through the GitHub App's user authorization. The
 // user token is used once, to read who signed in, then revoked.
@@ -45,16 +46,18 @@ export async function loginFromCode(
     if (!user.ok || !data.login) throw new Error("GitHub did not say who signed in");
     return data.login;
   } finally {
-    // Best effort: the token has done its one job.
-    void fetcher(`https://api.github.com/applications/${clientId}/token`, {
-      method: "DELETE",
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ access_token: token }),
-      signal: AbortSignal.timeout(10_000),
-    }).catch(() => {});
+    // Best effort, but kept alive past the redirect: the token has done its one job.
+    keepAlive(
+      fetcher(`https://api.github.com/applications/${clientId}/token`, {
+        method: "DELETE",
+        headers: {
+          accept: "application/vnd.github+json",
+          authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ access_token: token }),
+        signal: AbortSignal.timeout(10_000),
+      }),
+    );
   }
 }

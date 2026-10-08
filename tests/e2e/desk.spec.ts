@@ -996,3 +996,24 @@ test("a typed steer line stays with its own pull request", async ({ page }) => {
   await expect(held).toBeVisible();
   await expect(held.getByRole("textbox")).toHaveValue("");
 });
+
+test("drop: assistive tech can confirm without a long press; a short key press cannot", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests = await signIn(page);
+  await page.goto(`/live?pr=${DROP.number}`);
+  const hold = page.getByRole("button", { name: "Hold to drop theirs and run" });
+  await expect(hold).toBeVisible();
+
+  await hold.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(1_000);
+  expect(requests).toHaveLength(0);
+
+  // A screen reader's activation is a click with no pointer press behind it.
+  await hold.dispatchEvent("click");
+  await expect(page.getByRole("group", { name: "Result: VERIFIED" })).toBeVisible();
+  expect(requests).toEqual([{ pr: DROP.number, token: "e2e", option: "keep_ours" }]);
+});

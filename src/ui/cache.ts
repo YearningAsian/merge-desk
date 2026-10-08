@@ -29,7 +29,7 @@ function readAll(): Record<string, Entry> {
     const out: Record<string, Entry> = {};
     for (const [key, value] of Object.entries(parsed)) {
       const entry = Entry.safeParse(value);
-      if (entry.success && Date.now() - entry.data.savedAt < TTL_MS) out[key] = entry.data;
+      if (entry.success) out[key] = entry.data;
     }
     return out;
   } catch {
@@ -39,16 +39,18 @@ function readAll(): Record<string, Entry> {
 
 export function loadAnalyses(): Record<string, Done> {
   return Object.fromEntries(
-    Object.entries(readAll()).map(([key, entry]) => [
-      key,
-      {
-        status: "done",
-        analysis: entry.analysis,
-        token: entry.token,
-        option: entry.option,
-        steps: entry.steps as Done["steps"],
-      } satisfies Done,
-    ]),
+    Object.entries(readAll())
+      .filter(([, entry]) => Date.now() - entry.savedAt < TTL_MS)
+      .map(([key, entry]) => [
+        key,
+        {
+          status: "done",
+          analysis: entry.analysis,
+          token: entry.token,
+          option: entry.option,
+          steps: entry.steps as Done["steps"],
+        } satisfies Done,
+      ]),
   );
 }
 
@@ -57,8 +59,10 @@ export function saveAnalyses(analyses: Record<string, AnalysisState>) {
   const out: Record<string, Entry> = {};
   for (const [key, state] of Object.entries(analyses)) {
     if (state.status !== "done") continue;
+    const prior = kept[key];
     out[key] = {
-      savedAt: kept[key]?.savedAt ?? Date.now(),
+      // The clock belongs to the signature: a later save of the same token keeps it.
+      savedAt: prior && prior.token === state.token ? prior.savedAt : Date.now(),
       analysis: state.analysis,
       token: state.token,
       option: state.option,

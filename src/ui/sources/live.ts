@@ -72,10 +72,15 @@ export const liveSource: DataSource = {
           "The connection dropped before GitHub answered. Check the pull request before trying again.",
       };
     }
-    const answer = LandAnswer.safeParse(await response.json().catch(() => null));
+    const body: unknown = await response.json().catch(() => null);
+    const answer = LandAnswer.safeParse(body);
     if (answer.success) return answer.data;
+    const error = (body as { error?: unknown } | null)?.error;
     return response.status === 401 || response.status === 403
-      ? { outcome: "REFUSED", reason: (await failure(response)).message }
+      ? {
+          outcome: "REFUSED",
+          reason: typeof error === "string" ? error : `The server answered ${response.status}.`,
+        }
       : {
           outcome: "UNKNOWN",
           reason: `The server answered ${response.status} without a clear result. Check the pull request before trying again.`,

@@ -29,4 +29,18 @@ describe("readNdjson", () => {
     await expect(collect(streamOf('{"n":1}\nnot json\n'))).rejects.toThrow(/isn't JSON/);
     await expect(collect(streamOf('{"n":"one"}\n'))).rejects.toThrow(/doesn't recognise/);
   });
+
+  it("cancels a body that is still streaming, so the server's run is told to stop", async () => {
+    let cancelled = false;
+    const open = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("not json\n"));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    await expect(collect(open)).rejects.toThrow(/isn't JSON/);
+    expect(cancelled).toBe(true);
+  });
 });

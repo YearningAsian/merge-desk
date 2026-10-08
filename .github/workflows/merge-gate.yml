@@ -1,7 +1,10 @@
 name: merge gate
 
+# pull_request_target runs this file and the checker from the base branch, so a
+# pull request can't rewrite the check that judges it. It never checks out or
+# runs the pull request's code; the description only reaches it through env.
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
     types: [opened, edited, synchronize, reopened]
 
@@ -16,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
           sparse-checkout: |
             scripts/check-pr-body.mts
             .nvmrc

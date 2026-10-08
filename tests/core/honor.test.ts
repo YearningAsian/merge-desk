@@ -214,7 +214,7 @@ describe("fails closed", () => {
   });
 });
 
-describe("keep one side means git's own checkout of it", () => {
+describe("keep one side means the merge with every conflict resolved to it", () => {
   const INTENTS = { ours: "ours intent", theirs: "theirs intent" };
   const versions = (base: string, ours: string, theirs: string) => ({
     path: "x.js",

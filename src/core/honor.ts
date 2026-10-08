@@ -319,8 +319,9 @@ function checkFile(file: FileVersions, option: Option, intents: Record<Side, str
     (["ours", "theirs"] as Side[]).every(
       (side) => sides[side].status === "present" || sides[side].status === "dropped",
     );
-  // Keeping a side means git's own checkout of it, line for line: the lines
-  // above are a bag, which accepts an access check moved below its grant.
+  // Keeping a side means the merge with every conflict resolved to it, line for
+  // line: the lines above are a bag, which accepts an access check moved below
+  // its grant.
   const keep: Side | null =
     option === "combine" ? null : option === "keep_ours" ? "ours" : "theirs";
   const misplaced =

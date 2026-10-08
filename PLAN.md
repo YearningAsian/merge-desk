@@ -176,7 +176,7 @@ Every pull request into `main` clears steps 1 to 4 before it merges, and step 5 
 4. **Review verdict.** A fresh reviewer (a different model when one is available) runs `ponytail-review` on every pull request, and the `hackathon-adversarial-review` Code mode as well on side-effect paths (writes to GitHub, spends model or sandbox budget, touches access). The description's `Review:` line names the model and round and says `Ship` and, where it applies, `CLEAN ROUND`. Full reports stay in `.review/round-<n>.md`.
 5. **After a deploy.** `curl /api/health`, walk `/judge`, and record the deployment in the PLAN row.
 
-The `merge gate` workflow (`scripts/check-pr-body.mts`) fails a pull request whose description lacks a `VERIFIED` claim or a shipping `Review:` line, or still has a `NOT VERIFIED` or `INCONCLUSIVE` one. Editing the description re-runs only that check. The template in `.github/pull_request_template.md` has the sections.
+The `merge gate` workflow (`scripts/check-pr-body.mts`) fails a pull request whose description lacks a `VERIFIED` claim or a `Review:` line with `ponytail-review Ship` (and no NOT or fix), or still has a `NOT VERIFIED` or `INCONCLUSIVE` one. It runs from the base branch (`pull_request_target`), so a pull request can't edit the check that judges it, and a change to the check takes effect only once merged. It reads words, not proof, and the verdict isn't tied to a head: after any push, including a Land, re-run the review and update the line. Editing the description re-runs only this check. The template in `.github/pull_request_template.md` has the sections.
 
 ---
 

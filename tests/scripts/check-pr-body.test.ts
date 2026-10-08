@@ -32,7 +32,7 @@ describe("merge gate PR description check", () => {
     expect(checkPrBody(undefined)).toHaveLength(2);
     expect(checkPrBody("Verification: `land.test.ts` passes locally.")).toEqual([
       "no claim starts with VERIFIED (verify-this verdict)",
-      "no 'Review:' line with Ship or CLEAN ROUND (ponytail-review or adversarial round)",
+      "no shipping 'Review:' line (ponytail-review Ship, nothing NOT or fix)",
     ]);
   });
 
@@ -49,7 +49,37 @@ describe("merge gate PR description check", () => {
       "Review: ponytail-review says fix 1 and 3 first.",
     );
     expect(checkPrBody(blocked)).toEqual([
-      "no 'Review:' line with Ship or CLEAN ROUND (ponytail-review or adversarial round)",
+      "no shipping 'Review:' line (ponytail-review Ship, nothing NOT or fix)",
     ]);
+  });
+});
+
+describe("merge gate PR description check, round 11.1 bypasses", () => {
+  const REVIEW = "no shipping 'Review:' line (ponytail-review Ship, nothing NOT or fix)";
+  const BLOCKED = "a claim is NOT VERIFIED or INCONCLUSIVE: fix it or move it to 'Not checked:'";
+
+  it("refuses a review line that negates or defers its verdict", () => {
+    for (const review of [
+      "Review: Sonnet 11.1, ponytail-review Ship, adversarial NOT CLEAN ROUND",
+      "Review: Sonnet 11.1, ponytail-review Ship blocked until fix 3",
+      "Review: Sonnet 11.1, adversarial CLEAN ROUND",
+    ])
+      expect(checkPrBody(`- VERIFIED a: test\n${review}`), review).toEqual([REVIEW]);
+  });
+
+  it("finds a blocking verdict under any list, checkbox, quote or bold prefix", () => {
+    for (const claim of [
+      "1. NOT VERIFIED x",
+      "- [ ] NOT VERIFIED x",
+      "**NOT VERIFIED** x",
+      "> - INCONCLUSIVE x",
+    ])
+      expect(checkPrBody(`${ready}\n${claim}`), claim).toEqual([BLOCKED]);
+  });
+
+  it("ignores everything after an unterminated comment, as GitHub hides it", () => {
+    expect(checkPrBody("Adds X.\n<!--\n- VERIFIED x\nReview: ponytail-review Ship")).toHaveLength(
+      2,
+    );
   });
 });

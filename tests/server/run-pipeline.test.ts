@@ -382,3 +382,58 @@ describe("signed run records", () => {
     expect(received).toBe(controller.signal);
   });
 });
+
+describe("runPipeline retries", () => {
+  it("never pairs the last attempt's description with an earlier attempt's patch", async () => {
+    const path = "src/a.js";
+    let applies = 0;
+    const runner = fakeRunner({
+      applyProposal: async (_revisions, files) => {
+        applies += 1;
+        if (applies > 1) throw new Error("The proposal must cover exactly the conflicted files");
+        return {
+          conflicted: [{ path, base: "", ours: "", theirs: "", merged: "" }],
+          changedFiles: [path],
+          patch: "PATCH FROM ATTEMPT 1",
+          tree: "f".repeat(40),
+          changes: files.map((file) => ({
+            path: file.path,
+            mode: "100644" as const,
+            content: file.content,
+          })),
+          changesNote: null,
+        };
+      },
+      parseCheck: async (paths) =>
+        paths.map((p) => ({ path: p, state: "failed" as const, detail: "SyntaxError" })),
+    });
+    let attempt = 0;
+    const proposer: Proposer = async () => {
+      attempt += 1;
+      return {
+        files: [{ path, content: `attempt ${attempt}` }],
+        description: `attempt ${attempt}`,
+        source: "fixture",
+      };
+    };
+    const applied: unknown[] = [];
+    const events: RunEvent[] = [];
+    for await (const event of runPipeline({
+      runner,
+      proposer,
+      revisions: { head: "a".repeat(40), base: "b".repeat(40) },
+      option: "combine",
+      intents: { ours: "ours", theirs: "theirs" },
+      conflictedPaths: [path],
+      onApplied: (value) => applied.push(value),
+    }))
+      events.push(event);
+    const result = events.at(-1);
+    if (!result || !("type" in result)) throw new Error("no result event");
+    expect({ description: result.description, patch: result.patch, applied }).toEqual({
+      description: "attempt 2",
+      patch: undefined,
+      applied: [],
+    });
+  });
+});

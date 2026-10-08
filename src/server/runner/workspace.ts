@@ -160,8 +160,6 @@ export function assertRevisions(revisions: Revisions) {
     throw new Error("Revisions must be full commit ids");
 }
 
-export { isRepoPath };
-
 export function assertRepoPath(path: string): string {
   if (!isRepoPath(path)) throw new Error(`Path is outside the repository: ${path}`);
   return path;
@@ -377,7 +375,8 @@ export async function parseFiles(shell: Shell, paths: string[]): Promise<ParseRe
     assertRepoPath(path);
     const extension = extname(path);
     if ([".js", ".mjs", ".cjs"].includes(extension)) {
-      const exit = await shell.exec("node", ["--check", path], { timeoutMs: 10_000 });
+      // "--" so a conflicted path such as "--require=./x.js" is never read as an option.
+      const exit = await shell.exec("node", ["--check", "--", path], { timeoutMs: 10_000 });
       results.push(
         exit.code === 0
           ? { path, state: "passed", detail: "node --check" }

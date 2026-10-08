@@ -78,7 +78,7 @@ if (found) {
   process.stdout.write("node_modules:" + found);
 } else {
   const marker = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  const differs = ["package.json", "package-lock.json"].filter((name) => {
+  const differs = ${JSON.stringify(DEPS_FILES)}.filter((name) => {
     const expected = marker && marker.files ? marker.files[name] : undefined;
     return typeof expected !== "string" || createHash("sha256").update(fs.readFileSync(name)).digest("hex") !== expected;
   });

@@ -96,6 +96,8 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
           `Retrying (attempt ${attempt + 1} of ${attempts}): ${reason}`.slice(0, 2_000),
         );
       };
+      // The result describes the last attempt only, never an earlier one's merge.
+      description = undefined;
       try {
         proposal = await input.proposer({
           conflictedPaths: input.conflictedPaths,
@@ -143,9 +145,6 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
         );
         return yield* skipRest("parse");
       }
-      changedFiles = applied.changedFiles;
-      patch = applied.patch;
-      input.onApplied?.(applied);
       yield step(
         "write",
         "passed",
@@ -173,6 +172,9 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
       break;
     }
     if (!proposal || !applied) return yield* skipRest("write");
+    changedFiles = applied.changedFiles;
+    patch = applied.patch;
+    input.onApplied?.(applied);
 
     yield step("honor", "running");
     const results = new Map(proposal.files.map((file) => [file.path, file.content]));

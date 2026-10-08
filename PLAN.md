@@ -165,9 +165,18 @@
 | [#9](https://github.com/YearningAsian/merge-desk/pull/9) | 2.13 | yes (Land message) | Fresh Sonnet 9.1 CLEAN (with #10) | Merged 2026-10-07 (d3f0f5d): dogfood side A |
 | [#10](https://github.com/YearningAsian/merge-desk/pull/10) | 2.13 | yes (Land message) | 9.1 CLEAN | Open, conflicting by design: the dogfood PR Merge Desk resolves |
 | [#11](https://github.com/YearningAsian/merge-desk/pull/11) | 2.13 | yes (Land guard) | Fresh Sonnet 10.1 (0H 2M 3L, M fixed), 10.2 CLEAN | Merged 2026-10-07 (4813bbc); deployed |
-| [#7](https://github.com/YearningAsian/merge-desk/pull/7) | 2.12 | yes (secrets, access, outbound calls) | Fresh Sonnet 7.1 running; Codex not installed here | Open 2026-10-07; local lint/typecheck/360 unit/29 e2e/build pass; no real provider key, so providers unverified live |
 
-Merge rule: CI green on the merged result, and a clean adversarial round for side-effect paths (anything that writes to GitHub or spends LLM budget). After every production deploy: `curl /api/health` and walk `/judge`.
+### Merge gate
+
+Every pull request into `main` clears steps 1 to 4 before it merges, and step 5 follows every deploy. CI enforces step 1, and checks that steps 3 and 4 are recorded in the description; step 2 is the builder's own pass.
+
+1. **Build check.** `npm run verify` passes locally on the final head, and CI's `web` and `hygiene` jobs are green on the merged result. `verify` is the single command for format, lint, typecheck, unit tests, recordings, playground tests and build.
+2. **Author hygiene.** Before the last commit, the builder runs `deslop` and `no-comments` (pstack) on the diff: no AI filler, no comment that only restates the code.
+3. **Claims proved (verify-this).** Each user-visible claim in the description is one falsifiable line that starts with `VERIFIED`, with its evidence: a test that fails on `main` and passes on the head, or a command and its output. `NOT VERIFIED` and `INCONCLUSIVE` block the merge. What could not be checked goes on a `Not checked:` line and stays out of the claims.
+4. **Review verdict.** A fresh reviewer (a different model when one is available) runs `ponytail-review` on every pull request, and the `hackathon-adversarial-review` Code mode as well on side-effect paths (writes to GitHub, spends model or sandbox budget, touches access). The description's `Review:` line names the model and round and says `Ship` and, where it applies, `CLEAN ROUND`. Full reports stay in `.review/round-<n>.md`.
+5. **After a deploy.** `curl /api/health`, walk `/judge`, and record the deployment in the PLAN row.
+
+The `merge gate` workflow (`scripts/check-pr-body.mts`) fails a pull request whose description lacks a `VERIFIED` claim or a shipping `Review:` line, or still has a `NOT VERIFIED` or `INCONCLUSIVE` one. Editing the description re-runs only that check. The template in `.github/pull_request_template.md` has the sections.
 
 ---
 

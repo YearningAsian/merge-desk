@@ -96,7 +96,6 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
           `Retrying (attempt ${attempt + 1} of ${attempts}): ${reason}`.slice(0, 2_000),
         );
       };
-      // The result describes the last attempt only, never an earlier one's merge.
       description = undefined;
       try {
         proposal = await input.proposer({

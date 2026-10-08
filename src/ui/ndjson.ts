@@ -37,7 +37,6 @@ export async function* readNdjson<T>(
     const rest = (buffer + decoder.decode()).trim();
     if (rest) yield parse(rest);
   } finally {
-    // A rejected line must also stop the server's run, not just this reader.
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }

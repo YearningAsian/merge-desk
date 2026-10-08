@@ -13,7 +13,7 @@ const KEY = "merge-desk:analyses";
 const TTL_MS = 55 * 60 * 1000;
 
 const Entry = z.object({
-  savedAt: z.number(),
+  signedAt: z.number(),
   analysis: Analysis,
   token: z.string().nullable(),
   option: OptionKind,
@@ -40,7 +40,7 @@ function readAll(): Record<string, Entry> {
 export function loadAnalyses(): Record<string, Done> {
   return Object.fromEntries(
     Object.entries(readAll())
-      .filter(([, entry]) => Date.now() - entry.savedAt < TTL_MS)
+      .filter(([, entry]) => Date.now() - entry.signedAt < TTL_MS)
       .map(([key, entry]) => [
         key,
         {
@@ -61,8 +61,7 @@ export function saveAnalyses(analyses: Record<string, AnalysisState>) {
     if (state.status !== "done") continue;
     const prior = kept[key];
     out[key] = {
-      // The clock belongs to the signature: a later save of the same token keeps it.
-      savedAt: prior && prior.token === state.token ? prior.savedAt : Date.now(),
+      signedAt: prior && prior.token === state.token ? prior.signedAt : Date.now(),
       analysis: state.analysis,
       token: state.token,
       option: state.option,

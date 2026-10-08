@@ -46,7 +46,6 @@ export async function loginFromCode(
     if (!user.ok || !data.login) throw new Error("GitHub did not say who signed in");
     return data.login;
   } finally {
-    // Best effort, but kept alive past the redirect: the token has done its one job.
     keepAlive(
       fetcher(`https://api.github.com/applications/${clientId}/token`, {
         method: "DELETE",

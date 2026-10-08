@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 async function performLand(
   request: Request,
   signal: AbortSignal,
-  answered: AbortSignal,
+  untilAnswered: AbortSignal,
   progress: Progress,
   started: number,
 ) {
@@ -173,12 +173,6 @@ async function performLand(
     );
   }
 
-  // The branch moved. Record the decision at once and, side by side, ask
-  // GitHub what it now thinks (it may still be working it out). Neither can
-  // undo the Land and each has the same time budget, so the LANDED answer
-  // always arrives before the function's limit (a timeout here must never
-  // read as UNKNOWN). The record stops only once the answer is sent, not when
-  // the browser goes away: the Land already happened and must be recorded.
   const mergeability = async (): Promise<"mergeable" | "conflicting" | "checking"> => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
@@ -196,16 +190,16 @@ async function performLand(
   };
   const writeRecord = async (): Promise<{ ok: boolean; reason?: string }> => {
     try {
-      answered.throwIfAborted();
+      untilAnswered.throwIfAborted();
       const app = await appIdentity();
-      answered.throwIfAborted();
+      untilAnswered.throwIfAborted();
       const result = await upsertRecord(octokit, {
         repo: REPO,
         pr,
         appId: app.id,
         deskUrl: deskLink(request, pr),
         seal: recordSeal(requireEnv("SESSION_SECRET")),
-        signal: answered,
+        signal: untilAnswered,
         entry: entryFor(run, {
           action: run.drops ? "dropped" : "landed",
           who: guard.login,

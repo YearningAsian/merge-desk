@@ -29,7 +29,8 @@
     "gate": "tsx scripts/gate.mts",
     "demo:seed": "tsx scripts/demo-seed.mts",
     "demo:reset": "tsx scripts/demo-reset.mts",
-    "env:check": "node scripts/env-check.mjs"
+    "env:check": "node scripts/env-check.mjs",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run recordings:check && npm run test:playground && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.131.0",

@@ -1,0 +1,31 @@
+name: merge gate
+
+# PLAN "Merge gate": a pull request into main shows its verify-this verdicts and
+# its review verdict in the description. Editing the description re-runs only this.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  verdicts:
+    name: verdicts (verify-this, review)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/check-pr-body.mts
+            .nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # The body goes through env, never into the script text, so it cannot inject shell.
+      - run: node scripts/check-pr-body.mts
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}

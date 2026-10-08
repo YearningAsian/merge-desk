@@ -117,6 +117,7 @@
 | 3.3 | Live abuse checks on production (replay land, double land, forged PR number, oversized file, prompt injection in code comments) | n/a | B | ⬜ | |
 | 3.4 | Truth sweep: PLAN = code = live site | `PLAN.md` | A | ⬜ | |
 | 3.5 | Claims dry run (`check_claims.py`) | n/a | A | ⬜ | |
+| 3.6 | Codebase audit (ponytail-audit with verify-this repros) and the merge gate (`npm run verify`, verdicts in the PR description) | `PLAN.md`, `.github/**`, `scripts/**`, `src/**` | B | 🟡 | 2026-10-08 11:40 claimed (Claude Opus 5.5): four-area audit running, baseline on main lint/typecheck/412 tests/build green |
 
 ### Phase 4: Assets
 

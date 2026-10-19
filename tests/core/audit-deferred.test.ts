@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { parseMergeMarkers } from "@/core/conflicts";
 import { checkChoiceHonored, type FileVersions, type Option } from "@/core/honor";
-import { normalizedLines, splitLines } from "@/core/text";
+import { normalizedLines, splitLines, tokenize } from "@/core/text";
 import { GeminiClient } from "@/server/gemini/client";
 import { candidate, gitMergeFile, resolveWith, scenarioFile } from "../helpers/scenarios";
 
@@ -189,5 +189,32 @@ describe("combine checks conflicts that share a region of the result together", 
       files: [{ path: "a.js", base: "", ours: "", theirs: "", merged, result }],
     });
     expect(report.ok, `summary was: ${report.summary.join(" | ")}`).toBe(true);
+  });
+});
+
+describe("review round 3 claims, settled by tests", () => {
+  it("holds a third copy of a line both sides inserted, even in a region two conflicts share", () => {
+    const conflict = (ours: string, theirs: string) =>
+      `<<<<<<< ours\n${ours}\n||||||| base\n=======\n${theirs}\n>>>>>>> theirs\n`;
+    const merged =
+      "function a() {\n" +
+      conflict("  x();\n  a();", "  x();\n  b();") +
+      "\n" +
+      conflict("  c();", "  d();") +
+      "}\n";
+    const honest = "function a() {\n  x();\n  a();\n  b();\n\n  c();\n  d();\n}\n";
+    const tripled = "function a() {\n  x();\n  x();\n  a();\n  b();\n\n  x();\n  c();\n  d();\n}\n";
+    const run = (result: string) =>
+      checkChoiceHonored({
+        option: "combine",
+        intents: INTENTS,
+        files: [{ path: "a.js", base: "", ours: "", theirs: "", merged, result }],
+      });
+    expect(run(honest).ok, "control").toBe(true);
+    expect(run(tripled).ok).toBe(false);
+  });
+
+  it("reads an escaped quote the way a JavaScript lexer does", () => {
+    expect(tokenize('"a\\" + "b"')).toEqual(['"a\\" + "', "b", '"']);
   });
 });

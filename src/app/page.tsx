@@ -111,8 +111,8 @@ function CheckRows({ checks }: { checks: ReturnType<typeof checksOf> }) {
             <span className="flex-1 text-[14px] font-medium">{check.label}</span>
             <Badge tone={TONE[check.state]}>{check.state.replace("_", " ")}</Badge>
           </div>
-          {check.lines.map((line) => (
-            <p key={line} className="mt-1 text-[13px] text-muted">
+          {check.lines.map((line, index) => (
+            <p key={index} className="mt-1 text-[13px] text-muted">
               {line}
             </p>
           ))}

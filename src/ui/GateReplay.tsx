@@ -46,7 +46,10 @@ export function GateReplay({
 
   const steps = events
     .slice(0, shown)
-    .reduce<RunSteps>((acc, event) => ({ ...acc, [event.step]: withStep(acc[event.step], event) }), {});
+    .reduce<RunSteps>(
+      (acc, event) => ({ ...acc, [event.step]: withStep(acc[event.step], event) }),
+      {},
+    );
 
   return (
     <div className="space-y-3">

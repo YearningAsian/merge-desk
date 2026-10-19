@@ -40,7 +40,7 @@ const stops = [
     recording: cleanRun!,
     steps: [
       "Run Combine both. It parses, both branches' changes are present, and the tests pass: VERIFIED.",
-      "Press Land. This replays a real Land: the merge commit went onto the pull request's own branch, never its base, the decision record gained an entry, and GitHub then reported the pull request could merge. The branch was reset afterwards so the demo can start over.",
+      "Press Land. This replays a real Land: the merge commit went onto the pull request's own branch, never its base, and the decision record gained an entry. The branch was reset afterwards so the demo can start over.",
     ],
   },
   {

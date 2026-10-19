@@ -94,7 +94,13 @@ function Motif({ className }: { className?: string }) {
   );
 }
 
-const TONE = { passed: "ok", failed: "stop", not_run: "wait", queued: "neutral", running: "wait" } as const;
+const TONE = {
+  passed: "ok",
+  failed: "stop",
+  not_run: "wait",
+  queued: "neutral",
+  running: "wait",
+} as const;
 
 function CheckRows({ checks }: { checks: ReturnType<typeof checksOf> }) {
   return (
@@ -151,11 +157,11 @@ export default function Home() {
       aria-labelledby="home-title"
       className="text-[16px] leading-[1.55] outline-none"
     >
-      <section className="grid gap-3 p-3 lg:min-h-dvh lg:grid-cols-2">
+      <section className="grid gap-3 px-4 py-3 sm:px-8 lg:min-h-dvh lg:grid-cols-2 lg:px-12">
         <div className="flex flex-col overflow-hidden rounded-desk bg-surface">
           <Motif className="h-12 sm:h-14" />
           <div className="flex flex-1 flex-col justify-center gap-7 px-5 py-12 sm:px-12 lg:py-16">
-            <p className="text-[22px] font-bold tracking-[-0.01em]">Merge Desk</p>
+            <p className="text-[20px] font-bold">Merge Desk</p>
             <h1 id="home-title" className={cn(DISPLAY, "max-w-[12ch]")}>
               AI merges that wait for proof.
             </h1>
@@ -168,7 +174,7 @@ export default function Home() {
               <Link href="/demo" className={PRIMARY}>
                 Try the demo <ArrowRight aria-hidden className="size-4" />
               </Link>
-              <span className="text-[15px]">No account, and it writes nothing.</span>
+              <span>No account, and it writes nothing.</span>
             </div>
           </div>
           <nav
@@ -207,7 +213,7 @@ export default function Home() {
               </p>
             ) : null}
             <GateReplay
-              events={stepEvents(landed)}
+              events={stepEvents(landed).map((event) => ({ ...event, log: undefined }))}
               verdictAt={landedResult.t}
               verdict={landedResult.verdict}
               after={`Landed on ${land.branch} as ${short(land.commit)}`}
@@ -228,23 +234,23 @@ export default function Home() {
           <h2 id="pick-title" className={H2}>
             Pick a resolution. The gate answers.
           </h2>
-          <p className="mt-4 max-w-[54ch] text-[17px]">
-            The same conflict, each option Gemini offered, each run for real. Choose one to see
-            what the checks recorded.
+          <p className="mt-4 max-w-[54ch]">
+            The same conflict, each option Gemini offered, each run for real. Choose one to see what
+            the checks recorded.
           </p>
           <fieldset className="mt-12 lg:mt-16">
             <legend className="sr-only">Resolution for pull request #{pull.number}</legend>
             <div className="relative grid grid-cols-3">
               <div
                 aria-hidden
-                className="absolute inset-x-[16.667%] top-[22px] flex h-3 overflow-hidden rounded-full ring-4 ring-white sm:top-[30px] sm:h-4"
+                className="absolute inset-x-[16.667%] top-[22px] flex h-5 overflow-hidden rounded-full border-4 border-white sm:top-[28px] sm:h-6"
               >
                 <div className="flex-1 bg-ours" />
                 <div className="flex-1 bg-theirs" />
               </div>
               <div
                 aria-hidden
-                className="absolute top-[6px] left-1/2 size-11 -translate-x-1/2 rounded-full bg-ink ring-4 ring-white transition-[left] duration-200 group-has-[#pick-ours:checked]/pick:left-[16.667%] group-has-[#pick-theirs:checked]/pick:left-[83.333%] sm:top-[10px] sm:size-14"
+                className="absolute top-[6px] left-1/2 size-11 -translate-x-1/2 rounded-full border-4 border-white bg-ink transition-[left] duration-200 group-has-[#pick-ours:checked]/pick:left-[16.667%] group-has-[#pick-theirs:checked]/pick:left-[83.333%] sm:top-[10px] sm:size-14"
               />
               {picks.map((pick) => (
                 <label
@@ -286,7 +292,11 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="how" aria-labelledby="how-title" className={cn(FRAME, "scroll-mt-6 py-28 lg:py-40")}>
+      <section
+        id="how"
+        aria-labelledby="how-title"
+        className={cn(FRAME, "scroll-mt-6 py-28 lg:py-40")}
+      >
         <div className="grid gap-x-2.5 gap-y-4 lg:grid-cols-12 lg:items-end">
           <h2
             id="how-title"
@@ -296,7 +306,7 @@ export default function Home() {
           </h2>
 
           <div className="lg:col-span-3 lg:row-start-2">
-            <div className="flex flex-col justify-end rounded-desk bg-ours-wash p-3 lg:min-h-[32vh]">
+            <div className="flex flex-col justify-end rounded-desk bg-ours-wash p-3 lg:min-h-[28vh]">
               <div data-ui className="space-y-3 rounded-desk bg-surface p-3">
                 <Intents />
                 <ul className="space-y-1 text-[13px]">
@@ -317,7 +327,7 @@ export default function Home() {
           </div>
 
           <div className="lg:col-span-4 lg:row-start-2">
-            <div className="flex flex-col justify-end rounded-desk bg-stop-wash p-3 lg:min-h-[46vh]">
+            <div className="flex flex-col justify-end rounded-desk bg-stop-wash p-3 lg:min-h-[38vh]">
               <div data-ui className="space-y-2 rounded-desk bg-surface p-3">
                 <p className="text-[13px]">
                   <span className="font-semibold">{OPTION_LABELS[caught.option]}</span>, steered:{" "}
@@ -338,15 +348,13 @@ export default function Home() {
           </div>
 
           <div className="lg:col-span-5 lg:row-span-2 lg:row-start-1">
-            <div className="flex flex-col justify-end rounded-desk bg-ok-wash p-3 lg:min-h-[62vh]">
+            <div className="flex flex-col justify-end rounded-desk bg-ok-wash p-3 lg:min-h-[48vh]">
               <div data-ui className="space-y-3 rounded-desk bg-surface p-4">
                 <div className="flex items-center gap-2">
                   <Badge tone="ok" className="text-[13px] leading-6">
                     LANDED
                   </Badge>
-                  <span className="text-[13px] text-muted">
-                    in {(land.ms / 1000).toFixed(1)} s
-                  </span>
+                  <span className="text-[13px] text-muted">in {(land.ms / 1000).toFixed(1)} s</span>
                 </div>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
                   <dt className="text-muted">Head</dt>
@@ -371,6 +379,17 @@ export default function Home() {
                       : "written"}
                   </dd>
                 </dl>
+                {land.entry ? (
+                  <ul className="flex flex-wrap gap-1.5" aria-label="Checks recorded with the Land">
+                    {land.entry.checks.map((check) => (
+                      <li key={check.step}>
+                        <Badge tone={check.state === "passed" ? "ok" : "stop"}>
+                          {STEP_LABELS[check.step]}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {land.entry?.reason ? (
                   <p className="rounded-[6px] bg-bg px-3 py-2 text-[13px]">
                     <span className="font-semibold">Why: </span>
@@ -403,9 +422,18 @@ export default function Home() {
           </div>
           {[
             [metrics.studyProjects, "open source projects in the merge conflict study"],
-            [`${metrics.studyConflictsNeedingLogicPct}%`, "of their conflicts needed reasoning about program logic"],
-            [`${metrics.studyBugLikelihoodMultiplier}x`, "as likely to have a bug, for code tied to a conflict"],
-            [metrics.demoRecordedRuns, "real runs recorded for the demo, Gemini and sandbox included"],
+            [
+              `${metrics.studyConflictsNeedingLogicPct}%`,
+              "of their conflicts needed reasoning about program logic",
+            ],
+            [
+              `${metrics.studyBugLikelihoodMultiplier}x`,
+              "as likely to have a bug, for code tied to a conflict",
+            ],
+            [
+              metrics.demoRecordedRuns,
+              "real runs recorded for the demo, Gemini and sandbox included",
+            ],
             [metrics.demoRecordedHeld, "of those runs HELD, each with its reason"],
             [metrics.demoRecordedLands, "real Lands on demo pull requests, each reset afterwards"],
           ].map(([value, label]) => (
@@ -435,17 +463,20 @@ export default function Home() {
       </section>
 
       <section aria-labelledby="open-title" className="bg-ink text-white">
-        <div className={cn(FRAME, "grid gap-12 py-24 lg:min-h-[86svh] lg:grid-cols-12 lg:items-center")}>
-          <div className="lg:col-span-5 lg:self-end">
+        <div className={cn(FRAME, "grid gap-12 py-24 md:grid-cols-12 md:items-center lg:py-32")}>
+          <div className="md:col-span-5 md:self-end">
             <h2 id="open-title" className={DISPLAY}>
               Open a conflict.
             </h2>
-            <p className="mt-6 max-w-[40ch] text-[17px]">
+            <p className="mt-6 max-w-[40ch]">
               The demo replays the real runs on three pull requests, at their original pace. No
               account, and nothing is written to GitHub.
             </p>
           </div>
-          <div data-ui className="rounded-desk bg-surface p-2 text-ink lg:col-span-6 lg:col-start-7">
+          <div
+            data-ui
+            className="rounded-desk bg-surface p-2 text-ink md:col-span-7 lg:col-span-6 lg:col-start-7"
+          >
             <p className="px-3 pt-2 pb-1 text-[13px] font-medium text-muted">
               Needs resolution {recordings.length}
             </p>

@@ -40,6 +40,8 @@ export function detectRenames(baseText: string, sideText: string): Rename[] {
   const base = normalizedLines(splitLines(baseText));
   const side = normalizedLines(splitLines(sideText));
   // A whole-file reformat changes nearly every line; renames need stable context.
+  // ponytail: a real rename touching >80% of a 100+ line file is skipped, so that merge is
+  // held (fails closed); replace with a cheaper alignment if such merges show up.
   if (base.length > 100) {
     const changes = diffArrays(base, side);
     const changed = changes.reduce((n, c) => n + (c.added || c.removed ? c.count : 0), 0);

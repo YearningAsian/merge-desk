@@ -50,3 +50,6 @@ agent/
 .vercel
 .env*
 !.env.example
+
+# design inspector output (local)
+.taste-skill/

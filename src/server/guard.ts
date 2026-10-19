@@ -59,7 +59,7 @@ export function checkLand({ login, repo, defaultBranch, pull, record }: LandInpu
   const branch = pull.head.ref;
   if (branch === "main" || branch === defaultBranch)
     return refuse(
-      `Can't land on ${branch}: Merge Desk only writes to a pull request's own branch.`,
+      `Can't land on ${branch}: Merge Desk never writes to main or the default branch.`,
     );
   if (branch === pull.base.ref)
     return refuse("Can't land: the branch is also the pull request's base.");

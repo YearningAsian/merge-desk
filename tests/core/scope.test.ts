@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WRITE_SCOPE, checkWritableBranch } from "@/core/scope";
+import { LAND_SCOPE, WRITE_SCOPE, checkWritableBranch } from "@/core/scope";
 
 describe("checkWritableBranch (demo-only until the learner approves the dogfood Land)", () => {
   it("is demo-only by default", () => {
@@ -51,5 +51,12 @@ describe("checkWritableBranch (demo-only until the learner approves the dogfood 
       branch: "feature/retry",
     });
     expect(checkWritableBranch("refs/heads/../main", "repository").ok).toBe(false);
+  });
+});
+
+describe("scripts and Land use separate scopes", () => {
+  it("keeps the scripts' default scope on demo/* while Land may write any well-formed branch", () => {
+    expect(checkWritableBranch("feat/x").ok).toBe(false);
+    expect(checkWritableBranch("feat/x", LAND_SCOPE)).toEqual({ ok: true, branch: "feat/x" });
   });
 });

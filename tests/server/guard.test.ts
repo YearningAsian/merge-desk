@@ -112,10 +112,12 @@ describe("checkLand", () => {
   });
 
   it("still refuses main, the default branch and a malformed branch name", () => {
-    expect(reason(pull({ head: { ...input.pull.head, ref: "main" } }))).toMatch(/own branch/);
+    expect(reason(pull({ head: { ...input.pull.head, ref: "main" } }))).toMatch(
+      /never writes to main or the default branch/,
+    );
     expect(
       reason({ ...pull({ head: { ...input.pull.head, ref: "trunk" } }), defaultBranch: "trunk" }),
-    ).toMatch(/own branch/);
+    ).toMatch(/never writes to main or the default branch/);
     expect(reason(pull({ head: { ...input.pull.head, ref: "feat/../main" } }))).toMatch(
       /Not a valid branch name/,
     );

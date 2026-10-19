@@ -530,6 +530,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       aria-label="Merge Desk"
       className="relative flex min-h-0 flex-1 outline-none"
     >
+      <h1 className="sr-only">Merge Desk: pull requests to resolve</h1>
       <p role="status" className="sr-only">
         {announcement}
       </p>
@@ -563,9 +564,9 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
           {detail ?? (
             <div className="flex h-full flex-col items-start justify-center gap-4 px-8 text-[14px]">
               <GitMerge aria-hidden className="size-6 text-muted" />
-              <h1 className="text-[22px] font-semibold tracking-tight">
+              <h2 className="text-[22px] font-semibold tracking-tight">
                 Pick a conflict to resolve
-              </h1>
+              </h2>
               <p className="max-w-md">
                 Open a pull request to see what each side meant and how the conflict could be
                 resolved. Nothing lands until a run passes every check:

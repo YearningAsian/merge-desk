@@ -39,6 +39,12 @@ export function applyRenames(line: string, renames: Rename[]): string {
 export function detectRenames(baseText: string, sideText: string): Rename[] {
   const base = normalizedLines(splitLines(baseText));
   const side = normalizedLines(splitLines(sideText));
+  // A whole-file reformat changes nearly every line; renames need stable context.
+  if (base.length > 100) {
+    const changes = diffArrays(base, side);
+    const changed = changes.reduce((n, c) => n + (c.added || c.removed ? c.count : 0), 0);
+    if (changed > base.length * 0.8) return [];
+  }
   const alignment = alignSide(base, side);
 
   const candidates = new Map<string, { to: string; pure: string | null }>();

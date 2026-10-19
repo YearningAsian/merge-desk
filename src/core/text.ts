@@ -1,7 +1,7 @@
 // Line and token normalization shared by every check. Lines compare by their
 // tokens, so whitespace and formatting differences never count as changes.
 
-const TOKEN = /[A-Za-z_$][\w$]*|\d[\w.]*|\S/g;
+const TOKEN = /`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Za-z_$][\w$]*|\d[\w.]*|\S/g;
 
 export const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 

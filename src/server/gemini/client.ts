@@ -4,6 +4,7 @@ import { requireEnv } from "@/server/env";
 import { MalformedOutputError } from "@/server/errors";
 import {
   ProviderError,
+  providerFailure,
   type StructuredClient,
   type StructuredRequest,
 } from "@/server/llm/structured";
@@ -113,9 +114,12 @@ export class GeminiClient implements StructuredClient {
         deadline,
       ]);
     } catch (error) {
-      // A cancel mid-call: say so in our words, not the SDK's.
       if (request.signal?.aborted) throw new ProviderError("Stopped before Gemini answered.");
-      throw error;
+      if (error instanceof MalformedOutputError || error instanceof ProviderError) throw error;
+      if (controller.signal.aborted)
+        throw new ProviderError(`Gemini did not answer within ${this.deadlineMs / 1000} s`);
+      const status = (error as { status?: unknown }).status;
+      throw providerFailure("Gemini", typeof status === "number" ? status : undefined);
     } finally {
       clearTimeout(timer);
       request.signal?.removeEventListener("abort", abort);

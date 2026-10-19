@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { parseMergeMarkers } from "@/core/conflicts";
 import { checkChoiceHonored, type FileVersions, type Option } from "@/core/honor";
-import { normalizedLines, splitLines, tokenize } from "@/core/text";
+import { normalizedLines, normalizeLine, splitLines, tokenize } from "@/core/text";
 import { GeminiClient } from "@/server/gemini/client";
 import { candidate, gitMergeFile, resolveWith, scenarioFile } from "../helpers/scenarios";
 
@@ -216,5 +216,12 @@ describe("review round 3 claims, settled by tests", () => {
 
   it("reads an escaped quote the way a JavaScript lexer does", () => {
     expect(tokenize('"a\\" + "b"')).toEqual(['"a\\" + "', "b", '"']);
+  });
+});
+
+describe("review round 4: template literals", () => {
+  it("keeps a plain template whole and tokenizes an interpolated one piece by piece", () => {
+    expect(tokenize("x = `a  b`;")).toEqual(["x", "=", "`a  b`", ";"]);
+    expect(normalizeLine("x = `a ${ b } c`;")).toBe(normalizeLine("x = `a ${b} c`;"));
   });
 });

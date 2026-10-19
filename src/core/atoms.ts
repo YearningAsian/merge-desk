@@ -43,9 +43,9 @@ export function detectRenames(baseText: string, sideText: string): Rename[] {
   // ponytail: a real rename touching >80% of a 100+ line file is skipped, so that merge is
   // held (fails closed); replace with a cheaper alignment if such merges show up.
   if (base.length > 100) {
-    const changes = diffArrays(base, side);
-    const changed = changes.reduce((n, c) => n + (c.added || c.removed ? c.count : 0), 0);
-    if (changed > base.length * 0.8) return [];
+    const sideLines = new Set(side);
+    const kept = base.filter((line) => sideLines.has(line)).length;
+    if (kept < base.length * 0.2) return [];
   }
   const alignment = alignSide(base, side);
 

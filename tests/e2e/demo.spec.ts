@@ -228,11 +228,22 @@ test("judge guide: every stop opens its recorded pull request in the demo", asyn
 
 test("home: says what Merge Desk is, with the demo one click away", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  // The replay fades each check line in; axe judges the settled page.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "AI merges that wait for proof." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Try the demo" })).toHaveAttribute("href", "/demo");
-  await expect(page.getByRole("link", { name: "Judge's guide" })).toHaveAttribute("href", "/judge");
-  await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/live");
+  await expect(page.getByRole("link", { name: "Try the demo" }).first()).toHaveAttribute(
+    "href",
+    "/demo",
+  );
+  await expect(page.getByRole("link", { name: "Judge's guide" }).first()).toHaveAttribute(
+    "href",
+    "/judge",
+  );
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toHaveAttribute(
+    "href",
+    "/live",
+  );
   await noHorizontalOverflow(page);
   await noSeriousAxe(page);
 });

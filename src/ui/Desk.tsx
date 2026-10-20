@@ -399,6 +399,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
 
   const detail = selected ? (
     <PrDetail
+      key={selected.number}
       pull={selected}
       repo={repo}
       titleId={`pr-title-${selected.number}`}

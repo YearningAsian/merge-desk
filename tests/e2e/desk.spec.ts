@@ -956,3 +956,64 @@ test("an analysis that fails says why and offers to run it again", async ({ page
   await expect(page.getByRole("button", { name: "Analyze again" })).toBeVisible();
   await shot(page, "analysis-failed-1440");
 });
+
+test("turning single-key shortcuts off stops J and K in the list too", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  await page.goto("/live");
+  const list = page.getByRole("navigation", { name: "Pull requests" });
+  await expect(list.getByRole("button", { name: /\[Demo\]/ })).toHaveCount(3);
+
+  await page.keyboard.press(",");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("switch", { name: "Single-key shortcuts" }).click();
+  await page.keyboard.press("Escape");
+  await expect(settings).toHaveCount(0);
+
+  await page.locator("body").press("j");
+  await expect(list.locator("[data-pr]:focus")).toHaveCount(0);
+});
+
+test("a typed steer line stays with its own pull request", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  // Both pull requests end HELD, so each shows a steer line.
+  await page.route("**/api/live/run", (route) =>
+    route.fulfill({ status: 200, contentType: "application/x-ndjson", body: runs[HELD]! }),
+  );
+  await page.goto("/live");
+  const detail = page.getByRole("article");
+  const held = detail.getByRole("group", { name: "Result: HELD" });
+  for (const pr of [HELD, CLEAN]) {
+    await page.locator(`[data-pr="${pr}"]`).click();
+    await expect(detail.getByRole("button", { name: "Run checks" })).toBeVisible();
+    await page.keyboard.press("Control+Enter");
+    await expect(held).toBeVisible();
+  }
+  await held.getByRole("textbox").fill("only for the clean pull request");
+
+  await page.locator(`[data-pr="${HELD}"]`).click();
+  await expect(held).toBeVisible();
+  await expect(held.getByRole("textbox")).toHaveValue("");
+});
+
+test("drop: assistive tech can confirm without a long press; a short key press cannot", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests = await signIn(page);
+  await page.goto(`/live?pr=${DROP.number}`);
+  const hold = page.getByRole("button", { name: "Hold to drop theirs and run" });
+  await expect(hold).toBeVisible();
+
+  await hold.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(1_000);
+  expect(requests).toHaveLength(0);
+
+  // A screen reader's activation is a click with no pointer press behind it.
+  await hold.dispatchEvent("click");
+  await expect(page.getByRole("group", { name: "Result: VERIFIED" })).toBeVisible();
+  expect(requests).toEqual([{ pr: DROP.number, token: "e2e", option: "keep_ours" }]);
+});

@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TARGETS = ["README.md", "docs/pitch.md", "docs/submission-draft.md", "docs/stills/GALLERY.md", "src/app", "src/ui"]
+DEFAULT_TARGETS = ["README.md", "docs/pitch.md", "docs/submission-draft.md", "docs/stills/GALLERY.md", "docs/FACTS.json", "demo/recordings", "src/app", "src/ui"]
 SUFFIXES = {".md", ".mdx", ".tsx", ".ts", ".jsx", ".js", ".css", ".html", ".json"}
 NEEDLES = ("—", "&mdash;")
 

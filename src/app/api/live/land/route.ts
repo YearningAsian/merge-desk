@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       else resolve(refused(503, "Land stopped before the branch update. Nothing was pushed."));
     }, REQUEST_MS);
   });
-  const work = performLand(request, signal, progress, started);
+  const work = performLand(request, signal, controller.signal, progress, started);
   keepAlive(work); // its tail may still be releasing the record lock
   try {
     return await Promise.race([work, timeout]);
@@ -80,6 +80,7 @@ export async function POST(request: Request) {
 async function performLand(
   request: Request,
   signal: AbortSignal,
+  untilAnswered: AbortSignal,
   progress: Progress,
   started: number,
 ) {
@@ -172,38 +173,33 @@ async function performLand(
     );
   }
 
-  // The branch moved. Ask GitHub what it now thinks (it may still be working
-  // it out) and record the decision. Neither can undo the Land, and both get
-  // a time budget, so the LANDED answer always arrives before the function's
-  // limit (a timeout here must never read as UNKNOWN).
-  const afterLand = async () => {
-    let mergeable: "mergeable" | "conflicting" | "checking" = "checking";
+  const mergeability = async (): Promise<"mergeable" | "conflicting" | "checking"> => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         signal.throwIfAborted();
         const after = await readPull(octokit, REPO, pr);
         // Right after the push GitHub can still answer for the old head.
-        if (after.summary.head.sha === commit && after.summary.mergeable !== "checking") {
-          mergeable = after.summary.mergeable;
-          break;
-        }
+        if (after.summary.head.sha === commit && after.summary.mergeable !== "checking")
+          return after.summary.mergeable;
       } catch {
         break;
       }
       await pause(1_000);
     }
-    let record: { ok: boolean; reason?: string };
+    return "checking";
+  };
+  const writeRecord = async (): Promise<{ ok: boolean; reason?: string }> => {
     try {
-      signal.throwIfAborted();
+      untilAnswered.throwIfAborted();
       const app = await appIdentity();
-      signal.throwIfAborted();
+      untilAnswered.throwIfAborted();
       const result = await upsertRecord(octokit, {
         repo: REPO,
         pr,
         appId: app.id,
         deskUrl: deskLink(request, pr),
         seal: recordSeal(requireEnv("SESSION_SECRET")),
-        signal,
+        signal: untilAnswered,
         entry: entryFor(run, {
           action: run.drops ? "dropped" : "landed",
           who: guard.login,
@@ -211,28 +207,24 @@ async function performLand(
           commit,
         }),
       });
-      record = result.ok ? { ok: true } : { ok: false, reason: result.reason };
+      return result.ok ? { ok: true } : { ok: false, reason: result.reason };
     } catch {
-      record = {
+      return {
         ok: false,
         reason: "The record update wasn't confirmed. Check the pull request before trying again.",
       };
     }
-    return { mergeable, record };
   };
-  const tail = afterLand();
-  keepAlive(tail);
-  const { mergeable, record } = await withDeadline(
-    tail,
-    Math.max(0, Math.min(AFTER_LAND_MS, REQUEST_MS - (Date.now() - started))),
-    {
-      mergeable: "checking" as const,
-      record: {
-        ok: false,
-        reason: "the record update took too long; it may still appear on the pull request",
-      },
-    },
-  );
+  const budget = Math.max(0, Math.min(AFTER_LAND_MS, REQUEST_MS - (Date.now() - started)));
+  const pending = [mergeability(), writeRecord()] as const;
+  for (const task of pending) keepAlive(task);
+  const [mergeable, record] = await Promise.all([
+    withDeadline(pending[0], budget, "checking" as const),
+    withDeadline(pending[1], budget, {
+      ok: false,
+      reason: "The record update wasn't confirmed before this answer. Check the pull request.",
+    }),
+  ]);
 
   return answer(200, "LANDED", { commit, branch: refs.head, mergeable, record });
 }

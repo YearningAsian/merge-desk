@@ -52,7 +52,6 @@ export type DeskAction =
   | { type: "analysis/event"; key: string; event: AnalyzeEvent }
   | { type: "analysis/error"; key: string; reason: string }
   | { type: "option"; key: string; option: Option }
-  | { type: "hydrate"; analyses: Record<string, AnalysisState> }
   | { type: "run/start"; key: string; steer: string | null }
   | { type: "run/event"; key: string; event: RunEvent }
   | { type: "run/error"; key: string; reason: string }
@@ -136,9 +135,6 @@ export function deskReducer(state: DeskState, action: DeskAction): DeskState {
         reason: action.reason,
       });
     }
-    case "hydrate":
-      // Restored analyses never replace one already in this session.
-      return { ...state, analyses: { ...action.analyses, ...state.analyses } };
     case "run/start":
     case "run/event":
     case "run/error": {

@@ -18,11 +18,14 @@ const LandAnswer = z.union([
 const Entries = z.object({ entries: z.array(RecordEntry) });
 const Read = z.object({ entries: z.array(RecordEntry), note: z.string().nullable() });
 
+const reasonOf = (body: unknown, status: number) => {
+  const error = (body as { error?: unknown } | null)?.error;
+  return typeof error === "string" ? error : `The server answered ${status}.`;
+};
+
 async function failure(response: Response): Promise<SourceError> {
-  const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
-  const message =
-    typeof body?.error === "string" ? body.error : `The server answered ${response.status}.`;
-  return new SourceError(message, response.status);
+  const body: unknown = await response.json().catch(() => null);
+  return new SourceError(reasonOf(body, response.status), response.status);
 }
 
 export const liveSource: DataSource = {
@@ -72,10 +75,11 @@ export const liveSource: DataSource = {
           "The connection dropped before GitHub answered. Check the pull request before trying again.",
       };
     }
-    const answer = LandAnswer.safeParse(await response.json().catch(() => null));
+    const body: unknown = await response.json().catch(() => null);
+    const answer = LandAnswer.safeParse(body);
     if (answer.success) return answer.data;
     return response.status === 401 || response.status === 403
-      ? { outcome: "REFUSED", reason: (await failure(response)).message }
+      ? { outcome: "REFUSED", reason: reasonOf(body, response.status) }
       : {
           outcome: "UNKNOWN",
           reason: `The server answered ${response.status} without a clear result. Check the pull request before trying again.`,

@@ -20,5 +20,6 @@ export default defineConfig([
     "agent/**",
     ".claude/**",
     ".github/skills/**",
+    "graphify-out/**",
   ]),
 ]);

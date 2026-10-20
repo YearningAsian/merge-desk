@@ -46,6 +46,8 @@ export function runSteps(steps: RunSteps): StepRow[] {
   });
 }
 
+const isAssistiveActivation = (event: React.MouseEvent) => event.detail === 0;
+
 function HoldToConfirm({ label, onConfirm }: { label: string; onConfirm: () => void }) {
   const [holding, setHolding] = useState(false);
   const confirm = useRef(onConfirm);
@@ -84,7 +86,13 @@ function HoldToConfirm({ label, onConfirm }: { label: string; onConfirm: () => v
         }
       }}
       onKeyUp={(event) => {
-        if (event.key === " " || event.key === "Enter") cancel();
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          cancel();
+        }
+      }}
+      onClick={(event) => {
+        if (isAssistiveActivation(event)) confirm.current();
       }}
       onContextMenu={(event) => event.preventDefault()}
       className="relative inline-flex h-11 touch-none items-center overflow-hidden rounded-desk border border-stop bg-surface px-4 text-[13px] font-semibold text-stop-text select-none md:h-9"

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { RunRecord } from "@/core/run";
-import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
-import { appIdentity, installationOctokit } from "@/server/github/app";
+import { requireEnv } from "@/server/env";
+import { openRepo } from "@/server/github/access";
+import { appIdentity } from "@/server/github/app";
 import { readRecord, upsertRecord } from "@/server/github/comment";
 import { readPull } from "@/server/github/prs";
 import { verifyRun } from "@/server/pipeline/run";
@@ -16,8 +17,6 @@ export const runtime = "nodejs";
 // under its own budget (RECORD_BUDGET_MS), and its lock is then released.
 export const maxDuration = 60;
 
-const REPO = CODE_ALLOWED_REPOS[0];
-
 const json = (status: number, body: Record<string, unknown>) =>
   Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
@@ -26,14 +25,18 @@ const json = (status: number, body: Record<string, unknown>) =>
 export async function GET(request: Request) {
   const guard = await guardLive(request);
   if (!guard.ok) return guard.response;
-  const pr = Number(new URL(request.url).searchParams.get("pr"));
+  const params = new URL(request.url).searchParams;
+  const repo = params.get("repo") ?? "";
+  const pr = Number(params.get("pr"));
   if (!Number.isInteger(pr) || pr <= 0)
     return json(400, { error: "Send the pull request number." });
+  const access = await openRepo(guard.login, repo, { pull_requests: "read" });
+  if (!access.ok) return json(access.status, { error: access.error });
   try {
-    const octokit = await installationOctokit(REPO, { pull_requests: "read" });
+    const octokit = access.octokit;
     const app = await appIdentity(octokit);
     const seal = recordSeal(requireEnv("SESSION_SECRET"));
-    const record = await readRecord(octokit, { repo: REPO, pr, appId: app.id, seal });
+    const record = await readRecord(octokit, { repo, pr, appId: app.id, seal });
     return json(200, { entries: record.entries, note: record.note });
   } catch {
     return json(503, { error: "GitHub isn't reachable right now." });
@@ -44,6 +47,7 @@ export async function GET(request: Request) {
 // can be recorded, and a held entry needs a run that was actually held.
 // Writes only the comment; never code.
 const Body = z.object({
+  repo: z.string().max(200),
   pr: z.number().int().positive(),
   token: z.string().min(1).max(4_000_000),
   action: z.enum(["held", "discarded"]),
@@ -72,13 +76,13 @@ async function performRecord(request: Request, signal: AbortSignal) {
   if (!guard.ok) return guard.response;
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return json(400, { error: "Send the signed run and what to record." });
-  const { pr, token, action } = body.data;
+  const { repo, pr, token, action } = body.data;
 
   let run: RunRecord;
   try {
     run = verifyRun(
       token,
-      { user: guard.login, repo: REPO, pr },
+      { user: guard.login, repo, pr },
       { secret: requireEnv("SESSION_SECRET") },
     );
   } catch {
@@ -87,23 +91,27 @@ async function performRecord(request: Request, signal: AbortSignal) {
   if (action === "held" && run.verdict !== "HELD")
     return json(409, { error: "Only a held run can be recorded as held." });
 
+  if (signal.aborted)
+    return json(503, {
+      error: "The record update wasn't confirmed. Check the pull request before trying again.",
+    });
+  // contents: write is for the record lock (a ref), never for code.
+  const access = await openRepo(guard.login, repo, { contents: "write", pull_requests: "write" });
+  if (!access.ok) return json(access.status, { error: access.error });
+
   try {
     signal.throwIfAborted();
-    // contents: write is for the record lock (a ref), never for code.
-    const octokit = await installationOctokit(REPO, {
-      contents: "write",
-      pull_requests: "write",
-    });
+    const octokit = access.octokit;
     signal.throwIfAborted();
-    const pull = await readPull(octokit, REPO, pr);
+    const pull = await readPull(octokit, repo, pr);
     signal.throwIfAborted();
     const app = await appIdentity(octokit);
     signal.throwIfAborted();
     const result = await upsertRecord(octokit, {
-      repo: REPO,
+      repo,
       pr,
       appId: app.id,
-      deskUrl: deskLink(request, pr),
+      deskUrl: deskLink(request, repo, pr),
       seal: recordSeal(requireEnv("SESSION_SECRET")),
       signal,
       entry: entryFor(run, {

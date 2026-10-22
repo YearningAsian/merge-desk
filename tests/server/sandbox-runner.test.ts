@@ -68,6 +68,7 @@ class FakeSandbox {
   setupFailure: "chmod" | "missing-exit" | "root-user" | "sudo" | "bad-permissions" | null = null;
 
   async update() {}
+  async mkDir() {}
   async stop() {
     this.stopped = true;
   }

@@ -73,6 +73,33 @@ describe("daily live-run throttle", () => {
     expect(result.reason).toMatch(/3 of 3 .*00:00 UTC/);
   });
 
+  it("counts a person's share from their own tag and refuses at it", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const filters: unknown[] = [];
+    const everyone = [today(1), today(2), today(3)];
+    const theirs = [today(1), today(2)];
+    const list: ListSandboxes = (_signal, filter) => {
+      filters.push(filter);
+      return listing(filter ? theirs : everyone).list(_signal);
+    };
+    const env = { DAILY_LIVE_RUN_CAP: "30", DAILY_USER_RUN_CAP: "2" };
+    const result = await admitLiveWork({ login: "Some-One", env, now: NOW, list });
+    expect(filters).toEqual([undefined, { user: "some-one" }]);
+    expect(result).toMatchObject({ ok: false, status: 429 });
+    if (result.ok) throw new Error("expected a refusal");
+    expect(result.reason).toMatch(/today's 2 live runs/);
+    expect(
+      await admitLiveWork({ login: "other", env: { DAILY_USER_RUN_CAP: "3" }, now: NOW, list }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("refuses when a person's cap is misconfigured", async () => {
+    const { list } = listing([]);
+    expect(
+      await admitLiveWork({ login: "x", env: { DAILY_USER_RUN_CAP: "0" }, now: NOW, list }),
+    ).toMatchObject({ ok: false, status: 503 });
+  });
+
   it("refuses when the sandbox list can't be read", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
     const { list } = listing([], new Error("401 OIDC token expired"));

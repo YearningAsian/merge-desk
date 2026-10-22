@@ -9,6 +9,7 @@ import type { PullList } from "@/core/pulls";
 // The desk on desktop and phone, with live API answers replayed from real
 // recorded data. Screenshots go to test-results/e2e/screens for review.
 
+const REPO = "YearningAsian/merge-desk";
 const FIXTURES = join(process.cwd(), "tests", "e2e", "fixtures");
 const prs = JSON.parse(readFileSync(join(FIXTURES, "prs.json"), "utf8")) as PullList;
 const stream = (scenario: string) =>
@@ -45,7 +46,10 @@ const shot = (page: Page, name: string) =>
   page.screenshot({ path: `test-results/e2e/screens/${name}.png` });
 
 async function signIn(page: Page) {
-  const value = await sealSession("YearningAsian", { env: { SESSION_SECRET: E2E_SESSION_SECRET } });
+  const value = await sealSession("YearningAsian", {
+    env: { SESSION_SECRET: E2E_SESSION_SECRET },
+    repos: ["YearningAsian/merge-desk"],
+  });
   await page.context().addCookies([
     {
       name: SESSION_COOKIE,
@@ -56,7 +60,7 @@ async function signIn(page: Page) {
       sameSite: "Lax",
     },
   ]);
-  await page.route("**/api/live/prs", (route) => route.fulfill({ json: prs }));
+  await page.route("**/api/live/prs**", (route) => route.fulfill({ json: prs }));
   await page.route("**/api/live/analyze", (route) => {
     const { pr } = route.request().postDataJSON() as { pr: number };
     return route.fulfill({ status: 200, contentType: "application/x-ndjson", body: byPr[pr]! });
@@ -123,6 +127,75 @@ test("signed out, /live shows only the sign-in panel", async ({ page }) => {
 test("a refused sign-in says why", async ({ page }) => {
   await page.goto("/live?signin=refused");
   await expect(page.getByRole("alert").filter({ hasText: "can't use live mode" })).toBeVisible();
+});
+
+test("signed in with no installed repository, /live asks to install the App", async ({ page }) => {
+  // No repositories: GitHub listed none with the App installed at sign-in.
+  const value = await sealSession("YearningAsian", { env: { SESSION_SECRET: E2E_SESSION_SECRET } });
+  await page.context().addCookies([
+    {
+      name: SESSION_COOKIE,
+      value,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  for (const [width, height] of [
+    [1440, 900],
+    [390, 844],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/live");
+    await expect(
+      page.getByRole("heading", { name: "Install Merge Desk on a repository" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Install on GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/apps/merge-desk-yearningasian/installations/new",
+    );
+    await expect(page.getByText("Gemini API on its free tier")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await shot(page, `install-${width}`);
+    await noSeriousAxe(page);
+  }
+});
+
+test("the repository picker switches the desk to another repository", async ({ page }) => {
+  const value = await sealSession("YearningAsian", {
+    env: { SESSION_SECRET: E2E_SESSION_SECRET },
+    repos: ["YearningAsian/merge-desk", "YearningAsian/other-app"],
+  });
+  await page.context().addCookies([
+    {
+      name: SESSION_COOKIE,
+      value,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  const asked: string[] = [];
+  await page.route("**/api/live/prs**", (route) => {
+    asked.push(new URL(route.request().url()).searchParams.get("repo") ?? "");
+    return route.fulfill({ json: { ...prs, pulls: [] } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/live");
+  const picker = page.getByLabel("Repository");
+  await expect(picker).toHaveValue("YearningAsian/merge-desk");
+  await picker.selectOption("YearningAsian/other-app");
+  await expect(page).toHaveURL(/repo=YearningAsian%2Fother-app/);
+  await expect.poll(() => asked.at(-1)).toBe("YearningAsian/other-app");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await shot(page, "repo-picker-390");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await shot(page, "repo-picker-1440");
+  await noSeriousAxe(page);
 });
 
 test("desktop: keyboard to a conflicting pull request, its analysis and options", async ({
@@ -330,7 +403,7 @@ test("settings pick the model; keys open help and details; a reload reuses the a
   const detail = page.getByRole("article");
   const slider = detail.getByRole("slider", { name: "Resolution" });
   await expect(slider).toBeVisible();
-  expect(bodies).toEqual([{ pr: CLEAN }]);
+  expect(bodies).toEqual([{ repo: REPO, pr: CLEAN }]);
 
   // D shows Details; ? lists the shortcuts; Escape closes the list.
   await page.keyboard.press("d");
@@ -359,7 +432,7 @@ test("settings pick the model; keys open help and details; a reload reuses the a
   await page.keyboard.press("Escape");
   await detail.getByRole("button", { name: "Analyze with Gemini 3.8 Flash" }).click();
   await expect.poll(() => bodies.length).toBe(2);
-  expect(bodies[1]).toEqual({ pr: CLEAN, model: "gemini-3.8-flash" });
+  expect(bodies[1]).toEqual({ repo: REPO, pr: CLEAN, model: "gemini-3.8-flash" });
 });
 
 test("settings: Claude on your own key, sealed by the server and never shown again", async ({
@@ -409,7 +482,7 @@ test("settings: Claude on your own key, sealed by the server and never shown aga
     .getByRole("button", { name: "Analyze with Claude Opus 5.5" })
     .click();
   await expect.poll(() => bodies.length).toBe(2);
-  expect(bodies[1]).toEqual({ pr: CLEAN, model: "anthropic:claude-opus-5-5" });
+  expect(bodies[1]).toEqual({ repo: REPO, pr: CLEAN, model: "anthropic:claude-opus-5-5" });
 
   await page.keyboard.press(",");
   await settings.getByRole("button", { name: "Remove key" }).click();
@@ -430,7 +503,7 @@ test("held: steps tick to HELD with the failed check, then steer and retry or di
   await page.keyboard.press("Control+Enter");
   const result = detail.getByRole("group", { name: "Result: HELD" });
   await expect(result).toBeVisible();
-  expect(requests).toEqual([{ pr: HELD, token: "e2e", option: "combine" }]);
+  expect(requests).toEqual([{ repo: REPO, pr: HELD, token: "e2e", option: "combine" }]);
   await expect(result.getByText("Held at tests")).toBeVisible();
   await expect(detail.getByRole("list", { name: "Run steps" })).toContainText("exit 1");
   await expect(page.getByRole("status").filter({ hasText: "is HELD" })).toHaveCount(1);
@@ -446,6 +519,7 @@ test("held: steps tick to HELD with the failed check, then steer and retry or di
   await result.getByRole("button", { name: "Retry" }).click();
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1]).toEqual({
+    repo: REPO,
     pr: HELD,
     token: "e2e",
     option: "combine",
@@ -487,7 +561,7 @@ test("drop: the confirmation names the lost work, an early release cancels, Ctrl
   await page.locator("body").press("Control+Enter");
   const result = detail.getByRole("group", { name: "Result: VERIFIED" });
   await expect(result).toBeVisible();
-  expect(requests).toEqual([{ pr: DROP.number, token: "e2e", option: "keep_ours" }]);
+  expect(requests).toEqual([{ repo: REPO, pr: DROP.number, token: "e2e", option: "keep_ours" }]);
   await expect(result.getByText(/dropped as chosen/)).toBeVisible();
   await noSeriousAxe(page);
 });
@@ -502,7 +576,7 @@ test("clean: one click runs the recommended option to VERIFIED, with the merge a
   await detail.getByRole("button", { name: "Run checks" }).click();
   const result = detail.getByRole("group", { name: "Result: VERIFIED" });
   await expect(result).toBeVisible();
-  expect(requests).toEqual([{ pr: CLEAN, token: "e2e", option: "combine" }]);
+  expect(requests).toEqual([{ repo: REPO, pr: CLEAN, token: "e2e", option: "combine" }]);
   await expect(page).toHaveTitle(`VERIFIED #${CLEAN} | Merge Desk`);
   await result.getByRole("button", { name: /Show the merge/ }).click();
   await expect(result.getByLabel("The merge, compared with the pull request's head")).toContainText(
@@ -547,7 +621,7 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
   await landButton.click();
   await expect(result.getByRole("group", { name: "Land: UNKNOWN" })).toBeVisible();
   await expect(result.getByRole("group", { name: "Land: LANDED" })).toHaveCount(0);
-  expect(landed).toEqual([{ pr: CLEAN, token: expect.any(String) }]);
+  expect(landed).toEqual([{ repo: REPO, pr: CLEAN, token: expect.any(String) }]);
 
   // A separate page session starts an independent confirmed-Land fixture.
   // The UNKNOWN attempt is never discarded or retried.
@@ -779,7 +853,7 @@ test("no file conflicts is separate from blocked merge readiness, with current c
   const clean = prs.pulls.find((pull) => pull.number === CLEAN)!;
   const head = "a".repeat(40);
   const base = "b".repeat(40);
-  await page.route("**/api/live/prs", (route) =>
+  await page.route("**/api/live/prs**", (route) =>
     route.fulfill({
       json: {
         repo: prs.repo,
@@ -850,7 +924,7 @@ test("Land history survives a changed head or base and never supplies the curren
   await signIn(page);
   let current = structuredClone(prs);
   const commit = "e".repeat(40);
-  await page.route("**/api/live/prs", (route) => route.fulfill({ json: current }));
+  await page.route("**/api/live/prs**", (route) => route.fulfill({ json: current }));
   await page.route("**/api/live/land", (route) => {
     current = {
       ...current,
@@ -918,7 +992,7 @@ test("a hold is recorded on the pull request as it happens", async ({ page }) =>
   await detail.getByRole("button", { name: "Run checks" }).click();
   const result = detail.getByRole("group", { name: "Result: HELD" });
   await expect(result.getByText("Recorded on the pull request.")).toBeVisible();
-  expect(records).toEqual([{ pr: HELD, token: expect.any(String), action: "held" }]);
+  expect(records).toEqual([{ repo: REPO, pr: HELD, token: expect.any(String), action: "held" }]);
   await result.getByRole("button", { name: "Discard this attempt" }).click();
   await expect.poll(() => records.length).toBe(2);
   expect(records[1]).toMatchObject({ pr: HELD, action: "discarded" });
@@ -1015,5 +1089,5 @@ test("drop: assistive tech can confirm without a long press; a short key press c
   // A screen reader's activation is a click with no pointer press behind it.
   await hold.dispatchEvent("click");
   await expect(page.getByRole("group", { name: "Result: VERIFIED" })).toBeVisible();
-  expect(requests).toEqual([{ pr: DROP.number, token: "e2e", option: "keep_ours" }]);
+  expect(requests).toEqual([{ repo: REPO, pr: DROP.number, token: "e2e", option: "keep_ours" }]);
 });

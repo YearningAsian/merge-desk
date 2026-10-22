@@ -23,7 +23,7 @@ import {
   type RunEvent,
 } from "@/core/events";
 import type { Option } from "@/core/honor";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { GeminiClient } from "@/server/gemini/client";
 import { geminiAnalyst } from "@/server/gemini/analyze";
 import { geminiProposer } from "@/server/gemini/propose";
@@ -50,7 +50,7 @@ const { values, positionals } = parseArgs({
   },
 });
 
-const REPO = CODE_ALLOWED_REPOS[0];
+const REPO = DEMO_REPO;
 const config = loadDemoConfig();
 const scenario = config.scenarios.find((item) => item.id === positionals[0]);
 // Exits by setting process.exitCode, never process.exit(): on Windows, exiting

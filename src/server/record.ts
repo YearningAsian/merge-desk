@@ -42,5 +42,5 @@ export function entryFor(
 
 // Where the record's "Open in Merge Desk" link points: this deployment's own
 // origin, with the pull request in the address.
-export const deskLink = (request: Request, pr: number) =>
-  `${new URL(request.url).origin}/live?pr=${pr}`;
+export const deskLink = (request: Request, repo: string, pr: number) =>
+  `${new URL(request.url).origin}/live?repo=${encodeURIComponent(repo)}&pr=${pr}`;

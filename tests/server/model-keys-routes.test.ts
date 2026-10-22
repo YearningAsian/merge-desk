@@ -14,6 +14,19 @@ import { SESSION_COOKIE, SESSION_TTL_S, sealSession } from "@/server/session";
 
 const mocks = vi.hoisted(() => ({ admit: vi.fn(), client: vi.fn() }));
 vi.mock("@/server/throttle", () => ({ admitLiveWork: mocks.admit }));
+vi.mock("@/server/github/access", async () => {
+  const app = await import("@/server/github/app");
+  return {
+    // As the real one: a GitHub failure is a 503 answer, never a throw.
+    openRepo: async (_login: string, repo: string, permissions: object) => {
+      try {
+        return { ok: true, octokit: await app.installationOctokit(repo, permissions as never) };
+      } catch {
+        return { ok: false, status: 503, error: "GitHub isn't reachable right now. Try again." };
+      }
+    },
+  };
+});
 vi.mock("@/server/github/app", () => ({
   installationOctokit: mocks.client,
   splitRepo: (repo: string) => {
@@ -65,7 +78,9 @@ async function request(
   return new Request(`http://localhost:3000${path}`, {
     method,
     headers,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(body === undefined
+      ? {}
+      : { body: JSON.stringify({ repo: "YearningAsian/merge-desk", ...(body as object) }) }),
   });
 }
 

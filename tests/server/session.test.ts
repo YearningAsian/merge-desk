@@ -33,6 +33,16 @@ describe("session cookie", () => {
     ).toBeNull();
   });
 
+  it("keeps the seal small enough for one cookie, however long the repository names", async () => {
+    const now = Date.now();
+    const repos = Array.from({ length: 40 }, (_, i) => `owner-${i}/${"r".repeat(130)}`);
+    const seal = await sealSession("YearningAsian", { env, now, repos });
+    expect(seal.length).toBeLessThan(3_000);
+    const read = await readSession(cookie(SESSION_COOKIE, seal), { env, now });
+    expect(read!.repos).toEqual(repos.slice(0, read!.repos.length));
+    expect(read!.repos.length).toBeGreaterThan(0);
+  });
+
   it("refuses a tampered seal or one sealed with another secret", async () => {
     const seal = await sealSession("YearningAsian", { env });
     expect(

@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { appIdentity, installationOctokit, splitRepo } from "@/server/github/app";
 import { lockRef, readLock, releaseLock, withRefLock } from "@/server/github/lock";
 import { loadLocalEnv } from "../scripts/lib/env.mts";
 
 loadLocalEnv();
 
-const REPO = CODE_ALLOWED_REPOS[0];
+const REPO = DEMO_REPO;
 
 // The shared decision-record lock against the real repository: GitHub must
 // accept a ref under refs/merge-desk/locks/, refuse a second create while it

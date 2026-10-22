@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { SandboxRunner } from "@/server/runner/sandbox";
 import { loadLocalEnv } from "../scripts/lib/env.mts";
 import { loadDemoConfig, remoteRefs } from "../scripts/lib/git.mts";
@@ -21,7 +21,7 @@ describe("Vercel Sandbox (live)", () => {
     expect(revisions.head && revisions.base, "demo branches on origin").toBeTruthy();
 
     const runner = new SandboxRunner({
-      repoUrl: `https://github.com/${CODE_ALLOWED_REPOS[0]}.git`,
+      repoUrl: `https://github.com/${DEMO_REPO}.git`,
     });
     const started = Date.now();
     try {

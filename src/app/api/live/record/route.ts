@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     return json(400, { error: "Send the pull request number." });
   try {
     const octokit = await installationOctokit(REPO, { pull_requests: "read" });
-    const app = await appIdentity();
+    const app = await appIdentity(octokit);
     const seal = recordSeal(requireEnv("SESSION_SECRET"));
     const record = await readRecord(octokit, { repo: REPO, pr, appId: app.id, seal });
     return json(200, { entries: record.entries, note: record.note });
@@ -97,7 +97,7 @@ async function performRecord(request: Request, signal: AbortSignal) {
     signal.throwIfAborted();
     const pull = await readPull(octokit, REPO, pr);
     signal.throwIfAborted();
-    const app = await appIdentity();
+    const app = await appIdentity(octokit);
     signal.throwIfAborted();
     const result = await upsertRecord(octokit, {
       repo: REPO,

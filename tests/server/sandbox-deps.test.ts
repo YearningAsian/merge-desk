@@ -261,6 +261,31 @@ async function tested(setup: () => void = () => undefined, files = [LAND]) {
   }
 }
 
+describe("SandboxRunner reuse for a retry", () => {
+  // A retried proposal waits on a model call (up to 90 s with a saved key)
+  // while the sandbox's own two-minute clock runs.
+  it("reuses a young sandbox and boots a fresh one once too little of its life is left", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const runner = new SandboxRunner({
+      repoUrl: "https://github.com/YearningAsian/merge-desk.git",
+    });
+    const retry = () =>
+      runner.applyProposal({ head: HEAD, base: BASE }, [{ path: LAND, content: "x" }]);
+    try {
+      await retry();
+      now.mockReturnValue(1_000_000 + 30_000);
+      await retry();
+      expect(state.created).toHaveLength(1);
+      now.mockReturnValue(1_000_000 + 85_000);
+      await retry();
+      expect(state.created).toHaveLength(2);
+    } finally {
+      await runner.dispose();
+      now.mockRestore();
+    }
+  });
+});
+
 describe("SandboxRunner with the trusted dependency snapshot", () => {
   it("boots from the snapshot and fetches the exact head and base before the network closes", async () => {
     const runner = await trusted();

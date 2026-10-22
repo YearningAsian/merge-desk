@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { CODE_ALLOWED_REPOS } from "@/server/env";
-import { installationOctokit, splitRepo } from "@/server/github/app";
+import { appIdentity, installationOctokit, splitRepo } from "@/server/github/app";
 import { lockRef, readLock, releaseLock, withRefLock } from "@/server/github/lock";
 import { loadLocalEnv } from "../scripts/lib/env.mts";
 
@@ -62,5 +62,16 @@ describe("GitHub record lock (live)", () => {
       if ((await readLock(octokit, REPO, ref).catch(() => null)) !== null)
         await octokit.git.deleteRef({ owner, repo: repoName, ref: ref.slice("refs/".length) });
     }
+  });
+});
+
+// The committer's bot account is looked up with the installation token, never
+// anonymously (an anonymous call shares a 60-an-hour limit per address).
+describe("GitHub App identity (live)", () => {
+  it("names the App's bot through the installation client", async () => {
+    const octokit = await installationOctokit(REPO, { pull_requests: "read" });
+    const app = await appIdentity(octokit);
+    expect(app.botName).toBe(`${app.slug}[bot]`);
+    expect(app.botEmail).toMatch(/^\d+\+[\w-]+\[bot\]@users\.noreply\.github\.com$/);
   });
 });

@@ -137,7 +137,7 @@ async function performLand(
   try {
     const [user, app] = await Promise.all([
       octokit.users.getByUsername({ username: guard.login, request: { signal } }),
-      appIdentity(),
+      appIdentity(octokit),
     ]);
     signal.throwIfAborted();
     ({ commit } = await landMerge(octokit, {
@@ -191,7 +191,7 @@ async function performLand(
   const writeRecord = async (): Promise<{ ok: boolean; reason?: string }> => {
     try {
       untilAnswered.throwIfAborted();
-      const app = await appIdentity();
+      const app = await appIdentity(octokit);
       untilAnswered.throwIfAborted();
       const result = await upsertRecord(octokit, {
         repo: REPO,

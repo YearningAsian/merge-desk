@@ -103,9 +103,23 @@ describe("checkLand", () => {
     ).toMatch(/also the pull request's base/);
   });
 
-  it("refuses branches outside demo/* while the write scope is demo-only", () => {
-    expect(reason(pull({ head: { ...input.pull.head, ref: "feat/land" } }))).toMatch(
-      /writes only demo\/\* branches/,
+  it("lands on a feature branch of the allowed repository", () => {
+    expect(
+      checkLand({ ...input, ...pull({ head: { ...input.pull.head, ref: "feat/land" } }) }),
+    ).toEqual({
+      ok: true,
+    });
+  });
+
+  it("still refuses main, the default branch and a malformed branch name", () => {
+    expect(reason(pull({ head: { ...input.pull.head, ref: "main" } }))).toMatch(
+      /never writes to main or the default branch/,
+    );
+    expect(
+      reason({ ...pull({ head: { ...input.pull.head, ref: "trunk" } }), defaultBranch: "trunk" }),
+    ).toMatch(/never writes to main or the default branch/);
+    expect(reason(pull({ head: { ...input.pull.head, ref: "feat/../main" } }))).toMatch(
+      /Not a valid branch name/,
     );
   });
 

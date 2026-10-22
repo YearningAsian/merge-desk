@@ -1,7 +1,7 @@
 import type { RunRecord } from "@/core/run";
 import { isAllowedLogin, isAllowedRepo } from "@/server/env";
 import { isRepoPath } from "@/core/paths";
-import { checkWritableBranch } from "@/core/scope";
+import { checkWritableBranch, LAND_SCOPE } from "@/core/scope";
 
 // Server-side guards: which real test suite a merge runs, and whether a
 // checked merge may land. Every Land refusal says why in plain words, and
@@ -59,17 +59,12 @@ export function checkLand({ login, repo, defaultBranch, pull, record }: LandInpu
   const branch = pull.head.ref;
   if (branch === "main" || branch === defaultBranch)
     return refuse(
-      `Can't land on ${branch}: Merge Desk only writes to a pull request's own branch.`,
+      `Can't land on ${branch}: Merge Desk never writes to main or the default branch.`,
     );
   if (branch === pull.base.ref)
     return refuse("Can't land: the branch is also the pull request's base.");
-  const scope = checkWritableBranch(branch);
-  if (!scope.ok)
-    return refuse(
-      scope.reason.startsWith("Refused")
-        ? `Can't land on ${branch}: for now Merge Desk writes only demo/* branches.`
-        : `Can't land: ${scope.reason}.`,
-    );
+  const scope = checkWritableBranch(branch, LAND_SCOPE);
+  if (!scope.ok) return refuse(`Can't land: ${scope.reason}.`);
   if (pull.head.sha !== record.revisions.head || pull.base.sha !== record.revisions.base)
     return refuse("Pull request changed since the run; run it again.");
   if (!record.changes || !record.tree)

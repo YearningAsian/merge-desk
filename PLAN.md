@@ -158,7 +158,8 @@
 | H3 | GitHub App `merge-desk-yearningasian` (contents + pull requests read/write; no checks, no workflows), ✅ installed on `merge-desk` only (A, 2026-10-05); App ID, Client ID, client secret in `.env.local` ✅; private key rotated and confirmed by A (2026-10-05) | A | 1.6 |
 | H4 | Vercel project linked to this repo; env vars added; production callback URL added to the GitHub App | A | 2.6 |
 | H6 | ✅ Unused empty `merge-desk-playground` repo is gone (GitHub reports it does not exist, checked 2026-10-05) | A | none |
-| H7 | Make the GitHub App public (App settings, "Where can this GitHub App be installed?": Any account) so others can install it | A | 3.10 |
+| H7 | ✅ GitHub App made public (learner, 2026-10-22; checked signed out: github.com/apps/merge-desk-yearningasian 200, `GET /apps/merge-desk-yearningasian` answers without a token) | A | 3.10 |
+| H8 | Remove `ALLOWED_LOGINS` and `ALLOWED_REPOS` from Vercel production env, then deploy #17 (while set, production stays limited to those names) | A | 3.10 |
 | H5 | Final submit click on every portal | A | being judged |
 
 ---

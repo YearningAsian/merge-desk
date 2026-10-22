@@ -17,14 +17,14 @@
 
 import { Writable } from "node:stream";
 import { Sandbox } from "@vercel/sandbox";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { DEPS_FILES, DEPS_MARKER, SANDBOX_IMAGE, SANDBOX_TAGS } from "@/server/runner/sandbox";
 import { loadLocalEnv } from "./lib/env.mts";
 import { remoteRefs } from "./lib/git.mts";
 
 loadLocalEnv();
 
-const REPO = CODE_ALLOWED_REPOS[0];
+const REPO = DEMO_REPO;
 const POLICY = "npm ci --ignore-scripts --no-audit --no-fund";
 // Covers the judging window; rebuild when main's dependencies change.
 const EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000;

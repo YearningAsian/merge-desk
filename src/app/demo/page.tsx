@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Recording } from "@/core/recording";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { DemoDesk } from "@/ui/DemoDesk";
 import { TopBar } from "@/ui/TopBar";
 import clean from "../../../demo/recordings/clean.json";
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     "Three real merge conflicts, replayed from recorded runs: one verified, one held, one chosen drop.",
 };
 
-const REPO = CODE_ALLOWED_REPOS[0];
+const REPO = DEMO_REPO;
 
 // Checked when the page is built, so a broken recording fails the build
 // instead of the demo.

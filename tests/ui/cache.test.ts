@@ -46,13 +46,13 @@ describe("analysis cache", () => {
     });
 
     vi.setSystemTime(t0);
-    saveAnalyses({ [key]: done("signed-at-t0") });
+    saveAnalyses("o/r", { [key]: done("signed-at-t0") });
     vi.setSystemTime(t0 + 56 * 60_000);
-    saveAnalyses({ [key]: done("signed-at-t0") });
+    saveAnalyses("o/r", { [key]: done("signed-at-t0") });
     vi.setSystemTime(t0 + 57 * 60_000);
-    expect(Object.keys(loadAnalyses())).not.toContain(key);
+    expect(Object.keys(loadAnalyses("o/r"))).not.toContain(key);
 
-    saveAnalyses({ [key]: done("signed-at-t57") });
-    expect(Object.keys(loadAnalyses())).toContain(key);
+    saveAnalyses("o/r", { [key]: done("signed-at-t57") });
+    expect(Object.keys(loadAnalyses("o/r"))).toContain(key);
   });
 });

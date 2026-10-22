@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { RunRecord } from "@/core/run";
-import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
-import { appIdentity, installationOctokit, splitRepo } from "@/server/github/app";
+import { requireEnv } from "@/server/env";
+import { openRepo } from "@/server/github/access";
+import { appIdentity, splitRepo } from "@/server/github/app";
 import { upsertRecord } from "@/server/github/comment";
 import { LandError, landMerge } from "@/server/github/land";
 import { readPull } from "@/server/github/prs";
@@ -19,8 +20,11 @@ export const runtime = "nodejs";
 // released: 55 s + lock wait + RECORD_BUDGET_MS + release, inside 120 s.
 export const maxDuration = 120;
 
-const REPO = CODE_ALLOWED_REPOS[0];
-const Body = z.object({ pr: z.number().int().positive(), token: z.string().min(1).max(4_000_000) });
+const Body = z.object({
+  repo: z.string().max(200),
+  pr: z.number().int().positive(),
+  token: z.string().min(1).max(4_000_000),
+});
 
 type Outcome = "LANDED" | "REFUSED" | "UNKNOWN";
 const answer = (status: number, outcome: Outcome, body: Record<string, unknown>) =>
@@ -88,13 +92,13 @@ async function performLand(
   if (!guard.ok) return guard.response;
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return refused(400, "Send the signed run to land.");
-  const { pr, token } = body.data;
+  const { repo, pr, token } = body.data;
 
   let run: RunRecord;
   try {
     run = verifyRun(
       token,
-      { user: guard.login, repo: REPO, pr },
+      { user: guard.login, repo, pr },
       { secret: requireEnv("SESSION_SECRET") },
     );
   } catch {
@@ -104,19 +108,23 @@ async function performLand(
     );
   }
 
-  let octokit;
+  if (signal.aborted) return refused(503, "GitHub isn't reachable right now. Nothing was pushed.");
+  // Asked again right before the write: someone who lost push access since
+  // the run can't land it.
+  const access = await openRepo(guard.login, repo, { contents: "write", pull_requests: "write" });
+  if (!access.ok) return refused(access.status, `${access.error} Nothing was pushed.`);
+  const octokit = access.octokit;
   let pull;
   let defaultBranch: string;
   let repositoryId: string;
   try {
     signal.throwIfAborted();
-    octokit = await installationOctokit(REPO, { contents: "write", pull_requests: "write" });
-    const { owner, name } = splitRepo(REPO);
+    const { owner, name } = splitRepo(repo);
     signal.throwIfAborted();
     const repository = (await octokit.repos.get({ owner, repo: name, request: { signal } })).data;
     defaultBranch = repository.default_branch;
     repositoryId = repository.node_id;
-    pull = await readPull(octokit, REPO, pr);
+    pull = await readPull(octokit, repo, pr);
     signal.throwIfAborted();
   } catch {
     return refused(503, "GitHub isn't reachable right now. Nothing was pushed.");
@@ -124,7 +132,7 @@ async function performLand(
 
   const check = checkLand({
     login: guard.login,
-    repo: REPO,
+    repo,
     defaultBranch,
     pull: { state: pull.data.state, head: pull.summary.head, base: pull.summary.base },
     record: run,
@@ -141,7 +149,7 @@ async function performLand(
     ]);
     signal.throwIfAborted();
     ({ commit } = await landMerge(octokit, {
-      repo: REPO,
+      repo,
       repositoryId,
       record: run,
       refs,
@@ -177,7 +185,7 @@ async function performLand(
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         signal.throwIfAborted();
-        const after = await readPull(octokit, REPO, pr);
+        const after = await readPull(octokit, repo, pr);
         // Right after the push GitHub can still answer for the old head.
         if (after.summary.head.sha === commit && after.summary.mergeable !== "checking")
           return after.summary.mergeable;
@@ -194,10 +202,10 @@ async function performLand(
       const app = await appIdentity(octokit);
       untilAnswered.throwIfAborted();
       const result = await upsertRecord(octokit, {
-        repo: REPO,
+        repo,
         pr,
         appId: app.id,
-        deskUrl: deskLink(request, pr),
+        deskUrl: deskLink(request, repo, pr),
         seal: recordSeal(requireEnv("SESSION_SECRET")),
         signal: untilAnswered,
         entry: entryFor(run, {

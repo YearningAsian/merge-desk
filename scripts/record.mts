@@ -37,7 +37,7 @@ import { ROOT, loadDemoConfig, remoteRefs } from "./lib/git.mts";
 
 loadLocalEnv();
 // After the environment is loaded: the routes read it when they run.
-const { CODE_ALLOWED_LOGINS, CODE_ALLOWED_REPOS } = await import("@/server/env");
+const { DEMO_OWNER, DEMO_REPO } = await import("@/server/env");
 const { SESSION_COOKIE, sealSession } = await import("@/server/session");
 const { usesSandbox } = await import("@/server/runner");
 const analyzeRoute = (await import("@/app/api/live/analyze/route")).POST;
@@ -46,8 +46,8 @@ const landRoute = (await import("@/app/api/live/land/route")).POST;
 const recordRoutes = await import("@/app/api/live/record/route");
 const prsRoute = (await import("@/app/api/live/prs/route")).GET;
 
-const REPO = CODE_ALLOWED_REPOS[0];
-const LOGIN = CODE_ALLOWED_LOGINS[0];
+const REPO = DEMO_REPO;
+const LOGIN = DEMO_OWNER;
 const OUT = join(ROOT, "demo", "recordings");
 // The production origin, so the decision comment links back to the live desk.
 const ORIGIN = (

@@ -5,11 +5,12 @@ import type { AnalysisState } from "@/ui/state";
 
 // Finished analyses survive a reload of this tab (sessionStorage), so a
 // reload or a ?pr= link doesn't spend another Gemini call. Entries are keyed
-// by pull request and exact head and base, validated on the way back in, and
-// dropped after 55 minutes, before the server's 60-minute signature expires.
-// Signing out clears them.
+// by repository, pull request and exact head and base, validated on the way
+// back in, and dropped after 55 minutes, before the server's 60-minute
+// signature expires. Signing out clears them.
 
-const KEY = "merge-desk:analyses";
+const PREFIX = "merge-desk:analyses";
+const keyFor = (repo: string) => `${PREFIX}:${repo.toLowerCase()}`;
 const TTL_MS = 55 * 60 * 1000;
 
 const Entry = z.object({
@@ -22,9 +23,9 @@ const Entry = z.object({
 type Entry = z.infer<typeof Entry>;
 type Done = Extract<AnalysisState, { status: "done" }>;
 
-function readAll(): Record<string, Entry> {
+function readAll(repo: string): Record<string, Entry> {
   try {
-    const raw = window.sessionStorage.getItem(KEY);
+    const raw = window.sessionStorage.getItem(keyFor(repo));
     const parsed = raw ? z.record(z.string(), z.unknown()).parse(JSON.parse(raw)) : {};
     const out: Record<string, Entry> = {};
     for (const [key, value] of Object.entries(parsed)) {
@@ -37,9 +38,9 @@ function readAll(): Record<string, Entry> {
   }
 }
 
-export function loadAnalyses(): Record<string, Done> {
+export function loadAnalyses(repo: string): Record<string, Done> {
   return Object.fromEntries(
-    Object.entries(readAll())
+    Object.entries(readAll(repo))
       .filter(([, entry]) => Date.now() - entry.signedAt < TTL_MS)
       .map(([key, entry]) => [
         key,
@@ -54,8 +55,8 @@ export function loadAnalyses(): Record<string, Done> {
   );
 }
 
-export function saveAnalyses(analyses: Record<string, AnalysisState>) {
-  const kept = readAll();
+export function saveAnalyses(repo: string, analyses: Record<string, AnalysisState>) {
+  const kept = readAll(repo);
   const out: Record<string, Entry> = {};
   for (const [key, state] of Object.entries(analyses)) {
     if (state.status !== "done") continue;
@@ -69,7 +70,7 @@ export function saveAnalyses(analyses: Record<string, AnalysisState>) {
     };
   }
   try {
-    window.sessionStorage.setItem(KEY, JSON.stringify(out));
+    window.sessionStorage.setItem(keyFor(repo), JSON.stringify(out));
   } catch {
     // Full or refused storage only costs a fresh analysis after a reload.
   }
@@ -77,7 +78,8 @@ export function saveAnalyses(analyses: Record<string, AnalysisState>) {
 
 export function clearAnalyses() {
   try {
-    window.sessionStorage.removeItem(KEY);
+    for (const key of Object.keys(window.sessionStorage))
+      if (key === PREFIX || key.startsWith(`${PREFIX}:`)) window.sessionStorage.removeItem(key);
   } catch {
     // Nothing to clear.
   }

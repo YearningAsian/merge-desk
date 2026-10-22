@@ -3,10 +3,19 @@
 
 type Env = Record<string, string | undefined>;
 
-// Code defaults. The environment may narrow these lists but never widen them,
-// so an empty or mistyped variable can't open live mode to anyone else.
-export const CODE_ALLOWED_LOGINS = ["YearningAsian"] as const;
-export const CODE_ALLOWED_REPOS = ["YearningAsian/merge-desk"] as const;
+// The demo's repository: the recordings, the demo desk and the scripts use it.
+export const DEMO_OWNER = "YearningAsian";
+export const DEMO_REPO = `${DEMO_OWNER}/merge-desk`;
+
+// Live mode is open to any GitHub account. What a request may touch is
+// decided per repository by the signer's own GitHub permission
+// (server/github/access.ts). ALLOWED_LOGINS and ALLOWED_REPOS, when set, are
+// an emergency narrowing: only the listed names get through.
+const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
+
+export function isRepoName(value: string): boolean {
+  return REPO_NAME.test(value) && !/\/\.{1,2}$/.test(value);
+}
 
 const MIN_SESSION_SECRET_LENGTH = 32;
 
@@ -18,20 +27,19 @@ function listFrom(value: string | undefined): string[] | null {
     .filter(Boolean);
 }
 
-function isAllowed(value: string, defaults: readonly string[], fromEnv: string | undefined) {
+function isAllowed(value: string, fromEnv: string | undefined) {
   const candidate = value.trim().toLowerCase();
   if (!candidate) return false;
-  const inDefaults = defaults.some((item) => item.toLowerCase() === candidate);
   const narrowed = listFrom(fromEnv);
-  return inDefaults && (narrowed === null || narrowed.includes(candidate));
+  return narrowed === null || narrowed.includes(candidate);
 }
 
 export function isAllowedLogin(login: string, env: Env = process.env): boolean {
-  return isAllowed(login, CODE_ALLOWED_LOGINS, env.ALLOWED_LOGINS);
+  return isAllowed(login, env.ALLOWED_LOGINS);
 }
 
 export function isAllowedRepo(fullName: string, env: Env = process.env): boolean {
-  return isAllowed(fullName, CODE_ALLOWED_REPOS, env.ALLOWED_REPOS);
+  return isRepoName(fullName) && isAllowed(fullName, env.ALLOWED_REPOS);
 }
 
 const present = (env: Env, name: string) => Boolean(env[name]?.trim());

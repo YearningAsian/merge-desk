@@ -56,9 +56,9 @@ const without = <T,>(map: Record<string, T>, key: string) => {
 // Restored on the client only; the first render shows the list skeleton
 // either way, so the server and browser agree. Demo mode keeps nothing: a
 // reload or Reset starts the recordings over.
-const restore = (mode: DataSource["mode"]): DeskState => ({
+const restore = (mode: DataSource["mode"], repo: string): DeskState => ({
   ...initialDesk,
-  analyses: typeof window === "undefined" || mode === "demo" ? {} : loadAnalyses(),
+  analyses: typeof window === "undefined" || mode === "demo" ? {} : loadAnalyses(repo),
 });
 
 // The open pull request lives in the address (?pr=N), so a reload, a
@@ -92,7 +92,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
     refetchInterval: settings.refreshSeconds ? settings.refreshSeconds * 1000 : false,
     refetchIntervalInBackground: false,
   });
-  const [state, dispatch] = useReducer(deskReducer, source.mode, restore);
+  const [state, dispatch] = useReducer(deskReducer, source.mode, (mode) => restore(mode, repo));
   const demo = source.mode === "demo";
   const [detailsOpen, setDetailsOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -134,8 +134,8 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
   }, []);
 
   useEffect(() => {
-    if (!demo) saveAnalyses(state.analyses);
-  }, [demo, state.analyses]);
+    if (!demo) saveAnalyses(repo, state.analyses);
+  }, [demo, repo, state.analyses]);
 
   const pulls = query.data?.pulls ?? [];
   const selected = pulls.find((pull) => pull.number === state.selected) ?? null;

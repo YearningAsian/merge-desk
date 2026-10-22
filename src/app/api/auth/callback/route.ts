@@ -13,8 +13,8 @@ import {
 export const runtime = "nodejs";
 
 // Finishes sign-in: the state must match, GitHub must say who signed in, and
-// only an allowlisted login gets a session. Every outcome lands on /live,
-// which explains a refusal in plain words.
+// a login outside an emergency ALLOWED_LOGINS list gets no session. Every
+// outcome lands on /live, which explains a refusal in plain words.
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const back = (result?: string) => {
@@ -35,8 +35,9 @@ export async function GET(request: Request) {
   if (!code) return back("cancelled").response();
 
   let login: string;
+  let repos: string[];
   try {
-    login = await loginFromCode(code, url.origin);
+    ({ login, repos } = await loginFromCode(code, url.origin));
   } catch {
     return back("failed").response();
   }
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
   const done = back();
   done.headers.append(
     "set-cookie",
-    cookieHeader(SESSION_COOKIE, await sealSession(login), {
+    cookieHeader(SESSION_COOKIE, await sealSession(login, { repos }), {
       maxAge: SESSION_TTL_S,
       secure: isSecure(),
     }),

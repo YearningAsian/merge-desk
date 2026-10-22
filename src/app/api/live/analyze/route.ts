@@ -1,11 +1,11 @@
 import { z } from "zod";
 import type { AnalyzeEvent } from "@/core/events";
 import { ModelChoice } from "@/core/models";
-import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
+import { requireEnv } from "@/server/env";
 import { geminiAnalyst } from "@/server/gemini/analyze";
 import { readKeys } from "@/server/keys";
 import { ModelChoiceError, planModel, type ModelPlan } from "@/server/llm/client";
-import { installationOctokit } from "@/server/github/app";
+import { openRepo } from "@/server/github/access";
 import { BaseBranchError, readPull } from "@/server/github/prs";
 import { analyzePipeline, signAnalysis } from "@/server/pipeline/analyze";
 import { liveRunner, usesSandbox } from "@/server/runner";
@@ -15,11 +15,14 @@ import { admitLiveWork } from "@/server/throttle";
 export const runtime = "nodejs";
 export const maxDuration = 240;
 
-const REPO = CODE_ALLOWED_REPOS[0];
 const DEADLINE_MS = 210_000;
 // The model is optional and must be a Settings choice (Gemini, or a provider
 // whose key the signed-in person saved).
-const Body = z.object({ pr: z.number().int().positive(), model: ModelChoice.optional() });
+const Body = z.object({
+  repo: z.string().max(200),
+  pr: z.number().int().positive(),
+  model: ModelChoice.optional(),
+});
 
 const refuse = (status: number, error: string) =>
   Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
@@ -31,7 +34,9 @@ export async function POST(request: Request) {
   const guard = await guardLive(request, { mutating: true });
   if (!guard.ok) return guard.response;
   const body = Body.safeParse(await request.json().catch(() => null));
-  if (!body.success) return refuse(400, "Send the pull request number (and a known model).");
+  if (!body.success)
+    return refuse(400, "Send the repository and pull request number (and a known model).");
+  const repo = body.data.repo;
 
   // Before any sandbox boots: a choice that needs a key nobody saved stops here.
   let plan: ModelPlan;
@@ -44,25 +49,19 @@ export async function POST(request: Request) {
 
   // Every live analysis or run boots a sandbox; the day's count gates it.
   if (usesSandbox()) {
-    const admission = await admitLiveWork({ signal: request.signal });
+    const admission = await admitLiveWork({ login: guard.login, signal: request.signal });
     if (!admission.ok) return refuse(admission.status, admission.reason);
   }
 
-  // A 404 here means the App has no installation on the repository (signing
-  // in doesn't install it), not a missing pull request, so it is asked apart.
-  let octokit;
-  try {
-    // contents:read for the base branch's ref (readPull reads its tip).
-    octokit = await installationOctokit(REPO, { pull_requests: "read", contents: "read" });
-  } catch (error) {
-    const status = (error as { status?: number }).status;
-    return status === 404
-      ? refuse(503, "GitHub can't see the repository: is the Merge Desk app installed on it?")
-      : refuse(503, "GitHub isn't reachable right now. Try again.");
-  }
+  // Push access to this repository, asked of GitHub before anything is read.
+  // contents:read for the base branch's ref (readPull reads its tip).
+  const access = await openRepo(guard.login, repo, { pull_requests: "read", contents: "read" });
+  if (!access.ok) return refuse(access.status, access.error);
+  const octokit = access.octokit;
+
   let pull;
   try {
-    pull = await readPull(octokit, REPO, body.data.pr);
+    pull = await readPull(octokit, repo, body.data.pr);
   } catch (error) {
     if (error instanceof BaseBranchError) return refuse(409, error.message);
     const status = (error as { status?: number }).status;
@@ -80,11 +79,11 @@ export async function POST(request: Request) {
   request.signal.addEventListener("abort", () => controller.abort(), { once: true });
 
   const events = analyzePipeline({
-    runner: liveRunner(REPO, controller.signal),
+    runner: liveRunner(repo, controller.signal, { login: guard.login }),
     analyst: geminiAnalyst(client),
     model: client.model,
     signal: controller.signal,
-    repo: REPO,
+    repo,
     pr: pull.summary.number,
     revisions: { head: pull.summary.head.sha, base: pull.summary.base.sha },
     branches: { ours: pull.summary.head.ref, theirs: pull.summary.base.ref },

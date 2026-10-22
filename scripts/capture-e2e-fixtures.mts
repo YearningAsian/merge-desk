@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AnalyzeEvent } from "@/core/events";
 import { PullList, type PullSummary } from "@/core/pulls";
-import { CODE_ALLOWED_REPOS } from "@/server/env";
+import { DEMO_REPO } from "@/server/env";
 import { geminiAnalyst } from "@/server/gemini/analyze";
 import { GeminiClient } from "@/server/gemini/client";
 import { analyzePipeline } from "@/server/pipeline/analyze";
@@ -18,7 +18,7 @@ import { loadLocalEnv } from "./lib/env.mts";
 import { ROOT, git, loadDemoConfig } from "./lib/git.mts";
 
 loadLocalEnv();
-const REPO = CODE_ALLOWED_REPOS[0];
+const REPO = DEMO_REPO;
 const OUT = join(ROOT, "tests/e2e/fixtures");
 mkdirSync(OUT, { recursive: true });
 

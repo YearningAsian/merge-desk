@@ -9,7 +9,7 @@ describe("live source Land", () => {
       "fetch",
       vi.fn(async () => Response.json({ error: "Sign in to use live mode." }, { status: 401 })),
     );
-    await expect(liveSource.land(1, "token")).resolves.toEqual({
+    await expect(liveSource("o/r").land(1, "token")).resolves.toEqual({
       outcome: "REFUSED",
       reason: "Sign in to use live mode.",
     });

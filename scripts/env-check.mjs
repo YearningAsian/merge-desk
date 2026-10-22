@@ -20,7 +20,14 @@ const REQUIRED = [
   "RUNNER",
   "DAILY_LIVE_RUN_CAP",
 ];
-const OPTIONAL = ["GEMINI_MODEL", "VERCEL_OIDC_TOKEN", "DEPS_SNAPSHOT_ID"];
+const OPTIONAL = [
+  "GEMINI_MODEL",
+  "VERCEL_OIDC_TOKEN",
+  "DEPS_SNAPSHOT_ID",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
+];
 
 const flag = process.argv.indexOf("--file");
 const file = flag > -1 ? process.argv[flag + 1] : ".env.local";

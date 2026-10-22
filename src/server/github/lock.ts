@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Octokit } from "@octokit/rest";
-import { z } from "zod";
-import { splitRepo } from "./app";
+import { splitRepo, updateRef } from "./app";
 
 // The lock every writer of a decision record shares, wherever it runs (the
 // laptop's dev server and every production instance): a Git ref in the
@@ -151,13 +150,6 @@ async function acquire(
   }
 }
 
-const UpdateRefsResponse = z
-  .object({ updateRefs: z.object({ clientMutationId: z.string() }).strict() })
-  .strict();
-const UPDATE_REFS = `mutation ReleaseLock($input: UpdateRefsInput!) {
-  updateRefs(input: $input) { clientMutationId }
-}`;
-
 const repositoryIds = new Map<string, string>();
 async function repositoryId(octokit: Octokit, repo: string, signal?: AbortSignal) {
   const known = repositoryIds.get(repo);
@@ -181,18 +173,15 @@ export async function releaseLock(
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const clientMutationId = randomUUID();
-      const result = await octokit.graphql(UPDATE_REFS, {
-        input: {
-          repositoryId: await repositoryId(octokit, repo, signal),
-          clientMutationId,
-          refUpdates: [{ name: ref, beforeOid: mine, afterOid: ZERO, force: true }],
-        },
-        request: { signal },
+      const released = await updateRef(octokit, {
+        repositoryId: await repositoryId(octokit, repo, signal),
+        name: ref,
+        beforeOid: mine,
+        afterOid: ZERO,
+        force: true,
+        signal,
       });
-      const response = UpdateRefsResponse.safeParse(result);
-      if (response.success && response.data.updateRefs.clientMutationId === clientMutationId)
-        return true;
+      if (released) return true;
     } catch {
       // Decide from the ref's state below, not from the error.
     }

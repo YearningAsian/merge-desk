@@ -1,9 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { Octokit } from "@octokit/rest";
-import { z } from "zod";
 import { OPTION_LABELS } from "@/core/options";
 import type { RunRecord } from "@/core/run";
-import { splitRepo } from "./app";
+import { splitRepo, updateRef } from "./app";
 
 // Land: write the checked merge to the pull request's own branch. The tree
 // is rebuilt on GitHub from the signed changes and must have exactly the id
@@ -24,14 +22,6 @@ export class LandError extends Error {
 
 const statusOf = (error: unknown) =>
   error && typeof error === "object" ? (error as { status?: number }).status : undefined;
-
-const UpdateRefsResponse = z
-  .object({ updateRefs: z.object({ clientMutationId: z.string() }).strict() })
-  .strict();
-
-const UPDATE_REFS = `mutation Land($input: UpdateRefsInput!) {
-  updateRefs(input: $input) { clientMutationId }
-}`;
 
 const unconfirmed = () =>
   new LandError(
@@ -133,28 +123,18 @@ export async function landMerge(
     request,
   });
 
-  const clientMutationId = randomUUID();
   beforeUpdate(input.signal);
   try {
     input.onRefUpdate?.();
-    const result = await octokit.graphql(UPDATE_REFS, {
-      input: {
-        repositoryId: input.repositoryId,
-        clientMutationId,
-        refUpdates: [
-          {
-            name: `refs/heads/${input.refs.head}`,
-            beforeOid: record.revisions.head,
-            afterOid: commit.data.sha,
-            force: false,
-          },
-        ],
-      },
-      request,
+    const confirmed = await updateRef(octokit, {
+      repositoryId: input.repositoryId,
+      name: `refs/heads/${input.refs.head}`,
+      beforeOid: record.revisions.head,
+      afterOid: commit.data.sha,
+      force: false,
+      signal: input.signal,
     });
-    const response = UpdateRefsResponse.safeParse(result);
-    if (!response.success || response.data.updateRefs.clientMutationId !== clientMutationId)
-      throw unconfirmed();
+    if (!confirmed) throw unconfirmed();
   } catch (error) {
     if (statusOf(error) === 422 || statusOf(error) === 403 || statusOf(error) === 404)
       throw new LandError("GitHub refused the branch update. Nothing was pushed.", "REFUSED");

@@ -1,8 +1,10 @@
+import { Octokit } from "@octokit/rest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Keep the real Octokit request/authentication stack. Only credential minting
 // and HTTP are fake: no environment file, private key or GitHub call is used.
 const APP_JWT = "fixture.payload.signature";
+const INSTALLATION_TOKEN = "fixture-installation-token";
 vi.mock("@octokit/auth-app", () => ({
   createAppAuth: () => async () => ({ token: "fixture.payload.signature" }),
 }));
@@ -35,9 +37,10 @@ function github({ failApp = false, failBot = false } = {}) {
       return Response.json({ id: 7, slug: "fixture-app" });
     }
     if (decodeURIComponent(url.pathname) === "/users/fixture-app[bot]") {
-      // Public user lookup does not accept the App JWT used by GET /app.
-      if (authorization !== null)
-        return Response.json({ message: "Bad credentials" }, { status: 401 });
+      // Anonymous lookups share a 60-an-hour limit per address; the App JWT
+      // is refused here. Only the installation token answers.
+      if (authorization !== `token ${INSTALLATION_TOKEN}`)
+        return Response.json({ message: "API rate limit exceeded" }, { status: 403 });
       if (failBot && !botFailed) {
         botFailed = true;
         return Response.json({ message: "Bot unavailable" }, { status: 503 });
@@ -48,27 +51,29 @@ function github({ failApp = false, failBot = false } = {}) {
   };
 }
 
+const installation = () => new Octokit({ auth: INSTALLATION_TOKEN });
+
 beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("GitHub App identity authentication", () => {
-  it("resolves the committer using App auth for metadata and no App JWT for the public bot", async () => {
+  it("resolves the committer using App auth for metadata and the installation token for the bot", async () => {
     vi.stubGlobal("fetch", github());
     const { appIdentity } = await import("@/server/github/app");
-    await expect(appIdentity(env)).resolves.toEqual(expectedIdentity);
+    await expect(appIdentity(installation(), env)).resolves.toEqual(expectedIdentity);
   });
 
   it("refuses unavailable App metadata and allows a later identity lookup", async () => {
     vi.stubGlobal("fetch", github({ failApp: true }));
     const { appIdentity } = await import("@/server/github/app");
-    await expect(appIdentity(env)).rejects.toMatchObject({ status: 503 });
-    await expect(appIdentity(env)).resolves.toEqual(expectedIdentity);
+    await expect(appIdentity(installation(), env)).rejects.toMatchObject({ status: 503 });
+    await expect(appIdentity(installation(), env)).resolves.toEqual(expectedIdentity);
   });
 
   it("refuses an unavailable bot rather than inventing a committer and permits later recovery", async () => {
     vi.stubGlobal("fetch", github({ failBot: true }));
     const { appIdentity } = await import("@/server/github/app");
-    await expect(appIdentity(env)).rejects.toMatchObject({ status: 503 });
-    await expect(appIdentity(env)).resolves.toEqual(expectedIdentity);
+    await expect(appIdentity(installation(), env)).rejects.toMatchObject({ status: 503 });
+    await expect(appIdentity(installation(), env)).resolves.toEqual(expectedIdentity);
   });
 });

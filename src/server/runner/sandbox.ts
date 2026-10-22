@@ -32,7 +32,8 @@ import {
 // public repository at the exact head, fetches the exact base, then switches
 // its network to deny-all before any candidate file is written or any test
 // runs. It holds no GitHub token, model key or session secret. It stops in
-// dispose(), pass or fail, and times out on its own after two minutes.
+// dispose(), pass or fail, and times out on its own after two minutes, so a
+// retry reuses it only while a write, parse and test run still fit.
 //
 // With a trusted dependency snapshot (`npm run snapshot`), a boot restores
 // it instead: main's dependencies installed with `npm ci --ignore-scripts`
@@ -46,6 +47,7 @@ import {
 
 export const SANDBOX_IMAGE = "vercel/sandbox/node:24";
 export const SANDBOX_TIMEOUT_MS = 120_000;
+export const REUSE_MIN_LEFT_MS = 60_000;
 export const SANDBOX_TAGS = { app: "merge-desk" };
 export const DEPS_MARKER = ".merge-desk-deps.json";
 export const DEPS_FILES = ["package.json", "package-lock.json"] as const;
@@ -160,6 +162,7 @@ export class SandboxRunner implements Runner {
   nodeVersion: string | null = null;
   private sandbox: Sandbox | null = null;
   private booted: string | null = null; // "head..base" of the current copy
+  private bootedAt = 0;
   private networkDenied = false;
   private candidateRan = false;
   private integrity: WorkspaceIntegrity | null = null;
@@ -271,7 +274,8 @@ export class SandboxRunner implements Runner {
   private async boot(revisions: Revisions) {
     assertRevisions(revisions);
     const key = `${revisions.head}..${revisions.base}`;
-    if (this.sandbox && this.booted === key && this.networkDenied && !this.candidateRan) {
+    const fresh = Date.now() - this.bootedAt <= SANDBOX_TIMEOUT_MS - REUSE_MIN_LEFT_MS;
+    if (this.sandbox && this.booted === key && this.networkDenied && !this.candidateRan && fresh) {
       await this.timed("reset working copy", async () => {
         await git(this.shell, ["reset", "--quiet", "--hard", revisions.head]);
         await git(this.shell, ["clean", "-fdxq"]);
@@ -286,6 +290,7 @@ export class SandboxRunner implements Runner {
       tags: SANDBOX_TAGS,
       signal: this.options.signal,
     };
+    this.bootedAt = Date.now();
     const snapshot = this.options.dependencies?.snapshotId;
     // A snapshot boot inherits its image and holds main's checkout, so it
     // fetches the exact head as well as the base. If it can't be restored

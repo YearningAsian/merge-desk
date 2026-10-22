@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { KEY_PROVIDERS, PROVIDERS, modelChoice, type KeyProvider } from "@/core/models";
 import { resolveOptions } from "@/core/options";
 import { geminiAnalyst } from "@/server/gemini/analyze";
-import { ModelKeys } from "@/server/keys";
+import { KEYS_COOKIE, readKeys, sealKeys } from "@/server/keys";
 import { planModel } from "@/server/llm/client";
 import { loadLocalEnv } from "../scripts/lib/env.mts";
 import { scenarioFile } from "./helpers/scenarios";
@@ -17,7 +17,8 @@ const ENV_NAMES: Record<KeyProvider, string> = {
 };
 
 // One schema-valid analysis call per provider whose key is in .env.local,
-// through the same path a key saved in Settings takes. A missing key skips.
+// sealed and opened like a key saved in Settings, then through planModel.
+// A missing key skips.
 describe("Your own model keys (live)", () => {
   for (const provider of KEY_PROVIDERS) {
     const key = process.env[ENV_NAMES[provider]]?.trim();
@@ -25,10 +26,10 @@ describe("Your own model keys (live)", () => {
       `${provider}: answers one structured analysis call that validates`,
       async () => {
         const model = PROVIDERS[provider].models[0]!.id;
-        const client = planModel(
-          modelChoice(provider, model),
-          ModelKeys.parse({ [provider]: key }),
-        )();
+        const session = { login: "live-test", exp: Date.now() + 10 * 60_000 };
+        const sealed = await sealKeys(session, { [provider]: key });
+        const keys = await readKeys(`${KEYS_COOKIE}=${sealed}`, session);
+        const client = planModel(modelChoice(provider, model), keys)();
         const file = scenarioFile("clean", API, "");
         const started = Date.now();
         const answer = await geminiAnalyst(client)({

@@ -63,7 +63,7 @@ export const analysisKey = (pr: number, head: string, base: string) => `${pr}:${
 export const runKey = (analysis: string, option: Option) => `${analysis}:${option}`;
 
 // Keeps each step's latest event and when it started running.
-function withStep<S extends { from?: number; state: string; t: number }>(
+export function withStep<S extends { from?: number; state: string; t: number }>(
   before: S | undefined,
   event: Omit<S, "from">,
 ): S {

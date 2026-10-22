@@ -1,7 +1,10 @@
 // Line and token normalization shared by every check. Lines compare by their
-// tokens, so whitespace and formatting differences never count as changes.
+// tokens, so whitespace and formatting differences never count as changes,
+// except inside a string literal, which is one token. A template with ${...}
+// is tokenized piece by piece.
 
-const TOKEN = /[A-Za-z_$][\w$]*|\d[\w.]*|\S/g;
+const TOKEN =
+  /`(?:[^`\\$]|\\.|\$(?!\{))*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Za-z_$][\w$]*|\d[\w.]*|\S/g;
 
 export const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 

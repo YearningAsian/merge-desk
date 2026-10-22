@@ -3,13 +3,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitMerge } from "lucide-react";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { RunEvent } from "@/core/events";
+import { STEP_LABELS, type RunEvent } from "@/core/events";
 import type { Option } from "@/core/honor";
 import type { PullSummary } from "@/core/pulls";
 import { ActionBar, ActionBarSlot } from "@/ui/ActionBar";
 import { useMediaQuery } from "@/ui/hooks/useMediaQuery";
 import { PrDetail } from "@/ui/PrDetail";
 import { PrList, type RowState } from "@/ui/PrList";
+import { Badge } from "@/ui/primitives/badge";
 import { Button } from "@/ui/primitives/button";
 import { Kbd } from "@/ui/primitives/kbd";
 import { Sheet, SheetContent, SheetTitle } from "@/ui/primitives/sheet";
@@ -529,6 +530,7 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       aria-label="Merge Desk"
       className="relative flex min-h-0 flex-1 outline-none"
     >
+      <h1 className="sr-only">Merge Desk: pull requests to resolve</h1>
       <p role="status" className="sr-only">
         {announcement}
       </p>
@@ -560,13 +562,25 @@ export function Desk({ source, repo }: { source: DataSource; repo: string }) {
       {wide ? (
         <div className="relative min-w-0 flex-1 overflow-y-auto">
           {detail ?? (
-            <div className="flex h-full flex-col items-start justify-center gap-3 px-8 text-[13px] text-muted">
-              <GitMerge aria-hidden className="size-6" />
-              <p className="max-w-sm">
+            <div className="flex h-full flex-col items-start justify-center gap-4 px-8 text-[14px]">
+              <GitMerge aria-hidden className="size-6 text-muted" />
+              <h2 className="text-[22px] font-semibold tracking-tight">
+                Pick a conflict to resolve
+              </h2>
+              <p className="max-w-md">
                 Open a pull request to see what each side meant and how the conflict could be
-                resolved.
+                resolved. Nothing lands until a run passes every check:
               </p>
-              <p className="flex items-center gap-1.5">
+              <ol className="flex flex-wrap gap-1.5">
+                {(["parse", "honor", "tests"] as const).map((id) => (
+                  <li key={id}>
+                    <Badge tone="neutral" className="text-[12px] leading-6">
+                      {STEP_LABELS[id]}
+                    </Badge>
+                  </li>
+                ))}
+              </ol>
+              <p className="flex items-center gap-1.5 text-[13px] text-muted">
                 <Kbd>J</Kbd>
                 <Kbd>K</Kbd> to move, <Kbd>Enter</Kbd> to open
               </p>

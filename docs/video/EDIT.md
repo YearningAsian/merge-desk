@@ -8,7 +8,7 @@ Rules: real UI only for product shots; no third-party logos where avoidable (Git
 | 0:08-0:25 | Problem card over the PR list | /demo list | FACTS: 143 projects, 75.23% needed program-logic reasoning, 2x as likely to have a bug (Brindescu et al., 2019) |
 | 0:25-0:40 | Two intents side by side, options slider | /demo PR #1 | "Each side as one sentence. Gemini proposes; the checks decide." |
 | 0:40-1:15 | Beat A: run held on the real tests | /demo PR #2 (held) | "Parses. Choice honored. Then the real tests fail: HELD, nothing pushed." |
-| 1:15-1:55 | Beat B: verified, Land, PR mergeable | /demo PR #1 Land replay; GitHub PR status line crop | "Land rechecks nobody pushed, adds the merge commit to the PR's own branch. Never main." |
+| 1:15-1:55 | Beat B: verified, Land, decision recorded | /demo PR #1 Land replay; GitHub PR decision comment crop | "Land rechecks nobody pushed, adds the merge commit to the PR's own branch. Never main." |
 | 1:55-2:20 | Dogfood on the phone: Merge Desk resolves its own conflicting PR into main with the app's own tests | learner's phone screen recording, live mode (slice 8) | "And it resolved a real conflict in its own code." |
 | 2:20-2:40 | Proof: /judge, curl /api/health, repo | desktop capture + terminal | "Try it yourself: no sign-in." URL on screen |
 

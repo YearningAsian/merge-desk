@@ -12,7 +12,7 @@ import { normalizedLines, splitLines, tokensOf } from "./text";
 
 export type Option = "combine" | "keep_ours" | "keep_theirs";
 export type Side = "ours" | "theirs";
-export type SideStatus = "present" | "missing" | "dropped" | "leaked";
+export type SideStatus = "present" | "missing" | "dropped" | "leaked" | "unknown";
 
 export type FileVersions = {
   path: string;
@@ -209,9 +209,12 @@ function expectKept(hunk: Hunk, keep: Side, renames: Record<Side, Rename[]>) {
   };
 }
 
-const emptySides = (intents: Record<Side, string>): Record<Side, SideReport> => ({
-  ours: { intent: intents.ours, status: "present", lines: [] },
-  theirs: { intent: intents.theirs, status: "present", lines: [] },
+const emptySides = (
+  intents: Record<Side, string>,
+  status: SideStatus = "present",
+): Record<Side, SideReport> => ({
+  ours: { intent: intents.ours, status, lines: [] },
+  theirs: { intent: intents.theirs, status, lines: [] },
 });
 
 function failedFile(file: FileVersions, intents: Record<Side, string>, error: string): FileReport {
@@ -225,7 +228,7 @@ function failedFile(file: FileVersions, intents: Record<Side, string>, error: st
     unexpected: [],
     lostShared: [],
     misplaced: false,
-    sides: emptySides(intents),
+    sides: emptySides(intents, "unknown"),
   };
 }
 
@@ -264,13 +267,34 @@ function checkFile(file: FileVersions, option: Option, intents: Record<Side, str
       ? expectCombined(hunk, renames)
       : expectKept(hunk, option === "keep_ours" ? "ours" : "theirs", renames),
   );
-  const expected = parts.flatMap((part) => part.expected);
   const ambiguous = parts.flatMap((part) => part.ambiguous);
 
-  const missing: Expected[] = expected.filter((entry) => !gap.take(entry.line));
-  for (const entry of expected)
-    for (let k = 0; k < (entry.allowExtra ?? 0); k += 1) gap.take(entry.line);
-  const extras = new Bag(gap.rest());
+  // Each conflict is checked against the result lines that replaced it. Conflicts
+  // with no kept line between them share one region, as matchOutside reports it.
+  const groupOf: number[] = [];
+  let group = 0;
+  let pending = false;
+  for (const segment of segments) {
+    if (segment.kind === "conflict") {
+      groupOf.push(outside.ok ? group : 0);
+      pending = true;
+    } else if (pending && normalizedLines(segment.lines).length) {
+      group += 1;
+      pending = false;
+    }
+  }
+  const regions = outside.ok ? outside.gaps.map((lines) => new Bag(lines)) : [gap];
+  const missing: Expected[] = [];
+  parts.forEach((part, index) => {
+    const region = regions[groupOf[index]!] ?? new Bag();
+    for (const entry of part.expected) if (!region.take(entry.line)) missing.push(entry);
+  });
+  parts.forEach((part, index) => {
+    const region = regions[groupOf[index]!] ?? new Bag();
+    for (const entry of part.expected)
+      for (let k = 0; k < (entry.allowExtra ?? 0); k += 1) region.take(entry.line);
+  });
+  const extras = new Bag(regions.flatMap((region) => region.rest()));
 
   const sides = emptySides(intents);
   const lostShared: string[] = [];
@@ -359,10 +383,18 @@ function describeSide(side: Side, report: SideReport): string {
       return `${side}: ${report.intent}, MISSING (${lines(report.lines.length)})`;
     case "leaked":
       return `${side}: ${report.intent}, LEAKED into the result (${lines(report.lines.length)}) although it was dropped`;
+    case "unknown":
+      return `${side}: ${report.intent}, UNKNOWN`;
   }
 }
 
-const RANK: Record<SideStatus, number> = { present: 0, dropped: 0, missing: 1, leaked: 2 };
+const RANK: Record<SideStatus, number> = {
+  present: 0,
+  dropped: 0,
+  unknown: 1,
+  missing: 1,
+  leaked: 2,
+};
 
 export function checkChoiceHonored(input: HonorInput): HonorResult {
   const { option, intents } = input;

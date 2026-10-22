@@ -60,7 +60,12 @@ export async function sealSession(
   options: { env?: Env; now?: number; repos?: string[] } = {},
 ): Promise<string> {
   const now = options.now ?? Date.now();
-  const repos = (options.repos ?? []).slice(0, MAX_SESSION_REPOS);
+  // A seal over about 4 KB is dropped by the browser, so the names are also
+  // capped by length (1,600 characters seal to about 2.6 KB).
+  let size = 0;
+  const repos = (options.repos ?? [])
+    .slice(0, MAX_SESSION_REPOS)
+    .filter((repo) => (size += repo.length + 3) <= 1_600);
   return sealData(
     { login, exp: now + SESSION_TTL_S * 1000, repos },
     { password: password(options.env ?? process.env), ttl: SESSION_TTL_S },

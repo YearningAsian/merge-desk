@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merge Desk: App Map</title>
+<meta name="description" content="A take-home map of Merge Desk: one action followed through the real code, where to start a change, and a practice to reuse.">
+<style>
+:root {
+  --bg: #f5f5f3; --surface: #fff; --ink: #16181d; --muted: #646a75; --hair: #e3e3df;
+  --ours-text: #2558bd; --theirs-text: #a84e0f; --ok-text: #176b3a; --stop-text: #a83030; --wait-text: #78600b;
+  --ours-wash: #eef3fe; --ok-wash: #e8f4ed; --stop-wash: #fbeaea; --wait-wash: #f8f2dc;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131417; --surface: #1c1e22; --ink: #ecedef; --muted: #a2a7b1; --hair: #2e3137;
+    --ours-text: #8fb3ff; --theirs-text: #f2a865; --ok-text: #6fd19a; --stop-text: #f08f8f; --wait-text: #e3c75c;
+    --ours-wash: #1b2740; --ok-wash: #16301f; --stop-wash: #3a1d1d; --wait-wash: #332c12;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+.skip-link { position: fixed; top: 12px; left: 12px; padding: 10px 14px; background: var(--ink); color: var(--bg); border-radius: 6px; transform: translateY(-200%); }
+.skip-link:focus { transform: none; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+header { padding-bottom: 18px; border-bottom: 1px solid var(--hair); margin-bottom: 24px; }
+.eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 32px/1.1 var(--sans); letter-spacing: -.02em; margin: 6px 0 6px; }
+h2 { font: 650 19px/1.25 var(--sans); margin: 0 0 12px; }
+h3 { font: 600 15px/1.3 var(--sans); margin: 0 0 4px; }
+section { margin-bottom: 28px; }
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 16px 18px; }
+.muted { color: var(--muted); }
+p { margin: 0 0 10px; }
+code { font: 13px var(--mono); background: var(--bg); border: 1px solid var(--hair); padding: 0 4px; border-radius: 4px; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+.k { display: block; font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.k.ai { color: var(--ours-text); } .k.ok { color: var(--ok-text); } .k.stop { color: var(--stop-text); }
+ol.route { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: stop; }
+ol.route > li { counter-increment: stop; position: relative; padding-left: 44px; }
+ol.route > li::before { content: counter(stop); position: absolute; left: 16px; top: 16px; font: 700 13px/22px var(--mono); width: 22px; text-align: center; border-radius: 50%; background: var(--ours-wash); color: var(--ours-text); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-top: 1px solid var(--hair); }
+th { font-weight: 600; width: 38%; }
+svg.dia { width: 100%; height: auto; display: block; }
+svg.dia rect { fill: var(--surface); stroke: var(--hair); }
+svg.dia .ext { fill: var(--wait-wash); }
+svg.dia .verdict { fill: var(--ok-wash); }
+svg.dia text { fill: var(--ink); font: 13px var(--sans); }
+svg.dia text.code { fill: var(--muted); font: 11px var(--mono); }
+svg.dia line, svg.dia path { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.steps-alt { display: none; margin: 0; padding-left: 20px; }
+@media (max-width: 680px) { svg.dia { display: none; } .steps-alt { display: block; } }
+details { margin-top: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Devpost Learn · app map</div>
+  <h1>Merge Desk, mapped</h1>
+  <p class="muted">A snapshot of <code>main</code> at commit <code>8960272</code> (2026-10-23). Code drifts; search the anchors below if a path moves.</p>
+</header>
+<main id="main">
+
+<section>
+  <h2>What it is, in three pieces</h2>
+  <div class="grid">
+    <div class="card"><span class="k ai">Gemini proposes</span><p>Reads both sides of a conflicted pull request, says what each side meant, offers options, then writes the merge for the option you pick.</p></div>
+    <div class="card"><span class="k stop">Code decides</span><p>A fresh Vercel Sandbox with the network off checks the merge: it parses, the chosen option was honored line by line, and the real tests pass. Anything else is HELD.</p></div>
+    <div class="card"><span class="k ok">Land is guarded</span><p>Only a VERIFIED run can Land: a merge commit on the pull request's own branch after rechecking the exact head and base. Never <code>main</code>, never a force push.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>One action: pressing Run checks</h2>
+  <div class="card">
+    <svg class="dia" viewBox="0 0 940 250" role="img" aria-labelledby="dia-title">
+      <title id="dia-title">Run checks goes from the desk to the run route, through the pipeline's propose, write and parse, honor and tests steps, and back to the desk as a HELD or VERIFIED result.</title>
+      <rect x="10" y="20" width="170" height="64" rx="8"/>
+      <text x="22" y="46">Desk: Run checks</text>
+      <text class="code" x="22" y="68">src/ui/Run.tsx</text>
+      <rect x="215" y="20" width="190" height="64" rx="8"/>
+      <text x="227" y="46">POST /api/live/run</text>
+      <text class="code" x="227" y="68">api/live/run/route.ts</text>
+      <rect x="440" y="20" width="200" height="64" rx="8"/>
+      <text x="452" y="46">runPipeline</text>
+      <text class="code" x="452" y="68">server/pipeline/run.ts</text>
+      <rect x="675" y="20" width="255" height="64" rx="8" class="verdict"/>
+      <text x="687" y="46">Result: HELD or VERIFIED</text>
+      <text class="code" x="687" y="68">core/events.ts ResultEvent</text>
+      <line x1="180" y1="52" x2="215" y2="52"/>
+      <line x1="405" y1="52" x2="440" y2="52"/>
+      <line x1="640" y1="52" x2="675" y2="52"/>
+      <rect x="250" y="150" width="150" height="64" rx="8" class="ext"/>
+      <text x="262" y="176">1 propose</text>
+      <text class="code" x="262" y="198">gemini/propose.ts</text>
+      <rect x="420" y="150" width="150" height="64" rx="8" class="ext"/>
+      <text x="432" y="176">2 write, parse</text>
+      <text class="code" x="432" y="198">runner/workspace.ts</text>
+      <rect x="590" y="150" width="150" height="64" rx="8"/>
+      <text x="602" y="176">3 honor</text>
+      <text class="code" x="602" y="198">core/honor.ts</text>
+      <rect x="760" y="150" width="150" height="64" rx="8" class="ext"/>
+      <text x="772" y="176">4 tests</text>
+      <text class="code" x="772" y="198">runner/sandbox.ts</text>
+      <path d="M540 84 V120 H325 V150"/>
+      <path d="M540 120 H835 V150"/>
+      <line x1="495" y1="120" x2="495" y2="150"/>
+      <line x1="665" y1="120" x2="665" y2="150"/>
+      <text class="code" x="10" y="240">Shaded: calls an outside service (Gemini or Vercel Sandbox). Honor is plain code and never calls the model.</text>
+    </svg>
+    <ol class="steps-alt">
+      <li>Desk: Run checks (<code>src/ui/Run.tsx</code>)</li>
+      <li><code>POST /api/live/run</code> (<code>src/app/api/live/run/route.ts</code>)</li>
+      <li><code>runPipeline</code>: propose (Gemini), write and parse, honor (plain code), tests (Vercel Sandbox)</li>
+      <li>Result event: HELD or VERIFIED, back on the desk</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>A reference route through the code</h2>
+  <p class="muted">Three stops that explain most of the product. This is a reference route, not a record of a guided tour.</p>
+  <ol class="route">
+    <li class="card">
+      <h3>The button and the result card</h3>
+      <p><code>src/ui/Run.tsx</code>, search <code>export function RunSection</code> and <code>Every check passed on a scratch copy</code>. The button sends the option the slider is on; the card shows the verdict, the failed step and the MISSING or present lines.</p>
+    </li>
+    <li class="card">
+      <h3>The pipeline, in order</h3>
+      <p><code>src/server/pipeline/run.ts</code>, search <code>export async function* runPipeline</code>. Each step is yielded as an event the desk draws live. The verdict is VERIFIED only when every step passed: <code>ORDER.every</code>.</p>
+    </li>
+    <li class="card">
+      <h3>The check the model can't talk past</h3>
+      <p><code>src/core/honor.ts</code>, search <code>export function checkChoiceHonored</code>. For the chosen option, every line each side changed must be in the merge (or dropped as chosen), and nothing outside the conflicts may change.</p>
+    </li>
+  </ol>
+  <details>
+    <summary>And after VERIFIED: Land</summary>
+    <p><code>src/server/guard.ts</code> <code>checkLand</code> refuses anything not VERIFIED, a closed or forked pull request, the default or base branch, or a head or base that moved. <code>src/server/github/land.ts</code> <code>landMerge</code> then writes the merge commit with parents head and base and moves the branch only from the expected head.</p>
+  </details>
+</section>
+
+<section>
+  <h2>To change this, start here</h2>
+  <div class="card">
+    <table>
+      <tr><th>What Gemini is asked</th><td><code>src/server/gemini/propose.ts</code> <code>proposePrompt</code>; the analysis prompt lives beside it in <code>analyze.ts</code></td></tr>
+      <tr><th>Which tests a merge runs</th><td><code>src/server/guard.ts</code> <code>chooseTestSuite</code></td></tr>
+      <tr><th>The daily run cap</th><td><code>src/server/throttle.ts</code> <code>dailyCap</code> (env <code>DAILY_LIVE_RUN_CAP</code>)</td></tr>
+      <tr><th>Land's commit message</th><td><code>src/server/github/land.ts</code> <code>landMessage</code></td></tr>
+      <tr><th>What the server may send the desk</th><td><code>src/core/events.ts</code> <code>ResultEvent</code> and <code>StepEvent</code> (the size limits live here)</td></tr>
+      <tr><th>The public demo</th><td><code>demo/recordings/</code>, re-captured with <code>npm run record</code> (<code>scripts/record.mts</code>)</td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>A practice to reuse</h2>
+  <div class="card">
+    <p><strong>Rehearse the exact demo path on real, messy data before you record it.</strong> The seeded demo pull requests never move, so they hide whole classes of bugs. Twice, running Merge Desk on its own repository found one the unit tests didn't:</p>
+    <ul>
+      <li>2026-10-07: GitHub's <code>base.sha</code> is the base from when the pull request opened, so a moved <code>main</code> was invisible. Evidence: <code>docs/evidence/dogfood-2026-10-07.md</code>, fixed in PR #11.</li>
+      <li>2026-10-23: pull request #10, now 129 files behind <code>main</code>, produced a patch over the result event's limit, so the desk would have rejected the verdict mid-recording. Evidence: <code>PLAN.md</code> row 2.13, fixed on branch <code>fix/large-run-result</code> with a test that fails without it.</li>
+    </ul>
+    <p>On another project: before a demo or a release, run the real pipeline once on the oldest, largest real input you have, not the fixture, and read every event it emits.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Run it again</h2>
+  <div class="card">
+    <p><code>npm ci</code>, then <code>npm run dev</code> and open <code>http://localhost:3000/demo</code> (no keys needed). Live mode needs the GitHub App and Gemini settings in <code>.env.local</code>; see <code>README.md</code>. All checks: <code>node scripts/verify.mts</code>. Production: <code>https://merge-desk-swart.vercel.app/judge</code>.</p>
+  </div>
+</section>
+
+</main>
+</div>
+</body>
+</html>

@@ -35,6 +35,9 @@ export type StepEvent = z.infer<typeof StepEvent>;
 export const Verdict = z.enum(["VERIFIED", "HELD"]);
 export type Verdict = z.infer<typeof Verdict>;
 
+export const MAX_PATCH = 1_000_000;
+export const MAX_CHANGED_FILES = 500;
+
 export const ResultEvent = z.object({
   t: z.number().int().nonnegative(),
   type: z.literal("result"),
@@ -42,8 +45,8 @@ export const ResultEvent = z.object({
   failed: z.array(StepId),
   summary: z.array(z.string().max(2_000)).max(50),
   description: z.string().max(2_000).optional(),
-  changedFiles: z.array(z.string()).max(500).optional(),
-  patch: z.string().max(1_000_000).optional(),
+  changedFiles: z.array(z.string()).max(MAX_CHANGED_FILES).optional(),
+  patch: z.string().max(MAX_PATCH).optional(),
   token: z.string().max(4_000_000).optional(), // the signed run record, added by the server
 });
 export type ResultEvent = z.infer<typeof ResultEvent>;

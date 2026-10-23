@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RunRecord } from "@/core/run";
 import { signLandableRun, signRun, verifyRun } from "@/server/pipeline/run";
-import type { RunEvent } from "@/core/events";
+import { RunEvent } from "@/core/events";
 import { MalformedOutputError } from "@/server/errors";
 import { runPipeline, type Proposer } from "@/server/pipeline/run";
 import type { Runner } from "@/server/runner/types";
@@ -94,6 +94,31 @@ describe("runPipeline", () => {
     expect(result.verdict).toBe("VERIFIED");
     expect([...final.values()].every((state) => state === "passed")).toBe(true);
     expect(runner.calls.at(-1)).toBe("dispose");
+  });
+
+  it("leaves out a patch or file list too large for the event, so the desk still gets the verdict", async () => {
+    // A pull request far behind its base: on 2026-10-23 #10's patch was over 1,000,000 characters.
+    const base = fakeRunner();
+    const runner = fakeRunner({
+      applyProposal: async (revs, files) => ({
+        ...(await base.applyProposal(revs, files)),
+        changedFiles: Array.from({ length: 501 }, (_, i) => `f${i}.ts`),
+        patch: "x".repeat(1_000_001),
+      }),
+    });
+    const { result } = await collect(
+      runPipeline({
+        runner,
+        proposer: propose("combined"),
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths,
+      }),
+    );
+    expect(RunEvent.safeParse(result).success).toBe(true);
+    expect(result.verdict).toBe("VERIFIED");
+    expect(["patch", "changedFiles"].filter((key) => key in result)).toEqual([]);
   });
 
   it("holds a merge that dropped an intent, and still runs the tests for evidence", async () => {

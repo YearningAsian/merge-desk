@@ -1,4 +1,11 @@
-import { truncateLog, type RunEvent, type StepId, type StepState } from "@/core/events";
+import {
+  MAX_CHANGED_FILES,
+  MAX_PATCH,
+  truncateLog,
+  type RunEvent,
+  type StepId,
+  type StepState,
+} from "@/core/events";
 import { checkChoiceHonored, type Option } from "@/core/honor";
 import { RunRecord } from "@/core/run";
 import { MalformedOutputError } from "@/server/errors";
@@ -217,8 +224,9 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     failed: failedSteps.length ? failedSteps : notRun,
     summary,
     ...(description ? { description } : {}),
-    ...(changedFiles ? { changedFiles } : {}),
-    ...(patch ? { patch } : {}),
+    // A branch far behind its base can exceed these; the verdict must still reach the desk.
+    ...(changedFiles && changedFiles.length <= MAX_CHANGED_FILES ? { changedFiles } : {}),
+    ...(patch && patch.length <= MAX_PATCH ? { patch } : {}),
   };
 }
 

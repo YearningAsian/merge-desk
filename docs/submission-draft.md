@@ -56,7 +56,7 @@ Used: Next.js, React, Tailwind, shadcn/ui and Radix, TanStack Query, Pierre Diff
 
 ## Accomplishments that we're proud of
 
-- The whole journey works on production, on a phone and a desktop: analyze, run, HELD or VERIFIED, and a real Land on a demo pull request.
+- The whole journey works on real pull requests: analyze, run, HELD or VERIFIED, and a real Land. The public demo replays it on a phone or a desktop with no sign-in.
 - 15 recorded runs from real sandboxes and real Gemini answers: 3 VERIFIED, 12 HELD, 6 of them steered retries, and 3 real Lands (each reset afterwards). Each run took between 10.3 and 12.2 seconds from start to verdict.
 - Merge Desk resolved a real conflict in its own repository: Gemini proposed combining both sides, the deterministic check confirmed both were kept, and the app's own unit test suite passed in the sandbox: VERIFIED.
 - Nothing displays as success unless GitHub confirmed it: an unconfirmed write shows UNKNOWN, and a refusal says why.

@@ -22,12 +22,14 @@ export const StepState = z.enum(["queued", "running", "passed", "failed", "not_r
 export type StepState = z.infer<typeof StepState>;
 
 export const MAX_LOG = 64_000;
+export const MAX_DETAIL = 2_000;
+export const MAX_SUMMARY = 50;
 
 export const StepEvent = z.object({
   t: z.number().int().nonnegative(),
   step: StepId,
   state: StepState,
-  detail: z.string().max(2_000).optional(),
+  detail: z.string().max(MAX_DETAIL).optional(),
   log: z.string().max(MAX_LOG).optional(),
 });
 export type StepEvent = z.infer<typeof StepEvent>;
@@ -35,15 +37,18 @@ export type StepEvent = z.infer<typeof StepEvent>;
 export const Verdict = z.enum(["VERIFIED", "HELD"]);
 export type Verdict = z.infer<typeof Verdict>;
 
+export const MAX_PATCH = 1_000_000;
+export const MAX_CHANGED_FILES = 500;
+
 export const ResultEvent = z.object({
   t: z.number().int().nonnegative(),
   type: z.literal("result"),
   verdict: Verdict,
   failed: z.array(StepId),
-  summary: z.array(z.string().max(2_000)).max(50),
+  summary: z.array(z.string().max(MAX_DETAIL)).max(MAX_SUMMARY),
   description: z.string().max(2_000).optional(),
-  changedFiles: z.array(z.string()).max(500).optional(),
-  patch: z.string().max(1_000_000).optional(),
+  changedFiles: z.array(z.string()).max(MAX_CHANGED_FILES).optional(),
+  patch: z.string().max(MAX_PATCH).optional(),
   token: z.string().max(4_000_000).optional(), // the signed run record, added by the server
 });
 export type ResultEvent = z.infer<typeof ResultEvent>;

@@ -121,6 +121,44 @@ describe("runPipeline", () => {
     expect(["patch", "changedFiles"].filter((key) => key in result)).toEqual([]);
   });
 
+  it("keeps every event within the desk's limits when a merge has many conflicted files", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      ...conflicted[0]!,
+      path: `playground/src/f${i}.js`,
+    }));
+    const base = fakeRunner();
+    const runner = fakeRunner({
+      applyProposal: async (revs, files) => ({
+        ...(await base.applyProposal(revs, files)),
+        conflicted: many,
+      }),
+      runTests: async () => ({
+        state: "passed",
+        suite: "s".repeat(3_000),
+        exitCode: 0,
+        output: "",
+        durationMs: 1,
+      }),
+    });
+    const { all, result } = await collect(
+      runPipeline({
+        runner,
+        proposer: async () => ({
+          files: many.map((file) => ({ path: file.path, content: "" })),
+          description: "empties every file",
+          source: "fixture",
+        }),
+        revisions,
+        option: "combine",
+        intents,
+        conflictedPaths: many.map((file) => file.path),
+      }),
+    );
+    expect(all.filter((event) => !RunEvent.safeParse(event).success)).toEqual([]);
+    expect(result.verdict).toBe("HELD");
+    expect(result.summary.at(-1)).toMatch(/^and \d+ more$/);
+  });
+
   it("holds a merge that dropped an intent, and still runs the tests for evidence", async () => {
     const runner = fakeRunner();
     const { result, final } = await collect(

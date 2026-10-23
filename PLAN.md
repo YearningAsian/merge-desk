@@ -64,6 +64,26 @@
 
 ---
 
+## Wrap-up tickets (2026-10-23, Claude Opus 5.5 audit)
+
+Done means: a public video under 3:00 linked from FACTS, the Devpost form submitted and reload-checked by 2026-10-26 15:30 EDT, and every judge-facing line backed by production. Production `/api/health` was all true on 2026-10-23 22:29Z; demo PRs #1, #2, #6 and dogfood #10 conflicting; snapshot dependencies unchanged since 69f712e; MIT detected; em dash and claims checks clean (0 errors).
+
+| T | Rows | Ticket | Who | By (EDT) | Proposal |
+|---|---|---|---|---|---|
+| T1 | 3.10, 3.11 | Decide #17. It opens writes and sandbox spend to strangers during judging and its separate-model round is still pending (the merge-gate check fails on it). Judges use `/demo`, so nothing in the video needs it | learner | 10-24 12:00 | Freeze: keep #17 open after submission. Merge only if a round comes back CLEAN ROUND by 10-25 12:00 (the last worker was stopped by low memory; free RAM first). Either way, don't deploy it before the video is recorded |
+| T2 | 2.13, 3.8, 3.9 | Rehearse the live run on #10 (Run only), then Land it on camera: the first production Land on a non-demo branch and the first after the `appIdentity` change | learner | 10-24 | `docs/video/EDIT.md` R4, with the recovery steps |
+| T3 | 4.3 | Record takes R1 to R7 per `docs/video/EDIT.md` | learner | 10-24 | R7 on the phone also closes 2.6's phone check |
+| T4 | 4.4 | Edit, caption, upload (YouTube, Public); put the link in FACTS `demo.videoUrl` | learner | 10-25 12:00 | |
+| T5 | 3.4 | Truth sweep: README "Built and verified locally" and "the submission video remains future work" / "will show real live runs"; writeup "works on production, on a phone" (unbacked until R7); PLAN 2.13 "waiting on the learner" (stale since #14); add the video link | agent | after T4 | |
+| T6 | Learn pack | Run the pack's `6-ship` skill: checklist Final Review, Code Tour and `devpost/app-map.html` are still open, and the rules make the six skills the required build process | learner + agent | 10-25 | Do it: it is the cheapest eligibility insurance |
+| T7 | 4.5 | Gallery: 3:2 crops of the five captioned stills, plus a cover from a real still | agent | 10-25 | |
+| T8 | 5.1, 5.3 | `npm run facts`, `check_claims.py --strict` | agent | 10-26 morning | |
+| T9 | 5.2 | Writeup in your voice; "What's next" stays accurate whether or not #17 ships | learner | 10-26 | |
+| T10 | 5.4, H5 | Submit on Devpost, reload, check every link | learner | 10-26 15:30 | |
+| T11 | 3.1 | Freeze. Proposed cuts: 2.15 rest, 2.16, 3.3 (keep only replay and double-Land refusals, already covered by tests), 4.2 poster and 5.5 expo pack (online event) | learner | 10-24 | |
+
+---
+
 ## Status dashboard
 
 ### Phase 0: Ideate

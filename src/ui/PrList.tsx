@@ -193,11 +193,6 @@ export function PrList({
                 {files.length} {files.length === 1 ? "file" : "files"} on both sides
               </span>
             ) : null}
-            {pull.demo ? (
-              <Badge tone="outline" className="ml-auto">
-                DEMO
-              </Badge>
-            ) : null}
           </span>
         </button>
       </li>

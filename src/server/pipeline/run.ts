@@ -1,4 +1,13 @@
-import { truncateLog, type RunEvent, type StepId, type StepState } from "@/core/events";
+import {
+  MAX_CHANGED_FILES,
+  MAX_DETAIL,
+  MAX_PATCH,
+  MAX_SUMMARY,
+  truncateLog,
+  type RunEvent,
+  type StepId,
+  type StepState,
+} from "@/core/events";
 import { checkChoiceHonored, type Option } from "@/core/honor";
 import { RunRecord } from "@/core/run";
 import { MalformedOutputError } from "@/server/errors";
@@ -54,7 +63,7 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
       t: t(),
       step: id,
       state,
-      ...(detail ? { detail } : {}),
+      ...(detail ? { detail: detail.slice(0, MAX_DETAIL) } : {}),
       ...(log ? { log: truncateLog(log) } : {}),
     };
   };
@@ -215,10 +224,14 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     type: "result",
     verdict: ORDER.every((id) => states.get(id) === "passed") ? "VERIFIED" : "HELD",
     failed: failedSteps.length ? failedSteps : notRun,
-    summary,
+    // A large merge can exceed the event limits; the verdict must still reach the desk.
+    summary: (summary.length > MAX_SUMMARY
+      ? [...summary.slice(0, MAX_SUMMARY - 1), `and ${summary.length - MAX_SUMMARY + 1} more`]
+      : summary
+    ).map((line) => line.slice(0, MAX_DETAIL)),
     ...(description ? { description } : {}),
-    ...(changedFiles ? { changedFiles } : {}),
-    ...(patch ? { patch } : {}),
+    ...(changedFiles && changedFiles.length <= MAX_CHANGED_FILES ? { changedFiles } : {}),
+    ...(patch && patch.length <= MAX_PATCH ? { patch } : {}),
   };
 }
 

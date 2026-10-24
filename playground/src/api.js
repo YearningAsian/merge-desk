@@ -2,8 +2,12 @@
 
 const API_ROOT = "https://api.example.test";
 
-export async function getUser(id, { fetchImpl = globalThis.fetch } = {}) {
-  const response = await fetchImpl(`${API_ROOT}/users/${id}`);
+export async function getUser(id, { fetchImpl = globalThis.fetch, retries = 2 } = {}) {
+  const url = `${API_ROOT}/users/${id}`;
+  let response = await fetchImpl(url);
+  for (let attempt = 0; response.status === 429 && attempt < retries; attempt += 1) {
+    response = await fetchImpl(url);
+  }
   if (!response.ok) {
     throw new Error(`getUser failed with ${response.status}`);
   }

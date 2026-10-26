@@ -24,7 +24,7 @@ const recordings = [clean, held, drop].map((recording) => Recording.parse(record
 export default function DemoPage() {
   return (
     <div className="flex h-dvh flex-col">
-      <TopBar repo={REPO} demo />
+      <TopBar demo />
       <DemoDesk recordings={recordings} repo={REPO} />
     </div>
   );

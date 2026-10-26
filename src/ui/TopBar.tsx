@@ -4,9 +4,9 @@ import { OverlayButtons } from "@/ui/Overlays";
 import { Button } from "@/ui/primitives/button";
 import { RepoPicker } from "@/ui/RepoPicker";
 
-// The slim bar over every desk view: the product, the repository, and which
-// mode this is. Live mode names the signed-in account, switches between
-// their repositories and offers sign-out; demo mode links to live mode.
+// The slim bar over every desk view: the product and which mode this is.
+// Live mode names the signed-in account, switches between their
+// repositories and offers sign-out; demo mode links to live mode.
 export function TopBar({
   repo,
   repos,
@@ -26,11 +26,7 @@ export function TopBar({
       >
         Merge Desk
       </Link>
-      {repo && repos ? (
-        <RepoPicker repo={repo} repos={repos} />
-      ) : repo ? (
-        <span className="hidden truncate font-mono text-[12px] text-muted sm:inline">{repo}</span>
-      ) : null}
+      {repo && repos ? <RepoPicker repo={repo} repos={repos} /> : null}
       <div className="ml-auto flex shrink-0 items-center gap-2.5">
         {demo ? (
           <>

@@ -61,6 +61,7 @@ test("demo: three recorded pull requests under the demo banner, no sign-in", asy
   const list = page.getByRole("navigation", { name: "Pull requests" });
   await expect(list.getByRole("button", { name: /\[Demo\]/ })).toHaveCount(3);
   await expect(page.getByRole("link", { name: "Live mode" })).toHaveAttribute("href", "/live");
+  await expect(page.getByRole("banner")).not.toContainText("YearningAsian/merge-desk");
   await shot(page, "demo-list-1440");
   await noSeriousAxe(page);
   expect(calls).toEqual([]);

@@ -173,7 +173,9 @@ export async function git(
   const result = await shell.exec("git", [...GIT_CONFIG, ...args], { timeoutMs: RUN_LIMIT_MS });
   if (result.code !== null && allowExit.includes(result.code))
     return { stdout: result.stdout, code: result.code };
-  throw new Error(`git ${args[0]} failed: ${result.output.trim().slice(0, 500)}`);
+  // Named by the subcommand: a leading -c value can hold a fetch token.
+  const command = args.find((arg, i) => !arg.startsWith("-") && args[i - 1] !== "-c");
+  throw new Error(`git ${command} failed: ${result.output.trim().slice(0, 500)}`);
 }
 
 export type MergeState = {

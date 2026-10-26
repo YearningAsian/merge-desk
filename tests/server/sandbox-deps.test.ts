@@ -590,7 +590,7 @@ describe("SandboxRunner with another repository's own tests", () => {
     expect(remote.args).toContain("https://github.com/someone/merge-desk.git");
   });
 
-  it.each([
+  it.each<[string, () => void, RegExp]>([
     [
       "no lockfile",
       () => void sandbox.entries.delete(`${ROOT}/package-lock.json`),
@@ -611,7 +611,7 @@ describe("SandboxRunner with another repository's own tests", () => {
               scripts: { [hook]: "exit 42", test: "vitest run" },
             })),
           new RegExp(`${hook} script`),
-        ] as const,
+        ] as [string, () => void, RegExp],
     ),
   ])("runs nothing with %s", async (_name, setup, reason) => {
     const result = await ownTested(setup);

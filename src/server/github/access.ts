@@ -5,7 +5,9 @@ import { installationOctokit, splitRepo, type RepoPermissions } from "@/server/g
 // Live mode's authorization: a signed-in person may work on a repository only
 // where the App is installed and GitHub says they can push to it. It is asked
 // with the installation's own token on every request, so a removed
-// collaborator or an uninstalled App stops at once. Anything uncertain refuses.
+// collaborator or an uninstalled App stops at once. The answer must be about
+// the account that signed in (its numeric id), not whoever holds the login
+// now. Anything uncertain refuses.
 
 type Env = Record<string, string | undefined>;
 
@@ -16,7 +18,7 @@ export type RepoAccess =
 const CAN_PUSH = new Set(["admin", "write"]);
 
 export async function openRepo(
-  login: string,
+  user: { login: string; id: number },
   repo: string,
   permissions: RepoPermissions,
   env: Env = process.env,
@@ -40,8 +42,14 @@ export async function openRepo(
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
       owner,
       repo: name,
-      username: login,
+      username: user.login,
     });
+    if (data.user?.id !== user.id)
+      return {
+        ok: false,
+        status: 403,
+        error: "That GitHub login now belongs to another account. Sign in again.",
+      };
     if (CAN_PUSH.has(data.permission)) return { ok: true, octokit };
     return {
       ok: false,

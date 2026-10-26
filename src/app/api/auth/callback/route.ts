@@ -34,19 +34,18 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   if (!code) return back("cancelled").response();
 
-  let login: string;
-  let repos: string[];
+  let user: Awaited<ReturnType<typeof loginFromCode>>;
   try {
-    ({ login, repos } = await loginFromCode(code, url.origin));
+    user = await loginFromCode(code, url.origin);
   } catch {
     return back("failed").response();
   }
-  if (!isAllowedLogin(login)) return back("refused").response();
+  if (!isAllowedLogin(user.login)) return back("refused").response();
 
   const done = back();
   done.headers.append(
     "set-cookie",
-    cookieHeader(SESSION_COOKIE, await sealSession(login, { repos }), {
+    cookieHeader(SESSION_COOKIE, await sealSession(user, { repos: user.repos }), {
       maxAge: SESSION_TTL_S,
       secure: isSecure(),
     }),

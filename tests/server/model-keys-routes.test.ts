@@ -67,7 +67,7 @@ async function request(
   extra: { keys?: string; login?: string; origin?: string | null } = {},
 ) {
   const cookies = [
-    `${SESSION_COOKIE}=${await sealSession(extra.login ?? "YearningAsian", { now })}`,
+    `${SESSION_COOKIE}=${await sealSession({ login: extra.login ?? "YearningAsian", id: 1 }, { now })}`,
   ];
   if (extra.keys) cookies.push(`${KEYS_COOKIE}=${extra.keys}`);
   const headers: Record<string, string> = {

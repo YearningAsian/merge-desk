@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const guard = await guardLive(request);
   if (!guard.ok) return guard.response;
   const repo = new URL(request.url).searchParams.get("repo") ?? "";
-  const access = await openRepo(guard.login, repo, { pull_requests: "read", contents: "read" });
+  const access = await openRepo(guard, repo, { pull_requests: "read", contents: "read" });
   if (!access.ok) return json({ error: access.error }, access.status);
   try {
     return json(await listPulls(access.octokit, repo));

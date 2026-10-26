@@ -111,7 +111,7 @@ async function performLand(
   if (signal.aborted) return refused(503, "GitHub isn't reachable right now. Nothing was pushed.");
   // Asked again right before the write: someone who lost push access since
   // the run can't land it.
-  const access = await openRepo(guard.login, repo, { contents: "write", pull_requests: "write" });
+  const access = await openRepo(guard, repo, { contents: "write", pull_requests: "write" });
   if (!access.ok) return refused(access.status, `${access.error} Nothing was pushed.`);
   const octokit = access.octokit;
   let pull;

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   // Push access to this repository, asked of GitHub before anything is read.
   // contents:read for the base branch's ref (readPull reads its tip).
-  const access = await openRepo(guard.login, repo, { pull_requests: "read", contents: "read" });
+  const access = await openRepo(guard, repo, { pull_requests: "read", contents: "read" });
   if (!access.ok) return refuse(access.status, access.error);
   const octokit = access.octokit;
 

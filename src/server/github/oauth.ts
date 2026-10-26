@@ -24,7 +24,7 @@ export async function loginFromCode(
   origin: string,
   env: Env = process.env,
   fetcher: typeof fetch = fetch,
-): Promise<{ login: string; repos: string[] }> {
+): Promise<{ login: string; id: number; repos: string[] }> {
   const clientId = requireEnv("GITHUB_APP_CLIENT_ID", env);
   const clientSecret = requireEnv("GITHUB_APP_CLIENT_SECRET", env);
   const exchange = await fetcher("https://github.com/login/oauth/access_token", {
@@ -46,9 +46,15 @@ export async function loginFromCode(
       headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(15_000),
     });
-    const data = (await user.json().catch(() => ({}))) as { login?: string };
-    if (!user.ok || !data.login) throw new Error("GitHub did not say who signed in");
-    return { login: data.login, repos: await pushableRepos(token, fetcher).catch(() => []) };
+    const data = (await user.json().catch(() => ({}))) as { login?: string; id?: unknown };
+    const id = data.id;
+    if (!user.ok || !data.login || typeof id !== "number" || !Number.isSafeInteger(id) || id < 1)
+      throw new Error("GitHub did not say who signed in");
+    return {
+      login: data.login,
+      id,
+      repos: await pushableRepos(token, fetcher).catch(() => []),
+    };
   } finally {
     keepAlive(
       fetcher(`https://api.github.com/applications/${clientId}/token`, {

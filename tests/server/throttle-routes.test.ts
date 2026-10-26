@@ -58,7 +58,7 @@ const post = async (
     new Request(`http://localhost:3000${path}`, {
       method: "POST",
       headers: {
-        cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+        cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
         origin: "http://localhost:3000",
         "content-type": "application/json",
       },

@@ -65,7 +65,7 @@ describe("sealed model keys", () => {
     const seal = await sealKeys(me, { openrouter: KEY }, { env });
     const tampered = seal.slice(0, -4) + (seal.endsWith("AAAA") ? "BBBB" : "AAAA");
     expect(await readKeys(cookie(tampered), me, { env, now })).toEqual({});
-    const session = await sealSession("YearningAsian", { env, now });
+    const session = await sealSession({ login: "YearningAsian", id: 1 }, { env, now });
     expect(await readKeys(cookie(session), me, { env, now })).toEqual({});
     expect(await readKeys(`${SESSION_COOKIE}=${seal}`, me, { env, now })).toEqual({});
   });

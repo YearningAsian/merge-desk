@@ -46,10 +46,13 @@ const shot = (page: Page, name: string) =>
   page.screenshot({ path: `test-results/e2e/screens/${name}.png` });
 
 async function signIn(page: Page) {
-  const value = await sealSession("YearningAsian", {
-    env: { SESSION_SECRET: E2E_SESSION_SECRET },
-    repos: ["YearningAsian/merge-desk"],
-  });
+  const value = await sealSession(
+    { login: "YearningAsian", id: 1 },
+    {
+      env: { SESSION_SECRET: E2E_SESSION_SECRET },
+      repos: ["YearningAsian/merge-desk"],
+    },
+  );
   await page.context().addCookies([
     {
       name: SESSION_COOKIE,
@@ -131,7 +134,10 @@ test("a refused sign-in says why", async ({ page }) => {
 
 test("signed in with no installed repository, /live asks to install the App", async ({ page }) => {
   // No repositories: GitHub listed none with the App installed at sign-in.
-  const value = await sealSession("YearningAsian", { env: { SESSION_SECRET: E2E_SESSION_SECRET } });
+  const value = await sealSession(
+    { login: "YearningAsian", id: 1 },
+    { env: { SESSION_SECRET: E2E_SESSION_SECRET } },
+  );
   await page.context().addCookies([
     {
       name: SESSION_COOKIE,
@@ -165,10 +171,13 @@ test("signed in with no installed repository, /live asks to install the App", as
 });
 
 test("the repository picker switches the desk to another repository", async ({ page }) => {
-  const value = await sealSession("YearningAsian", {
-    env: { SESSION_SECRET: E2E_SESSION_SECRET },
-    repos: ["YearningAsian/merge-desk", "YearningAsian/other-app"],
-  });
+  const value = await sealSession(
+    { login: "YearningAsian", id: 1 },
+    {
+      env: { SESSION_SECRET: E2E_SESSION_SECRET },
+      repos: ["YearningAsian/merge-desk", "YearningAsian/other-app"],
+    },
+  );
   await page.context().addCookies([
     {
       name: SESSION_COOKIE,

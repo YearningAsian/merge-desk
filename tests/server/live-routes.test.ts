@@ -22,7 +22,7 @@ vi.mock("@/server/github/access", async () => {
   const app = await import("@/server/github/app");
   return {
     // As the real one: a GitHub failure is a 503 answer, never a throw.
-    openRepo: vi.fn(async (_login: string, repo: string, permissions: object) => {
+    openRepo: vi.fn(async (_user: unknown, repo: string, permissions: object) => {
       try {
         return { ok: true, octokit: await app.installationOctokit(repo, permissions as never) };
       } catch {
@@ -61,8 +61,8 @@ const get = (cookie?: string) =>
 describe("GET /api/live/prs", () => {
   it("answers 401 signed out, 403 for another login, and the list when allowed", async () => {
     expect((await GET(get())).status).toBe(401);
-    expect((await GET(get(await sealSession("someone-else")))).status).toBe(403);
-    const ok = await GET(get(await sealSession("YearningAsian")));
+    expect((await GET(get(await sealSession({ login: "someone-else", id: 1 })))).status).toBe(403);
+    const ok = await GET(get(await sealSession({ login: "YearningAsian", id: 1 })));
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ repo: "YearningAsian/merge-desk", pulls: [] });
   });
@@ -74,7 +74,7 @@ describe("POST /api/live/analyze", () => {
       new Request("http://localhost:3000/api/live/analyze", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin: "https://evil.example",
           "content-type": "application/json",
         },
@@ -89,7 +89,7 @@ describe("POST /api/live/analyze", () => {
       new Request("http://localhost:3000/api/live/analyze", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin: "http://localhost:3000",
           "content-type": "application/json",
         },
@@ -120,7 +120,7 @@ describe("POST /api/live/run", () => {
       new Request("http://localhost:3000/api/live/run", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin,
           "content-type": "application/json",
         },
@@ -192,7 +192,7 @@ describe("POST /api/live/land and /api/live/record", () => {
       new Request(`http://localhost:3000${path}`, {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin,
           "content-type": "application/json",
         },
@@ -235,7 +235,7 @@ describe("analyze and run read the base branch", () => {
     new Request(`http://localhost:3000${path}`, {
       method: "POST",
       headers: {
-        cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+        cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
         origin: "http://localhost:3000",
         "content-type": "application/json",
       },
@@ -313,7 +313,8 @@ describe("a refused repository stops every live route", () => {
   const access = vi.mocked(openRepo);
   const REPO = "someone/private-app";
   const ERROR = `You need write access to ${REPO} to use it in Merge Desk.`;
-  const cookie = async () => `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`;
+  const cookie = async () =>
+    `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`;
   const post = async (path: string, body: object) =>
     new Request(`http://localhost:3000${path}`, {
       method: "POST",
@@ -428,7 +429,11 @@ describe("a refused repository stops every live route", () => {
     const response = await call();
     expect(response.status).toBe(403);
     expect(JSON.stringify(await response.json())).toContain(ERROR);
-    expect(access).toHaveBeenCalledWith("YearningAsian", REPO, permissions);
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ login: "YearningAsian", id: 1 }),
+      REPO,
+      permissions,
+    );
     expect(installationOctokit).not.toHaveBeenCalled();
     expect(listPulls).not.toHaveBeenCalled();
   });

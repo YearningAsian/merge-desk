@@ -61,7 +61,12 @@ const STEER = "Keep the old call working too.";
 const wanted = process.argv.slice(2).map((arg) => ScenarioId.parse(arg));
 const config = loadDemoConfig();
 const runner = usesSandbox() ? "sandbox" : "local";
-const cookie = `${SESSION_COOKIE}=${await sealSession(LOGIN)}`;
+// Access checks match the account id, so the seal carries the owner's real one.
+const owner = (await (await fetch(`https://api.github.com/users/${LOGIN}`)).json()) as {
+  id?: unknown;
+};
+if (typeof owner.id !== "number") throw new Error(`GitHub didn't give ${LOGIN}'s account id`);
+const cookie = `${SESSION_COOKIE}=${await sealSession({ login: LOGIN, id: owner.id })}`;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // A request as the desk sends it: signed in, from Merge Desk's own origin.

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const pr = Number(params.get("pr"));
   if (!Number.isInteger(pr) || pr <= 0)
     return json(400, { error: "Send the pull request number." });
-  const access = await openRepo(guard.login, repo, { pull_requests: "read" });
+  const access = await openRepo(guard, repo, { pull_requests: "read" });
   if (!access.ok) return json(access.status, { error: access.error });
   try {
     const octokit = access.octokit;
@@ -96,7 +96,7 @@ async function performRecord(request: Request, signal: AbortSignal) {
       error: "The record update wasn't confirmed. Check the pull request before trying again.",
     });
   // contents: write is for the record lock (a ref), never for code.
-  const access = await openRepo(guard.login, repo, { contents: "write", pull_requests: "write" });
+  const access = await openRepo(guard, repo, { contents: "write", pull_requests: "write" });
   if (!access.ok) return json(access.status, { error: access.error });
 
   try {

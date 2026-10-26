@@ -11,7 +11,7 @@ function github(repositories: (id: number) => Response) {
     const url = String(input instanceof Request ? input.url : input);
     if (url === "https://github.com/login/oauth/access_token")
       return Response.json({ access_token: "user-token-fixture" });
-    if (url === "https://api.github.com/user") return Response.json({ login: "someone" });
+    if (url === "https://api.github.com/user") return Response.json({ login: "someone", id: 7 });
     if (url.startsWith("https://api.github.com/user/installations?"))
       return Response.json({ installations: [{ id: 1 }, { id: 2 }] });
     const installation = /\/user\/installations\/(\d+)\/repositories/.exec(url);
@@ -40,6 +40,7 @@ describe("loginFromCode", () => {
     );
     expect(await loginFromCode("code", "http://localhost:3000", env, fetcher)).toEqual({
       login: "someone",
+      id: 7,
       repos: ["org/alpha", "someone/zeta"],
     });
   });
@@ -48,7 +49,18 @@ describe("loginFromCode", () => {
     const fetcher = github(() => new Response("down", { status: 500 }));
     expect(await loginFromCode("code", "http://localhost:3000", env, fetcher)).toEqual({
       login: "someone",
+      id: 7,
       repos: [],
     });
+  });
+
+  it("refuses a sign-in when GitHub doesn't give the account's numeric id", async () => {
+    const base = github(() => Response.json({ repositories: [] }));
+    const fetcher = vi.fn(async (input: string | URL | Request) =>
+      String(input) === "https://api.github.com/user"
+        ? Response.json({ login: "someone" })
+        : base(input),
+    );
+    await expect(loginFromCode("code", "http://localhost:3000", env, fetcher)).rejects.toThrow();
   });
 });

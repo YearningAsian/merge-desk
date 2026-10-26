@@ -87,7 +87,6 @@ export function PrDetail({
             <Badge tone="theirs">theirs</Badge>
             <span className="truncate font-mono text-theirs-text">{pull.base.ref}</span>
           </span>
-          {pull.demo ? <Badge tone="outline">DEMO</Badge> : null}
           <a
             href={pull.url}
             target="_blank"

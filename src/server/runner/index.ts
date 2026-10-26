@@ -1,5 +1,6 @@
 import { DEMO_OWNER, DEMO_REPO, depsSnapshotId } from "@/server/env";
 import { installationToken } from "@/server/github/app";
+import { confirmLiveWork } from "@/server/throttle";
 import { LocalRunner } from "./local";
 import { SandboxRunner } from "./sandbox";
 import type { Runner } from "./types";
@@ -29,6 +30,10 @@ export function liveRunner(
     repoUrl: url,
     signal,
     login: who.login,
+    afterCreate: async () => {
+      const recount = await confirmLiveWork({ login: who.login, env, signal });
+      if (!recount.ok) throw new Error(recount.reason);
+    },
     // Read-only, this repository only, an hour at most; private repos need it.
     cloneToken: () => installationToken(repo, { contents: "read" }, env),
     ...(snapshotId ? { dependencies: { snapshotId } } : {}),

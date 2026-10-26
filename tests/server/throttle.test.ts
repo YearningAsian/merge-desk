@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_DAILY_CAP,
   admitLiveWork,
+  confirmLiveWork,
   countToday,
   dailyCap,
   throttleReady,
@@ -91,6 +92,28 @@ describe("daily live-run throttle", () => {
     expect(
       await admitLiveWork({ login: "other", env: { DAILY_USER_RUN_CAP: "3" }, now: NOW, list }),
     ).toMatchObject({ ok: true });
+  });
+
+  it("confirms work whose own sandbox is already counted, and refuses past the cap", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const env = { DAILY_LIVE_RUN_CAP: "3", DAILY_USER_RUN_CAP: "2" };
+    const fits = listing([today(1), today(2), today(3)]);
+    expect(await confirmLiveWork({ env, now: NOW, list: fits.list })).toMatchObject({ ok: true });
+    const over = listing([today(1), today(2), today(3), today(4)]);
+    const result = await confirmLiveWork({ env, now: NOW, list: over.list });
+    expect(result).toMatchObject({ ok: false, status: 429 });
+    if (result.ok) throw new Error("expected a refusal");
+    expect(result.reason).toMatch(/3 of 3 /);
+    const theirs = (count: number): ListSandboxes => (signal, filter) =>
+      listing(filter ? Array.from({ length: count }, (_, i) => today(i)) : [today(1)]).list(signal);
+    const login = "some-one";
+    expect(await confirmLiveWork({ login, env, now: NOW, list: theirs(2) })).toMatchObject({
+      ok: true,
+    });
+    expect(await confirmLiveWork({ login, env, now: NOW, list: theirs(3) })).toMatchObject({
+      ok: false,
+      status: 429,
+    });
   });
 
   it("refuses when a person's cap is misconfigured", async () => {

@@ -231,8 +231,17 @@ export class SandboxRunner implements Runner {
       cloneToken?: () => Promise<string>;
       // Run the repository's own tests (any repository but the demo's).
       installDependencies?: boolean;
+      // Runs once each new sandbox exists, before it fetches anything; a
+      // throw stops that sandbox and the boot.
+      afterCreate?: () => Promise<void>;
     },
   ) {}
+
+  // The run's sandbox, booted for the write before the model is asked, so
+  // the day's recount covers it; applyProposal then reuses it.
+  reserve(revisions: Revisions): Promise<void> {
+    return this.boot(revisions, true);
+  }
 
   private lifetime() {
     return this.options.installDependencies ? INSTALL_SANDBOX_TIMEOUT_MS : SANDBOX_TIMEOUT_MS;
@@ -391,10 +400,17 @@ export class SandboxRunner implements Runner {
           "The trusted dependency snapshot is missing or expired, so the app's tests didn't run.";
       }
     }
-    if (!this.sandbox) {
+    if (!this.sandbox)
       this.sandbox = await this.timed("create sandbox", () =>
         Sandbox.create({ image: SANDBOX_IMAGE, ...common }),
       );
+    try {
+      await this.options.afterCreate?.();
+    } catch (error) {
+      await this.dispose();
+      throw error;
+    }
+    if (!this.restored) {
       await this.current().mkDir(this.at(), { signal: this.options.signal });
       await git(this.shell, ["init", "--quiet"]);
       await git(this.shell, ["remote", "add", "origin", this.options.repoUrl]);

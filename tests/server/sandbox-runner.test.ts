@@ -4,8 +4,15 @@ import { runInNewContext } from "node:vm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SandboxRunner } from "@/server/runner/sandbox";
 
-const state = vi.hoisted(() => ({ sandbox: null as unknown }));
-vi.mock("@vercel/sandbox", () => ({ Sandbox: { create: async () => state.sandbox } }));
+const state = vi.hoisted(() => ({ sandbox: null as unknown, created: 0 }));
+vi.mock("@vercel/sandbox", () => ({
+  Sandbox: {
+    create: async () => {
+      state.created += 1;
+      return state.sandbox;
+    },
+  },
+}));
 vi.mock("@/server/runner/workspace", async (original) => {
   const real = await original<typeof import("@/server/runner/workspace")>();
   return {
@@ -214,6 +221,7 @@ let sandbox: FakeSandbox;
 beforeEach(() => {
   sandbox = new FakeSandbox();
   state.sandbox = sandbox;
+  state.created = 0;
 });
 async function appliedRunner() {
   const runner = new SandboxRunner({ repoUrl: "https://github.com/YearningAsian/merge-desk.git" });
@@ -280,4 +288,38 @@ describe("SandboxRunner candidate source protection", () => {
       }
     },
   );
+});
+
+describe("SandboxRunner daily count", () => {
+  const revisions = { head: "a".repeat(40), base: "b".repeat(40) };
+
+  it("reserves one sandbox before the model is asked, confirmed once, and reuses it for the write", async () => {
+    let confirmed = 0;
+    const runner = new SandboxRunner({
+      repoUrl: "https://github.com/YearningAsian/merge-desk.git",
+      afterCreate: async () => {
+        confirmed += 1;
+      },
+    });
+    try {
+      await runner.reserve(revisions);
+      await runner.applyProposal(revisions, [{ path: API, content: PROPOSAL }]);
+      expect(state.created).toBe(1);
+      expect(confirmed).toBe(1);
+    } finally {
+      await runner.dispose();
+    }
+  });
+
+  it("stops a new sandbox at once when the recount refuses it, before anything is fetched", async () => {
+    const runner = new SandboxRunner({
+      repoUrl: "https://github.com/YearningAsian/merge-desk.git",
+      afterCreate: async () => {
+        throw new Error("Today's live runs are used up");
+      },
+    });
+    await expect(runner.reserve(revisions)).rejects.toThrow(/used up/);
+    expect(sandbox.stopped).toBe(true);
+    expect(runner.nodeVersion).toBeNull();
+  });
 });

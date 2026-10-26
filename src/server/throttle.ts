@@ -8,8 +8,10 @@ import { SANDBOX_TAGS } from "@/server/runner/sandbox";
 // count reaches DAILY_LIVE_RUN_CAP, and whenever the count can't be read.
 // Each person also has a daily share (DAILY_USER_RUN_CAP), counted from the
 // sandboxes tagged with their login, so one account can't use up the day.
-// Listing then starting isn't atomic: two requests at the same moment can
-// both pass, so this is a throttle, not a guaranteed daily or dollar limit.
+// Listing then starting isn't atomic, so each new sandbox recounts once it
+// exists (confirmLiveWork) and stops if the day is over. Requests at the same
+// moment can still refuse each other or, while the list lags, both pass, so
+// this is a throttle, not a guaranteed daily or dollar limit.
 
 export const DEFAULT_DAILY_CAP = 30;
 export const DEFAULT_USER_CAP = 6;
@@ -87,6 +89,8 @@ export async function admitLiveWork(
     now?: Date;
     list?: ListSandboxes;
     signal?: AbortSignal;
+    // The caller's own sandbox already exists, so the counts include it.
+    counted?: boolean;
   } = {},
 ): Promise<Admission> {
   const cap = dailyCap(input.env);
@@ -109,6 +113,10 @@ export async function admitLiveWork(
     used = await countToday(list, now, signal);
     if (input.login)
       mine = await countToday(list, now, signal, { user: input.login.toLowerCase() });
+    if (input.counted) {
+      used -= 1;
+      mine -= input.login ? 1 : 0;
+    }
   } catch {
     log({ admitted: false, cap, used: null });
     return {
@@ -133,6 +141,9 @@ export async function admitLiveWork(
         reason: `Today's live runs are used up (${used} of ${cap} sandboxes since 00:00 UTC). Live mode opens again after 00:00 UTC; the recorded demo still works.`,
       };
 }
+
+export const confirmLiveWork = (input: Omit<Parameters<typeof admitLiveWork>[0], "counted">) =>
+  admitLiveWork({ ...input, counted: true });
 
 // One structured line per decision: counts only, never request data.
 function log(entry: { admitted: boolean; cap: number; used: number | null }) {

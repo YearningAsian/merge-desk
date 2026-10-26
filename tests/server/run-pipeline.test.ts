@@ -267,6 +267,47 @@ describe("runPipeline", () => {
     expect(runner.calls).toEqual(["dispose"]);
   });
 
+  it("reserves the runner before the model is asked", async () => {
+    const runner = fakeRunner({
+      reserve: async () => {
+        runner.calls.push("reserve");
+      },
+    });
+    const proposer: Proposer = async (request) => {
+      runner.calls.push("model");
+      return propose("combined")(request);
+    };
+    const { result } = await collect(
+      runPipeline({ runner, proposer, revisions, option: "combine", intents, conflictedPaths }),
+    );
+    expect(result.verdict).toBe("VERIFIED");
+    expect(runner.calls.slice(0, 3)).toEqual(["reserve", "model", "apply"]);
+  });
+
+  it("holds without asking the model when the runner can't be reserved", async () => {
+    const runner = fakeRunner({
+      reserve: async () => {
+        throw new Error("Today's live runs are used up");
+      },
+    });
+    let asked = false;
+    const proposer: Proposer = async (request) => {
+      asked = true;
+      return propose("combined")(request);
+    };
+    const { result, final, all } = await collect(
+      runPipeline({ runner, proposer, revisions, option: "combine", intents, conflictedPaths }),
+    );
+    expect(asked).toBe(false);
+    expect(final.get("propose")).toBe("failed");
+    expect(final.get("write")).toBe("not_run");
+    expect(all.some((event) => "detail" in event && /used up/.test(event.detail ?? ""))).toBe(
+      true,
+    );
+    expect(result.verdict).toBe("HELD");
+    expect(runner.calls).toEqual(["dispose"]);
+  });
+
   it("retries a malformed model answer at most twice, passing the reason back", async () => {
     const runner = fakeRunner();
     const seen: Array<number | undefined> = [];

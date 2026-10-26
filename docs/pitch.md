@@ -35,7 +35,7 @@ What we measured is in FACTS: the recorded runs and their outcomes. In those run
 They write the model's output into the file. Merge Desk shows each side's intent and every option's keeps and drops first, then requires the checks before anything lands, and records every decision on the PR.
 
 **What is still open?**
-Live mode is one account and one repository on purpose. The daily usage throttle counts sandboxes; it isn't a hard spending limit.
+Live mode is open to anyone who installs the Merge Desk GitHub App on a repository they can push to, but another repository's tests run only for Node projects with a `package-lock.json`. The daily usage throttle counts sandboxes, overall and per person; it isn't a hard spending limit.
 
 **Can I check it myself?**
 Yes: `/judge`, `curl https://merge-desk-swart.vercel.app/api/health`, the demo PRs in the repository, and this public repo.

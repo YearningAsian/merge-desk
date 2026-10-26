@@ -68,7 +68,7 @@ Used: Next.js, React, Tailwind, shadcn/ui and Radix, TanStack Query, Pierre Diff
 
 ## What's next
 
-- Many repositories and any GitHub user (live mode is limited to my account and this repository on purpose).
+- Test runners beyond Node and npm, so live mode can check merges in any repository (today another repository runs `npm ci` and `npm test`).
 - A git merge driver for the terminal that shares the same checks.
 - A replay test over real historical merges to measure how often an unchecked AI merge drops an intent.
 

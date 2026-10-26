@@ -158,7 +158,8 @@ export default function JudgePage() {
           </li>
           <li>
             The demo itself sends no requests and writes nothing. Live mode runs the same pipeline
-            on real pull requests; it accepts only the owner&apos;s GitHub account.
+            on real pull requests: anyone can sign in with GitHub and use it on a repository where
+            they installed the Merge Desk app and can push.
           </li>
           <li>
             VERIFIED means exactly those checks passed. It is evidence, not a proof that a merge is

@@ -181,7 +181,8 @@ for (const name of ${JSON.stringify(DEPS_FILES)}) {
 }
 const scripts = JSON.parse(fs.readFileSync("package.json", "utf8")).scripts;
 const test = scripts && typeof scripts.test === "string" ? scripts.test : null;
-process.stdout.write(JSON.stringify({ files, test }));
+const hooks = ["pretest", "posttest"].filter((name) => scripts && name in scripts);
+process.stdout.write(JSON.stringify({ files, test, hooks }));
 `;
 
 // The candidate's tests from the marker's script, with the installed
@@ -190,6 +191,7 @@ const RUN_SCRIPT = 'PATH="$1:$PATH"; CI=true; export PATH CI; exec sh -c "$2"';
 const OWN_MARKER = z.object({
   files: z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/)),
   test: z.string().nullable(),
+  hooks: z.array(z.string()),
 });
 
 export type Timing = { label: string; ms: number };
@@ -563,6 +565,11 @@ export class SandboxRunner implements Runner {
     const script = this.installed.test?.trim();
     if (!script || /no test specified/.test(script))
       return notRun("This repository's package.json has no test script, so no tests ran.");
+    // npm test would run these too; running test alone could pass what npm test fails.
+    if (this.installed.hooks.length)
+      return notRun(
+        `This repository's package.json has a ${this.installed.hooks.join(" and ")} script, which Merge Desk doesn't run, so no tests ran.`,
+      );
     const home = this.current().cwd.replace(/\/+$/, "");
     const marker = `${home}/${DEPS_MARKER}`;
     const modules = `${home}/node_modules`;

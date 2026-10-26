@@ -602,6 +602,17 @@ describe("SandboxRunner with another repository's own tests", () => {
       /no test script/,
     ],
     ["a failing install", () => void (sandbox.npmExit = 1), /npm ci --ignore-scripts\) failed/],
+    ...(["pretest", "posttest"] as const).map(
+      (hook) =>
+        [
+          `a ${hook} script`,
+          () =>
+            void (sandbox.entries.get(`${ROOT}/package.json`)!.content = JSON.stringify({
+              scripts: { [hook]: "exit 42", test: "vitest run" },
+            })),
+          new RegExp(`${hook} script`),
+        ] as const,
+    ),
   ])("runs nothing with %s", async (_name, setup, reason) => {
     const result = await ownTested(setup);
     expect(result.state).toBe("not_run");

@@ -31,12 +31,15 @@ AI merge tools already exist, but they write the model's answer straight into yo
 
 The model never decides. Its answer is validated against a schema and then has to survive the same checks a person's merge would.
 
+Anyone can sign in with GitHub, install the Merge Desk GitHub App on repositories they can push to (public or private), and use it on those pull requests. `/demo` replays real recorded runs with no account.
+
 ## How we built it
 
 - **Next.js 16 and React 19 on Vercel**, with owned shadcn/Radix components, TanStack Query and Pierre Diffs for the code views. It works on a phone (full-height sheet, actions pinned within thumb reach) and on a desktop.
 - **Gemini** (Google GenAI Interactions API, `gemini-3.5-flash-lite`) reads both sides and proposes the merge with structured output; every answer is validated before use.
 - **Vercel Sandbox** runs each merge in a fresh microVM: clone at the exact commits, network set to deny-all before any candidate code, tests run as a separate non-root user against a read-only checkout, and the sandbox stops afterwards.
-- **A GitHub App** (contents and pull requests only) reads pull requests and writes the merge commit. The branch update is atomic on the expected head, so it can only move forward.
+- **A GitHub App** (contents and pull requests only) reads pull requests and writes the merge commit. Every request asks GitHub whether the signed-in account (by its numeric id, so a renamed login can't be reused) can push to that repository. The branch update is atomic on the expected head, so it can only move forward.
+- **Other people's repositories:** the sandbox installs the pull request's dependencies with `npm ci --ignore-scripts` while the network is open, cuts the network, then runs the repository's own `npm test` as a non-root user. A merge that edits `package.json` or the lockfile, a missing lockfile or test script, or a `pretest`/`posttest` script is HELD. Private repositories are fetched with a short-lived read-only token for that one repository. Live runs have a daily throttle, overall and per person.
 - **Proof you can check:** `/judge` walks through three real pull requests; `/demo` replays real recorded runs with no sign-in; `/api/health` and `/api/stats` are public.
 - **The app's own tests in the sandbox:** for pull requests into `main`, the sandbox restores a trusted dependency snapshot of `main` and runs the app's real unit tests; a merge that changes dependencies or brings its own `node_modules` isn't tested and is held.
 - **Engineering:** CI (format, lint, types, unit tests, build, em-dash and secret scans), Playwright and axe end-to-end checks on desktop and phone, a scheduled production probe, and separate-model adversarial review rounds on every path that writes to GitHub or spends model or sandbox budget.
@@ -52,6 +55,7 @@ Used: Next.js, React, Tailwind, shadcn/ui and Radix, TanStack Query, Pierre Diff
 - **The model I planned on was overloaded.** `gemini-3.8-flash` answered 503 "high demand" to analysis-sized requests on the free tier. I measured the alternatives and moved to `gemini-3.5-flash-lite`, the most cost-effective model that answered reliably within the deadline.
 - **Dogfooding found a real bug.** I pointed Merge Desk at a real conflict between two of its own pull requests. It said there was no conflict, while GitHub said there was. GitHub's `base.sha` on a pull request is the base from when it was opened, not where the base branch is now, so Merge Desk had been merging a stale base, and its "base moved since the run" guard could never fire. Every decision now reads the base branch's current tip, and the next run found the conflict.
 - **Running the app's own tests in a locked-down sandbox.** Its dependencies come from a trusted snapshot of `main`, installed outside the checkout and owned by root. A review round caught that `npm run` would read a `.npmrc` or a `node_modules` folder planted in the pull request and could fake a pass, so the trusted Vitest now runs by absolute path, never through npm.
+- **Opening it to everyone.** A second-model review found that a burst of requests could all pass the daily limit before any sandbox existed, so a run now boots and recounts its sandbox before Gemini is asked. It also found the base branch could move while Land was writing. GitHub's atomic multi-ref update can lock the base, but a test on scratch branches showed GitHub refuses it on protected branches like most `main`s, so Land says when the base moved and to run again.
 - **Gemini didn't make the mistake I wanted to demo.** In the recorded runs it never dropped a side on its own, so every recorded HELD came from the real tests. Steering the model with one line showed the deterministic check catching a missing or leaked change for real.
 
 ## Accomplishments that we're proud of

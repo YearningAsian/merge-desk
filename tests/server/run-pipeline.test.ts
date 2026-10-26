@@ -301,9 +301,7 @@ describe("runPipeline", () => {
     expect(asked).toBe(false);
     expect(final.get("propose")).toBe("failed");
     expect(final.get("write")).toBe("not_run");
-    expect(all.some((event) => "detail" in event && /used up/.test(event.detail ?? ""))).toBe(
-      true,
-    );
+    expect(all.some((event) => "detail" in event && /used up/.test(event.detail ?? ""))).toBe(true);
     expect(result.verdict).toBe("HELD");
     expect(runner.calls).toEqual(["dispose"]);
   });

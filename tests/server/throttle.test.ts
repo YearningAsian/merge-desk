@@ -104,8 +104,12 @@ describe("daily live-run throttle", () => {
     expect(result).toMatchObject({ ok: false, status: 429 });
     if (result.ok) throw new Error("expected a refusal");
     expect(result.reason).toMatch(/3 of 3 /);
-    const theirs = (count: number): ListSandboxes => (signal, filter) =>
-      listing(filter ? Array.from({ length: count }, (_, i) => today(i)) : [today(1)]).list(signal);
+    const theirs =
+      (count: number): ListSandboxes =>
+      (signal, filter) =>
+        listing(filter ? Array.from({ length: count }, (_, i) => today(i)) : [today(1)]).list(
+          signal,
+        );
     const login = "some-one";
     expect(await confirmLiveWork({ login, env, now: NOW, list: theirs(2) })).toMatchObject({
       ok: true,

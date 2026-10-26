@@ -11,6 +11,7 @@ const LandAnswer = z.union([
     commit: z.string().regex(/^[0-9a-f]{40}$/),
     branch: z.string(),
     mergeable: z.enum(["mergeable", "conflicting", "checking"]),
+    baseMoved: z.boolean().nullable().default(null),
     record: z.object({ ok: z.boolean(), reason: z.string().optional() }),
   }),
   z.object({ outcome: z.enum(["REFUSED", "UNKNOWN"]), reason: z.string() }),
@@ -28,11 +29,16 @@ async function failure(response: Response): Promise<SourceError> {
   return new SourceError(reasonOf(body, response.status), response.status);
 }
 
-export const liveSource: DataSource = {
+// Every call names the repository; the server checks the signed-in
+// person's push access to it each time.
+export const liveSource = (repo: string): DataSource => ({
   mode: "live",
 
   async listPullRequests(signal) {
-    const response = await fetch("/api/live/prs", { signal, cache: "no-store" });
+    const response = await fetch(`/api/live/prs?repo=${encodeURIComponent(repo)}`, {
+      signal,
+      cache: "no-store",
+    });
     if (!response.ok) throw await failure(response);
     return PullList.parse(await response.json());
   },
@@ -41,7 +47,7 @@ export const liveSource: DataSource = {
     const response = await fetch("/api/live/analyze", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(model ? { pr, model } : { pr }),
+      body: JSON.stringify(model ? { repo, pr, model } : { repo, pr }),
       signal,
     });
     if (!response.ok || !response.body) throw await failure(response);
@@ -52,7 +58,7 @@ export const liveSource: DataSource = {
     const response = await fetch("/api/live/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, repo }),
       signal,
     });
     if (!response.ok || !response.body) throw await failure(response);
@@ -66,7 +72,7 @@ export const liveSource: DataSource = {
       response = await fetch("/api/live/land", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pr, token }),
+        body: JSON.stringify({ repo, pr, token }),
       });
     } catch {
       return {
@@ -90,15 +96,18 @@ export const liveSource: DataSource = {
     const response = await fetch("/api/live/record", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr, token, action }),
+      body: JSON.stringify({ repo, pr, token, action }),
     });
     if (!response.ok) throw await failure(response);
     return Entries.parse(await response.json()).entries;
   },
 
   async readRecord(pr, signal) {
-    const response = await fetch(`/api/live/record?pr=${pr}`, { signal, cache: "no-store" });
+    const response = await fetch(`/api/live/record?repo=${encodeURIComponent(repo)}&pr=${pr}`, {
+      signal,
+      cache: "no-store",
+    });
     if (!response.ok) throw await failure(response);
     return Read.parse(await response.json());
   },
-};
+});

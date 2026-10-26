@@ -37,7 +37,7 @@ import { ROOT, loadDemoConfig, remoteRefs } from "./lib/git.mts";
 
 loadLocalEnv();
 // After the environment is loaded: the routes read it when they run.
-const { CODE_ALLOWED_LOGINS, CODE_ALLOWED_REPOS } = await import("@/server/env");
+const { DEMO_OWNER, DEMO_REPO } = await import("@/server/env");
 const { SESSION_COOKIE, sealSession } = await import("@/server/session");
 const { usesSandbox } = await import("@/server/runner");
 const analyzeRoute = (await import("@/app/api/live/analyze/route")).POST;
@@ -46,8 +46,8 @@ const landRoute = (await import("@/app/api/live/land/route")).POST;
 const recordRoutes = await import("@/app/api/live/record/route");
 const prsRoute = (await import("@/app/api/live/prs/route")).GET;
 
-const REPO = CODE_ALLOWED_REPOS[0];
-const LOGIN = CODE_ALLOWED_LOGINS[0];
+const REPO = DEMO_REPO;
+const LOGIN = DEMO_OWNER;
 const OUT = join(ROOT, "demo", "recordings");
 // The production origin, so the decision comment links back to the live desk.
 const ORIGIN = (
@@ -61,7 +61,12 @@ const STEER = "Keep the old call working too.";
 const wanted = process.argv.slice(2).map((arg) => ScenarioId.parse(arg));
 const config = loadDemoConfig();
 const runner = usesSandbox() ? "sandbox" : "local";
-const cookie = `${SESSION_COOKIE}=${await sealSession(LOGIN)}`;
+// Access checks match the account id, so the seal carries the owner's real one.
+const owner = (await (await fetch(`https://api.github.com/users/${LOGIN}`)).json()) as {
+  id?: unknown;
+};
+if (typeof owner.id !== "number") throw new Error(`GitHub didn't give ${LOGIN}'s account id`);
+const cookie = `${SESSION_COOKIE}=${await sealSession({ login: LOGIN, id: owner.id })}`;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // A request as the desk sends it: signed in, from Merge Desk's own origin.

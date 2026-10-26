@@ -39,6 +39,8 @@ export type LandOutcome =
       commit: string;
       branch: string;
       mergeable: "mergeable" | "conflicting" | "checking";
+      // The base moved during Land (true), stayed (false) or wasn't checked (null).
+      baseMoved: boolean | null;
       record: { ok: boolean; reason?: string };
     }
   | { outcome: "REFUSED" | "UNKNOWN"; reason: string };

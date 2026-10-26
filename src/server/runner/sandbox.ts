@@ -1,6 +1,8 @@
 import { Writable } from "node:stream";
 import { posix } from "node:path";
 import { Sandbox, type SandboxUser } from "@vercel/sandbox";
+import { z } from "zod";
+import { truncateLog } from "@/core/events";
 import { chooseTestSuite } from "@/server/guard";
 import type {
   AppliedProposal,
@@ -28,12 +30,22 @@ import {
   type WorkspaceIntegrity,
 } from "./workspace";
 
-// Runs merges in a Vercel Sandbox: a fresh microVM per boot that clones the
-// public repository at the exact head, fetches the exact base, then switches
-// its network to deny-all before any candidate file is written or any test
-// runs. It holds no GitHub token, model key or session secret. It stops in
-// dispose(), pass or fail, and times out on its own after two minutes, so a
-// retry reuses it only while a write, parse and test run still fit.
+// Runs merges in a Vercel Sandbox: a fresh microVM per boot that fetches the
+// exact head and base, then switches its network to deny-all before any
+// candidate file is written or any test runs. A private repository is
+// fetched with a read-only token for that repository alone, passed only on
+// the fetch's command line and never written to disk; the sandbox holds no
+// other credential, model key or session secret. It stops in dispose(), pass
+// or fail, and times out on its own (two minutes, five when it installs a
+// repository's dependencies), so a retry reuses it only while a write, parse
+// and test run still fit.
+//
+// Another repository's own tests (installDependencies): before deny-all and
+// before any candidate file, its head's package.json and package-lock.json
+// are copied outside the checkout and installed there with
+// `npm ci --ignore-scripts`, owned by root, beside a marker of their hashes
+// and the head's test script. The tests run only if the merge left both
+// files unchanged, as the test user, from that script.
 //
 // With a trusted dependency snapshot (`npm run snapshot`), a boot restores
 // it instead: main's dependencies installed with `npm ci --ignore-scripts`
@@ -47,7 +59,10 @@ import {
 
 export const SANDBOX_IMAGE = "vercel/sandbox/node:24";
 export const SANDBOX_TIMEOUT_MS = 120_000;
+export const INSTALL_SANDBOX_TIMEOUT_MS = 300_000;
+export const INSTALL_LIMIT_MS = 120_000;
 export const REUSE_MIN_LEFT_MS = 60_000;
+export const OWN_SUITE_LABEL = "npm test (the repository's own tests)";
 export const SANDBOX_TAGS = { app: "merge-desk" };
 export const DEPS_MARKER = ".merge-desk-deps.json";
 export const DEPS_FILES = ["package.json", "package-lock.json"] as const;
@@ -147,6 +162,38 @@ for (;;) {
 process.stdout.write("protected");
 `;
 
+// Trusted, with no candidate code present: copy the head's dependency files
+// to the folder above the checkout and report their hashes and test script.
+// Prints the marker JSON, or "missing:<file>".
+const OWN_DEPS = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const { createHash } = require("node:crypto");
+const home = process.argv[1];
+const files = {};
+for (const name of ${JSON.stringify(DEPS_FILES)}) {
+  let stat;
+  try { stat = fs.lstatSync(name); } catch { process.stdout.write("missing:" + name); process.exit(0); }
+  if (!stat.isFile()) { process.stdout.write("missing:" + name); process.exit(0); }
+  const data = fs.readFileSync(name);
+  files[name] = createHash("sha256").update(data).digest("hex");
+  fs.writeFileSync(path.join(home, name), data);
+}
+const scripts = JSON.parse(fs.readFileSync("package.json", "utf8")).scripts;
+const test = scripts && typeof scripts.test === "string" ? scripts.test : null;
+const hooks = ["pretest", "posttest"].filter((name) => scripts && name in scripts);
+process.stdout.write(JSON.stringify({ files, test, hooks }));
+`;
+
+// The candidate's tests from the marker's script, with the installed
+// dependencies' binaries on the PATH, as npm test would.
+const RUN_SCRIPT = 'PATH="$1:$PATH"; CI=true; export PATH CI; exec sh -c "$2"';
+const OWN_MARKER = z.object({
+  files: z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/)),
+  test: z.string().nullable(),
+  hooks: z.array(z.string()),
+});
+
 export type Timing = { label: string; ms: number };
 
 const sink = (write: (text: string) => void) =>
@@ -169,14 +216,44 @@ export class SandboxRunner implements Runner {
   private protectedSource = false;
   private restored = false; // booted from the dependency snapshot
   private snapshotFailure: string | null = null;
+  private installTried = false;
+  private installed: z.infer<typeof OWN_MARKER> | null = null;
+  private installFailure: string | null = null;
 
   constructor(
     private readonly options: {
       repoUrl: string;
       signal?: AbortSignal;
       dependencies?: { snapshotId: string };
+      // Tags the sandbox for the per-person daily count.
+      login?: string;
+      // A read-only token for this repository alone, for private ones.
+      cloneToken?: () => Promise<string>;
+      // Run the repository's own tests (any repository but the demo's).
+      installDependencies?: boolean;
+      // Runs once each new sandbox exists, before it fetches anything; a
+      // throw stops that sandbox and the boot.
+      afterCreate?: () => Promise<void>;
     },
   ) {}
+
+  // The run's sandbox, booted for the write before the model is asked, so
+  // the day's recount covers it; applyProposal then reuses it.
+  reserve(revisions: Revisions): Promise<void> {
+    return this.boot(revisions, true);
+  }
+
+  private lifetime() {
+    return this.options.installDependencies ? INSTALL_SANDBOX_TIMEOUT_MS : SANDBOX_TIMEOUT_MS;
+  }
+
+  // Git options that authenticate one fetch to GitHub; never stored.
+  private async fetchAuth(): Promise<string[]> {
+    if (!this.options.cloneToken) return [];
+    const token = await this.options.cloneToken();
+    const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+    return ["-c", `http.https://github.com/.extraHeader=Authorization: Basic ${basic}`];
+  }
 
   private async timed<T>(label: string, work: () => Promise<T>): Promise<T> {
     const started = Date.now();
@@ -270,12 +347,21 @@ export class SandboxRunner implements Runner {
   };
 
   // A copy at the exact head with the exact base fetched, network denied.
-  // Reused for a retry only if no candidate code has run in it.
-  private async boot(revisions: Revisions) {
+  // Reused for a retry only if no candidate code has run in it. `install`:
+  // this boot will run tests, so a repository's own dependencies go in first.
+  private async boot(revisions: Revisions, install = false) {
     assertRevisions(revisions);
     const key = `${revisions.head}..${revisions.base}`;
-    const fresh = Date.now() - this.bootedAt <= SANDBOX_TIMEOUT_MS - REUSE_MIN_LEFT_MS;
-    if (this.sandbox && this.booted === key && this.networkDenied && !this.candidateRan && fresh) {
+    const fresh = Date.now() - this.bootedAt <= this.lifetime() - REUSE_MIN_LEFT_MS;
+    const installs = install && Boolean(this.options.installDependencies);
+    if (
+      this.sandbox &&
+      this.booted === key &&
+      this.networkDenied &&
+      !this.candidateRan &&
+      fresh &&
+      (!installs || this.installTried)
+    ) {
       await this.timed("reset working copy", async () => {
         await git(this.shell, ["reset", "--quiet", "--hard", revisions.head]);
         await git(this.shell, ["clean", "-fdxq"]);
@@ -285,9 +371,12 @@ export class SandboxRunner implements Runner {
     await this.dispose();
     const common = {
       persistent: false,
-      timeout: SANDBOX_TIMEOUT_MS,
+      timeout: this.lifetime(),
       resources: { vcpus: 2 },
-      tags: SANDBOX_TAGS,
+      tags: {
+        ...SANDBOX_TAGS,
+        ...(this.options.login ? { user: this.options.login.toLowerCase() } : {}),
+      },
       signal: this.options.signal,
     };
     this.bootedAt = Date.now();
@@ -312,28 +401,38 @@ export class SandboxRunner implements Runner {
       }
     }
     if (!this.sandbox)
-      this.sandbox = await this.timed("create sandbox and clone head", () =>
-        Sandbox.create({
-          source: { type: "git", url: this.options.repoUrl, revision: revisions.head },
-          image: SANDBOX_IMAGE,
-          ...common,
-        }),
+      this.sandbox = await this.timed("create sandbox", () =>
+        Sandbox.create({ image: SANDBOX_IMAGE, ...common }),
       );
+    try {
+      await this.options.afterCreate?.();
+    } catch (error) {
+      await this.dispose();
+      throw error;
+    }
+    if (!this.restored) {
+      await this.current().mkDir(this.at(), { signal: this.options.signal });
+      await git(this.shell, ["init", "--quiet"]);
+      await git(this.shell, ["remote", "add", "origin", this.options.repoUrl]);
+    }
     this.nodeVersion = (await this.shell.exec("node", ["--version"])).stdout.trim() || null;
-    await this.timed(this.restored ? "fetch exact head and base" : "fetch exact base", async () => {
+    const auth = await this.fetchAuth();
+    await this.timed("fetch exact head and base", async () => {
       const shallow = await git(this.shell, ["rev-parse", "--is-shallow-repository"]);
       if (shallow.stdout.trim() === "true")
-        await git(this.shell, ["fetch", "--quiet", "--unshallow", "--no-tags", "origin"]);
+        await git(this.shell, [...auth, "fetch", "--quiet", "--unshallow", "--no-tags", "origin"]);
       await git(this.shell, [
+        ...auth,
         "fetch",
         "--quiet",
         "--no-tags",
         "origin",
-        ...(this.restored ? [revisions.head] : []),
+        revisions.head,
         revisions.base,
       ]);
       await git(this.shell, ["checkout", "--quiet", "--detach", revisions.head]);
     });
+    if (installs) await this.timed("install dependencies", () => this.installDependencies());
     await this.timed("network deny-all", () =>
       this.current().update({ networkPolicy: "deny-all" }, { signal: this.options.signal }),
     );
@@ -349,7 +448,7 @@ export class SandboxRunner implements Runner {
   }
 
   async applyProposal(revisions: Revisions, files: ProposedFile[]): Promise<AppliedProposal> {
-    await this.boot(revisions);
+    await this.boot(revisions, true);
     return this.timed("merge and write proposal", async () => {
       const applied = await commitProposal(
         this.shell,
@@ -375,6 +474,7 @@ export class SandboxRunner implements Runner {
         output: "Refusing to run candidate code: the sandbox network is not denied.",
         durationMs: 0,
       };
+    if (this.options.installDependencies) return this.runOwnTests(changedFiles);
     const suite = chooseTestSuite(changedFiles);
     let vitest: string | undefined;
     if (suite.id === "app") {
@@ -403,6 +503,132 @@ export class SandboxRunner implements Runner {
         output: `Refusing to run candidate code: source protection failed. ${error instanceof Error ? error.message : "Unknown setup result"}`,
         durationMs: 0,
       };
+    }
+  }
+
+  // Trusted, with the network still open and no candidate file written: the
+  // head's dependencies, installed outside the checkout with no install
+  // scripts, then made root-owned and read-only for the test user.
+  private async installDependencies() {
+    this.installTried = true;
+    const home = this.current().cwd.replace(/\/+$/, "");
+    const copied = await this.execute("node", ["-e", OWN_DEPS, home], { timeoutMs: 15_000 });
+    const answer = copied.stdout.trim();
+    if (copied.code !== 0) {
+      this.installFailure = "Couldn't read this repository's package.json, so no tests ran.";
+      return;
+    }
+    if (answer.startsWith("missing:")) {
+      this.installFailure = `This repository has no ${answer.slice("missing:".length)} at its root, so Merge Desk can't install its dependencies and no tests ran.`;
+      return;
+    }
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(answer);
+    } catch {}
+    const marker = OWN_MARKER.safeParse(parsed);
+    if (!marker.success) {
+      this.installFailure = "Couldn't read this repository's package.json, so no tests ran.";
+      return;
+    }
+    const npm = await this.execute(
+      "npm",
+      ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", home],
+      { timeoutMs: INSTALL_LIMIT_MS },
+    );
+    if (npm.code !== 0) {
+      this.installFailure = truncateLog(
+        `Installing this repository's dependencies (npm ci --ignore-scripts) ${npm.timedOut ? `took longer than ${INSTALL_LIMIT_MS / 1000} s` : "failed"}, so no tests ran.\n${npm.output}`,
+      );
+      return;
+    }
+    await this.current().writeFiles([
+      { path: `${home}/${DEPS_MARKER}`, content: JSON.stringify(marker.data) },
+    ]);
+    const owned = [`${home}/node_modules`, `${home}/${DEPS_MARKER}`];
+    for (const [command, args] of [
+      ["chown", ["--recursive", "--no-dereference", "root:root", "--", ...owned]],
+      ["chmod", ["--recursive", "go-w", "--", ...owned]],
+    ] as const) {
+      const done = await this.execute(
+        command,
+        [...args],
+        { timeoutMs: 60_000 },
+        this.current(),
+        true,
+      );
+      if (done.code !== 0) {
+        this.installFailure = "Couldn't protect the installed dependencies, so no tests ran.";
+        return;
+      }
+    }
+    this.installed = marker.data;
+  }
+
+  // The repository's own suite: the installed dependencies must still be the
+  // ones this merge uses and unwritable by the test user, and the head must
+  // name a test script. Otherwise nothing runs and the reason says why.
+  private async runOwnTests(changedFiles: string[]): Promise<TestResult> {
+    const notRun = (output: string): TestResult => ({
+      state: "not_run",
+      suite: OWN_SUITE_LABEL,
+      exitCode: null,
+      output,
+      durationMs: 0,
+    });
+    if (!this.installed)
+      return notRun(this.installFailure ?? "This repository's dependencies weren't installed.");
+    const script = this.installed.test?.trim();
+    if (!script || /no test specified/.test(script))
+      return notRun("This repository's package.json has no test script, so no tests ran.");
+    // npm test would run these too; running test alone could pass what npm test fails.
+    if (this.installed.hooks.length)
+      return notRun(
+        `This repository's package.json has a ${this.installed.hooks.join(" and ")} script, which Merge Desk doesn't run, so no tests ran.`,
+      );
+    const home = this.current().cwd.replace(/\/+$/, "");
+    const marker = `${home}/${DEPS_MARKER}`;
+    const modules = `${home}/node_modules`;
+    const match = await this.execute("node", ["-e", DEPS_MATCH, marker], { timeoutMs: 15_000 });
+    const answer = match.stdout.trim();
+    if (match.code !== 0 || !answer)
+      return notRun("Couldn't check this merge's dependencies, so no tests ran.");
+    if (answer.startsWith("node_modules:"))
+      return notRun(
+        `This merge carries its own ${answer.slice("node_modules:".length)}, which would replace the installed dependencies, so no tests ran.`,
+      );
+    if (answer.startsWith("differs:"))
+      return notRun(
+        `This merge changes ${answer.slice("differs:".length).split(",").join(" and ")}, so the dependencies installed from the pull request's head aren't the ones it uses. Resolve the dependency change first; no tests ran.`,
+      );
+    if (answer !== "match")
+      return notRun("Couldn't check this merge's dependencies, so no tests ran.");
+    const trust = await this.execute(
+      "node",
+      ["-e", DEPS_TRUSTED, modules, marker, marker],
+      { timeoutMs: 30_000 },
+      this.current(),
+      true,
+    );
+    if (trust.code !== 0 || trust.stdout.trim() !== "trusted")
+      return notRun(
+        "The installed dependencies aren't protected from the test user, so no tests ran.",
+      );
+    this.candidateRan = true;
+    try {
+      const candidate = await this.timed("protect test source", () => this.protectSource());
+      return this.timed("tests", () =>
+        runCheckedSuite(this.shell, candidate, changedFiles, this.integrity, {
+          own: {
+            label: OWN_SUITE_LABEL,
+            command: ["sh", ["-c", RUN_SCRIPT, "sh", `${modules}/.bin`, script]],
+          },
+        }),
+      );
+    } catch (error) {
+      return notRun(
+        `Refusing to run candidate code: source protection failed. ${error instanceof Error ? error.message : "Unknown setup result"}`,
+      );
     }
   }
 
@@ -510,6 +736,9 @@ export class SandboxRunner implements Runner {
     this.protectedSource = false;
     this.restored = false;
     this.snapshotFailure = null;
+    this.installTried = false;
+    this.installed = null;
+    this.installFailure = null;
     if (!sandbox) return;
     try {
       await this.timed("stop sandbox", () => sandbox.stop());

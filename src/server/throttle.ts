@@ -6,30 +6,34 @@ import { SANDBOX_TAGS } from "@/server/runner/sandbox";
 // created since 00:00 UTC is the day's live work, wherever it ran (laptop or
 // production share the Vercel project). New live work is refused once the
 // count reaches DAILY_LIVE_RUN_CAP, and whenever the count can't be read.
-// Listing then starting isn't atomic: two requests at the same moment can
-// both pass, so this is a throttle, not a guaranteed daily or dollar limit.
+// Each person also has a daily share (DAILY_USER_RUN_CAP), counted from the
+// sandboxes tagged with their login, so one account can't use up the day.
+// Listing then starting isn't atomic, so each new sandbox recounts once it
+// exists (confirmLiveWork) and stops if the day is over. Requests at the same
+// moment can still refuse each other or, while the list lags, both pass, so
+// this is a throttle, not a guaranteed daily or dollar limit.
 
 export const DEFAULT_DAILY_CAP = 30;
+export const DEFAULT_USER_CAP = 6;
 const LIST_MS = 10_000;
 
 type Env = Record<string, string | undefined>;
 type Created = { createdAt: number };
 
-// Tagged sandboxes, newest first.
-export type ListSandboxes = (signal: AbortSignal) => AsyncIterable<Created>;
+// Tagged sandboxes, newest first: all of the app's, or one person's.
+type Filter = typeof SANDBOX_TAGS | { user: string };
+export type ListSandboxes = (signal: AbortSignal, filter?: Filter) => AsyncIterable<Created>;
 
 export type Admission =
   { ok: true; used: number; cap: number } | { ok: false; status: 429 | 503; reason: string };
 
-export const listTagged: ListSandboxes = (signal) => ({
+export const listTagged: ListSandboxes = (signal, filter = SANDBOX_TAGS) => ({
   async *[Symbol.asyncIterator]() {
-    const result = await Sandbox.list({
-      tags: SANDBOX_TAGS,
-      sortBy: "createdAt",
-      sortOrder: "desc",
-      limit: 50,
-      signal,
-    });
+    const page = { sortBy: "createdAt", sortOrder: "desc", limit: 50, signal } as const;
+    const result =
+      "user" in filter
+        ? await Sandbox.list({ tags: { user: filter.user }, ...page })
+        : await Sandbox.list({ tags: SANDBOX_TAGS, ...page });
     for await (const sandbox of result) yield sandbox;
   },
 });
@@ -37,8 +41,16 @@ export const listTagged: ListSandboxes = (signal) => ({
 // The configured cap, or null when the variable is set to anything other
 // than a whole number from 1 to 1000 (a typo must not lift the throttle).
 export function dailyCap(env: Env = process.env): number | null {
-  const raw = env.DAILY_LIVE_RUN_CAP?.trim();
-  if (!raw) return DEFAULT_DAILY_CAP;
+  return capFrom(env.DAILY_LIVE_RUN_CAP, DEFAULT_DAILY_CAP);
+}
+
+export function userCap(env: Env = process.env): number | null {
+  return capFrom(env.DAILY_USER_RUN_CAP, DEFAULT_USER_CAP);
+}
+
+function capFrom(value: string | undefined, fallback: number): number | null {
+  const raw = value?.trim();
+  if (!raw) return fallback;
   if (!/^\d{1,4}$/.test(raw)) return null;
   const cap = Number(raw);
   return cap >= 1 && cap <= 1000 ? cap : null;
@@ -54,11 +66,12 @@ export async function countToday(
   list: ListSandboxes,
   now: Date,
   signal: AbortSignal,
+  filter?: Filter,
 ): Promise<number> {
   const since = dayStart(now);
   let used = 0;
   let previous = Infinity;
-  for await (const sandbox of list(signal)) {
+  for await (const sandbox of list(signal, filter)) {
     const created = sandbox.createdAt;
     if (!Number.isFinite(created) || created > previous)
       throw new Error("Sandbox list isn't in creation order");
@@ -70,10 +83,19 @@ export async function countToday(
 }
 
 export async function admitLiveWork(
-  input: { env?: Env; now?: Date; list?: ListSandboxes; signal?: AbortSignal } = {},
+  input: {
+    login?: string;
+    env?: Env;
+    now?: Date;
+    list?: ListSandboxes;
+    signal?: AbortSignal;
+    // The caller's own sandbox already exists, so the counts include it.
+    counted?: boolean;
+  } = {},
 ): Promise<Admission> {
   const cap = dailyCap(input.env);
-  if (cap === null)
+  const share = userCap(input.env);
+  if (cap === null || share === null)
     return {
       ok: false,
       status: 503,
@@ -83,9 +105,18 @@ export async function admitLiveWork(
     AbortSignal.timeout(LIST_MS),
     ...(input.signal ? [input.signal] : []),
   ]);
+  const list = input.list ?? listTagged;
+  const now = input.now ?? new Date();
   let used: number;
+  let mine = 0;
   try {
-    used = await countToday(input.list ?? listTagged, input.now ?? new Date(), signal);
+    used = await countToday(list, now, signal);
+    if (input.login)
+      mine = await countToday(list, now, signal, { user: input.login.toLowerCase() });
+    if (input.counted) {
+      used -= 1;
+      mine -= input.login ? 1 : 0;
+    }
   } catch {
     log({ admitted: false, cap, used: null });
     return {
@@ -94,8 +125,14 @@ export async function admitLiveWork(
       reason: "Couldn't count today's live runs, so nothing was started. Try again in a moment.",
     };
   }
-  const admitted = used < cap;
+  const admitted = used < cap && mine < share;
   log({ admitted, cap, used });
+  if (used < cap && mine >= share)
+    return {
+      ok: false,
+      status: 429,
+      reason: `You've used today's ${share} live runs (sandboxes since 00:00 UTC). Your share opens again after 00:00 UTC; the recorded demo still works.`,
+    };
   return admitted
     ? { ok: true, used, cap }
     : {
@@ -104,6 +141,9 @@ export async function admitLiveWork(
         reason: `Today's live runs are used up (${used} of ${cap} sandboxes since 00:00 UTC). Live mode opens again after 00:00 UTC; the recorded demo still works.`,
       };
 }
+
+export const confirmLiveWork = (input: Omit<Parameters<typeof admitLiveWork>[0], "counted">) =>
+  admitLiveWork({ ...input, counted: true });
 
 // One structured line per decision: counts only, never request data.
 function log(entry: { admitted: boolean; cap: number; used: number | null }) {

@@ -3,10 +3,12 @@ import { sealData, unsealData } from "iron-session";
 import { z } from "zod";
 import { isAllowedLogin, requireEnv } from "@/server/env";
 
-// The live-mode session: a sealed, HTTP-only cookie holding only the GitHub
-// login and an expiry (8 hours). Sealing keeps it from being read or forged;
-// it is not authorization. Every live route also checks the login allowlist,
-// and every mutating route checks the request's origin.
+// The live-mode session: a sealed, HTTP-only cookie holding the GitHub login
+// and numeric account id (a login can be renamed and reused; the id can't), an expiry (8 hours) and the repositories GitHub listed at sign-in for the
+// picker. Sealing keeps it from being read or forged; it is not
+// authorization. Every live route checks push access to the repository it
+// touches (server/github/access.ts), and every mutating route checks the
+// request's origin.
 
 type Env = Record<string, string | undefined>;
 
@@ -15,7 +17,14 @@ export const OAUTH_COOKIE = "merge_desk_oauth";
 export const SESSION_TTL_S = 8 * 60 * 60;
 const OAUTH_TTL_S = 10 * 60;
 
-const SessionData = z.object({ login: z.string().min(1).max(100), exp: z.number().int() });
+// Kept small: the whole seal must fit in one cookie.
+export const MAX_SESSION_REPOS = 40;
+const SessionData = z.object({
+  login: z.string().min(1).max(100),
+  id: z.number().int().positive(),
+  exp: z.number().int(),
+  repos: z.array(z.string().max(140)).max(MAX_SESSION_REPOS).default([]),
+});
 export type SessionData = z.infer<typeof SessionData>;
 const OAuthState = z.object({ state: z.string().min(32), exp: z.number().int() });
 
@@ -48,12 +57,18 @@ export function cookieHeader(
 export const isSecure = (env: Env = process.env) => env.NODE_ENV === "production";
 
 export async function sealSession(
-  login: string,
-  options: { env?: Env; now?: number } = {},
+  user: { login: string; id: number },
+  options: { env?: Env; now?: number; repos?: string[] } = {},
 ): Promise<string> {
   const now = options.now ?? Date.now();
+  // A seal over about 4 KB is dropped by the browser, so the names are also
+  // capped by length (1,600 characters seal to about 2.6 KB).
+  let size = 0;
+  const repos = (options.repos ?? [])
+    .slice(0, MAX_SESSION_REPOS)
+    .filter((repo) => (size += repo.length + 3) <= 1_600);
   return sealData(
-    { login, exp: now + SESSION_TTL_S * 1000 },
+    { login: user.login, id: user.id, exp: now + SESSION_TTL_S * 1000, repos },
     { password: password(options.env ?? process.env), ttl: SESSION_TTL_S },
   );
 }
@@ -112,7 +127,7 @@ const json = (status: number, error: string) =>
 
 // `exp` is the session's end, which model keys saved in it share.
 export type LiveGuard =
-  { ok: true; login: string; exp: number } | { ok: false; response: Response };
+  { ok: true; login: string; id: number; exp: number } | { ok: false; response: Response };
 
 // Every /api/live route: signed in, allowlisted, and for anything that spends
 // quota or writes, sent by this site's own pages.
@@ -127,7 +142,7 @@ export async function guardLive(
     return { ok: false, response: json(403, "This account can't use live mode.") };
   if (options.mutating && !isSameOrigin(request))
     return { ok: false, response: json(403, "Request refused: it didn't come from Merge Desk.") };
-  return { ok: true, login: session.login, exp: session.exp };
+  return { ok: true, login: session.login, id: session.id, exp: session.exp };
 }
 
 export function isSameOrigin(request: Request): boolean {

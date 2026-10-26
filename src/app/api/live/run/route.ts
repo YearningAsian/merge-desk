@@ -3,11 +3,11 @@ import type { Analysis, RunEvent } from "@/core/events";
 import { ModelChoice } from "@/core/models";
 import { OptionKind } from "@/core/options";
 import type { RunCheck, RunRecord } from "@/core/run";
-import { CODE_ALLOWED_REPOS, requireEnv } from "@/server/env";
+import { requireEnv } from "@/server/env";
 import { readKeys } from "@/server/keys";
 import { ModelChoiceError, planModel, type ModelPlan } from "@/server/llm/client";
 import { geminiProposer } from "@/server/gemini/propose";
-import { installationOctokit } from "@/server/github/app";
+import { openRepo } from "@/server/github/access";
 import { readPull } from "@/server/github/prs";
 import { verifyAnalysis } from "@/server/pipeline/analyze";
 import { runPipeline, signLandableRun } from "@/server/pipeline/run";
@@ -19,12 +19,12 @@ import { admitLiveWork } from "@/server/throttle";
 export const runtime = "nodejs";
 export const maxDuration = 240;
 
-const REPO = CODE_ALLOWED_REPOS[0];
 const DEADLINE_MS = 210_000;
 
 // The browser sends back the analysis this server signed, the option chosen
 // on it, and optionally a one-line steer and a model from the Settings list.
 const Body = z.object({
+  repo: z.string().max(200),
   pr: z.number().int().positive(),
   token: z.string().min(1).max(2_000_000),
   option: OptionKind,
@@ -46,12 +46,13 @@ export async function POST(request: Request) {
   const body = Body.safeParse(await request.json().catch(() => null));
   if (!body.success) return refuse(400, "Send the signed analysis and the option to run.");
   const secret = requireEnv("SESSION_SECRET");
+  const repo = body.data.repo;
 
   let analysis: Analysis;
   try {
     analysis = verifyAnalysis(
       body.data.token,
-      { user: guard.login, repo: REPO, pr: body.data.pr },
+      { user: guard.login, repo, pr: body.data.pr },
       { secret },
     );
   } catch {
@@ -74,19 +75,15 @@ export async function POST(request: Request) {
 
   // Every live analysis or run boots a sandbox; the day's count gates it.
   if (usesSandbox()) {
-    const admission = await admitLiveWork({ signal: request.signal });
+    const admission = await admitLiveWork({ login: guard.login, signal: request.signal });
     if (!admission.ok) return refuse(admission.status, admission.reason);
   }
 
-  let octokit;
-  try {
-    // contents:read for the base branch's ref (readPull reads its tip).
-    octokit = await installationOctokit(REPO, { pull_requests: "read", contents: "read" });
-  } catch (error) {
-    return (error as { status?: number }).status === 404
-      ? refuse(503, "GitHub can't see the repository: is the Merge Desk app installed on it?")
-      : refuse(503, "GitHub isn't reachable right now. Try again.");
-  }
+  // Push access to this repository, asked of GitHub before anything is read.
+  // contents:read for the base branch's ref (readPull reads its tip).
+  const access = await openRepo(guard, repo, { pull_requests: "read", contents: "read" });
+  if (!access.ok) return refuse(access.status, access.error);
+  const octokit = access.octokit;
 
   const client = plan();
   const controller = new AbortController();
@@ -96,7 +93,7 @@ export async function POST(request: Request) {
   let applied: AppliedProposal | undefined;
 
   const events = runPipeline({
-    runner: liveRunner(REPO, controller.signal),
+    runner: liveRunner(repo, controller.signal, { login: guard.login }),
     proposer: geminiProposer(client, analysis),
     signal: controller.signal,
     revisions,
@@ -109,7 +106,7 @@ export async function POST(request: Request) {
     },
     checkRevisions: async () => {
       try {
-        const pull = await readPull(octokit, REPO, body.data.pr);
+        const pull = await readPull(octokit, repo, body.data.pr);
         if (pull.data.state !== "open") return { ok: false, detail: "The pull request is closed." };
         const same =
           pull.summary.head.sha === revisions.head && pull.summary.base.sha === revisions.base;
@@ -158,7 +155,7 @@ export async function POST(request: Request) {
           }
           const record: RunRecord = {
             v: 1,
-            repo: REPO,
+            repo,
             pr: body.data.pr,
             verdict: event.verdict,
             option: chosen.kind,

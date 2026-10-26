@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isRepoPath } from "@/core/paths";
-import { parseFiles, type Shell } from "@/server/runner/workspace";
+import { git, parseFiles, type Shell } from "@/server/runner/workspace";
 
 describe("isRepoPath", () => {
   it("accepts relative paths inside the repository", () => {
@@ -59,5 +59,17 @@ describe("parseFiles", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("git", () => {
+  it("names the git command in a failure, never the -c settings that carry a token", async () => {
+    const shell: Shell = {
+      exec: async () => ({ code: 128, stdout: "", output: "fatal: unreachable", timedOut: false }),
+      readText: async () => null,
+      writeText: async () => undefined,
+    };
+    const failure = git(shell, ["-c", "http.extraHeader=Authorization: Basic c2VjcmV0", "fetch"]);
+    await expect(failure).rejects.toThrow(/^git fetch failed: fatal: unreachable$/);
   });
 });

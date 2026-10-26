@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { runInNewContext } from "node:vm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEPS_MARKER, SandboxRunner } from "@/server/runner/sandbox";
+import { DEPS_MARKER, OWN_SUITE_LABEL, SandboxRunner } from "@/server/runner/sandbox";
 
 // The app's own unit tests run only from the trusted dependency snapshot:
 // main's node_modules installed outside the checkout, root-owned, plus a
@@ -115,11 +115,21 @@ class FakeSandbox {
       }),
     ],
   ]);
+  readonly written: string[] = [];
   testExit = 0;
+  npmExit = 0;
 
-  async update() {}
+  async update(params: { networkPolicy?: string }) {
+    this.commands.push({ cmd: "update", args: [String(params.networkPolicy)], uid: 0 });
+  }
+  async mkDir() {}
   async stop() {}
-  async writeFiles() {}
+  async writeFiles(files: Array<{ path: string; content: string | Buffer }>) {
+    for (const file of files) {
+      this.written.push(`${file.path}\n${file.content.toString()}`);
+      this.entries.set(file.path, mine(0o644, { content: file.content.toString() }));
+    }
+  }
   async readFileToBuffer({ path }: { path: string }) {
     return Buffer.from(this.entries.get(path)!.content!);
   }
@@ -138,6 +148,7 @@ class FakeSandbox {
     this.commands.push({ cmd: command.cmd, args, uid, cwd: command.cwd });
     let output = "";
     let code = 0;
+    const exit = Symbol("exit");
     try {
       if (command.cmd === "git") {
         if (args.includes("--is-shallow-repository")) output = "false\n";
@@ -186,6 +197,11 @@ class FakeSandbox {
                   lstatSync: stat,
                   statSync: stat,
                   readlinkSync: (path: string) => entryAt(path).link!,
+                  writeFileSync: (path: string, data: Buffer) =>
+                    this.entries.set(
+                      posix.resolve(command.cwd ?? ROOT, path),
+                      mine(0o644, { content: data.toString() }),
+                    ),
                   readFileSync: (path: string, encoding?: string) => {
                     const content = entryAt(path).content!;
                     return encoding ? content : Buffer.from(content);
@@ -211,6 +227,9 @@ class FakeSandbox {
             cwd: () => command.cwd ?? ROOT,
             argv: ["node", ...args.slice(2)],
             stdout: { write: (text: string) => (output += text) },
+            exit: () => {
+              throw exit;
+            },
           },
         });
       } else if (command.cmd === "node" && args[0] === VITEST) {
@@ -218,10 +237,21 @@ class FakeSandbox {
         output = code === 0 ? "Tests 381 passed\n" : "Tests 1 failed\n";
       } else if (command.cmd === "node" && args[0] === "--test") {
         output = "playground tests passed\n";
+      } else if (command.cmd === "npm" && args[0] === "ci") {
+        code = this.npmExit;
+        if (code === 0)
+          for (const path of ["/vercel/node_modules", "/vercel/node_modules/.bin"])
+            this.entries.set(path, mine(0o775, { directory: true }));
+        else output = "npm ERR! lockfile out of date\n";
+      } else if (command.cmd === "sh") {
+        code = this.testExit;
+        output = code === 0 ? "own tests passed\n" : "own tests failed\n";
       } else throw new Error(`Unexpected command ${command.cmd} ${args.join(" ")}`);
     } catch (error) {
-      code = 1;
-      output = error instanceof Error ? error.message : String(error);
+      if (error !== exit) {
+        code = 1;
+        output = error instanceof Error ? error.message : String(error);
+      }
     }
     command.stdout?.write(output);
     return { cmd: { exitCode: code }, exitCode: code };
@@ -399,10 +429,9 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
     state.failSnapshot = 404;
     const runner = await trusted();
     try {
-      expect(state.created.map((params) => (params.source as { type: string }).type)).toEqual([
-        "snapshot",
-        "git",
-      ]);
+      expect(
+        state.created.map((params) => (params.source as { type: string } | undefined)?.type),
+      ).toEqual(["snapshot", undefined]);
       expect(state.created[1]!.image).toBe("vercel/sandbox/node:24");
       const app = await runner.runTests([LAND]);
       expect(app.state).toBe("not_run");
@@ -465,8 +494,23 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
     const runner = await applied();
     try {
       const [params] = state.created;
-      expect(params!.source).toMatchObject({ type: "git", revision: HEAD });
+      expect(params!.source).toBeUndefined();
       expect(params!.image).toBe("vercel/sandbox/node:24");
+      // An empty repository that fetches exactly the head and base, then checks out the head.
+      const git = (state.sandbox as FakeSandbox).commands
+        .filter((command) => command.cmd === "git")
+        .map((command) =>
+          command.args.filter((arg) => !arg.startsWith("-c") && !arg.includes("=")),
+        );
+      expect(git).toContainEqual(["init", "--quiet"]);
+      expect(git).toContainEqual([
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/YearningAsian/merge-desk.git",
+      ]);
+      expect(git).toContainEqual(["fetch", "--quiet", "--no-tags", "origin", HEAD, BASE]);
+      expect(git).toContainEqual(["checkout", "--quiet", "--detach", HEAD]);
       const result = await runner.runTests([LAND]);
       expect(result.state).toBe("not_run");
       expect(result.output).toMatch(/trusted dependency snapshot/);
@@ -474,5 +518,123 @@ describe("SandboxRunner with the trusted dependency snapshot", () => {
     } finally {
       await runner.dispose();
     }
+  });
+});
+
+describe("SandboxRunner with another repository's own tests", () => {
+  const TOKEN = "ghs_onerepo_readonly";
+  const OWN_PACKAGE = '{ "name": "app", "scripts": { "test": "vitest run" } }\n';
+  const ownRuns = () => sandbox.commands.filter((command) => command.cmd === "sh");
+  // An empty boot: no snapshot, no trusted node_modules and no marker yet.
+  async function ownTested(setup: () => void = () => undefined, afterApply = () => {}) {
+    for (const path of [...sandbox.entries.keys()])
+      if (path.startsWith("/vercel/node_modules") || path === `/vercel/${DEPS_MARKER}`)
+        sandbox.entries.delete(path);
+    sandbox.entries.get(`${ROOT}/package.json`)!.content = OWN_PACKAGE;
+    setup();
+    const runner = new SandboxRunner({
+      repoUrl: "https://github.com/someone/merge-desk.git",
+      login: "SomeOne",
+      cloneToken: async () => TOKEN,
+      installDependencies: true,
+    });
+    try {
+      await runner.applyProposal({ head: HEAD, base: BASE }, [{ path: LAND, content: "x" }]);
+      afterApply();
+      return await runner.runTests([LAND]);
+    } finally {
+      await runner.dispose();
+    }
+  }
+
+  it("installs the head's dependencies without scripts before deny-all, then runs its test script as the test user", async () => {
+    const result = await ownTested();
+    expect(result).toMatchObject({ state: "passed", exitCode: 0, suite: OWN_SUITE_LABEL });
+    const order = sandbox.commands.map((command) => command.cmd);
+    const npm = sandbox.commands.find((command) => command.cmd === "npm")!;
+    expect(npm.args).toEqual(
+      expect.arrayContaining(["ci", "--ignore-scripts", "--prefix", "/vercel"]),
+    );
+    expect(npm.uid).not.toBe(1001);
+    expect(order.indexOf("npm")).toBeLessThan(order.indexOf("update"));
+    expect(ownRuns()).toHaveLength(1);
+    expect(ownRuns()[0]).toMatchObject({ uid: 1001, cwd: ROOT });
+    expect(ownRuns()[0]!.args.slice(-2)).toEqual(["/vercel/node_modules/.bin", "vitest run"]);
+    expect(sandbox.entries.get("/vercel/node_modules")).toMatchObject({ uid: 0, gid: 0 });
+    expect(state.created[0]).toMatchObject({
+      timeout: 300_000,
+      tags: { app: "merge-desk", user: "someone" },
+    });
+  });
+
+  it("reports the repository's failing tests as failed", async () => {
+    const result = await ownTested(() => (sandbox.testExit = 1));
+    expect(result).toMatchObject({ state: "failed", exitCode: 1 });
+  });
+
+  it("passes the read-only token only on the fetch's command line, never to disk", async () => {
+    await ownTested();
+    const basic = Buffer.from(`x-access-token:${TOKEN}`).toString("base64");
+    const carries = (text: string) => text.includes(TOKEN) || text.includes(basic);
+    const withToken = sandbox.commands.filter((command) => command.args.some(carries));
+    expect(withToken.length).toBeGreaterThan(0);
+    for (const command of withToken) {
+      expect(command.cmd).toBe("git");
+      expect(command.args).toContain("fetch");
+      expect(command.args).toContain(
+        `http.https://github.com/.extraHeader=Authorization: Basic ${basic}`,
+      );
+    }
+    expect(sandbox.written.some(carries)).toBe(false);
+    const remote = sandbox.commands.find((command) => command.args.includes("remote"))!;
+    expect(remote.args).toContain("https://github.com/someone/merge-desk.git");
+  });
+
+  it.each<[string, () => void, RegExp]>([
+    [
+      "no lockfile",
+      () => void sandbox.entries.delete(`${ROOT}/package-lock.json`),
+      /package-lock\.json/,
+    ],
+    [
+      "no test script",
+      () => void (sandbox.entries.get(`${ROOT}/package.json`)!.content = PACKAGE),
+      /no test script/,
+    ],
+    ["a failing install", () => void (sandbox.npmExit = 1), /npm ci --ignore-scripts\) failed/],
+    ...(["pretest", "posttest"] as const).map(
+      (hook) =>
+        [
+          `a ${hook} script`,
+          () =>
+            void (sandbox.entries.get(`${ROOT}/package.json`)!.content = JSON.stringify({
+              scripts: { [hook]: "exit 42", test: "vitest run" },
+            })),
+          new RegExp(`${hook} script`),
+        ] as [string, () => void, RegExp],
+    ),
+  ])("runs nothing with %s", async (_name, setup, reason) => {
+    const result = await ownTested(setup);
+    expect(result.state).toBe("not_run");
+    expect(result.output).toMatch(reason);
+    expect(ownRuns()).toEqual([]);
+  });
+
+  it("runs nothing when the merge changes package.json after the install", async () => {
+    const result = await ownTested(undefined, () => {
+      sandbox.entries.get(`${ROOT}/package.json`)!.content += " ";
+    });
+    expect(result.state).toBe("not_run");
+    expect(result.output).toMatch(/changes package\.json/);
+    expect(ownRuns()).toEqual([]);
+  });
+
+  it("runs nothing when the installed dependencies stay writable by the test user", async () => {
+    const result = await ownTested(undefined, () => {
+      sandbox.entries.get("/vercel/node_modules/.bin")!.mode = 0o777;
+    });
+    expect(result.state).toBe("not_run");
+    expect(result.output).toMatch(/aren't protected/);
+    expect(ownRuns()).toEqual([]);
   });
 });

@@ -7,15 +7,30 @@ import { join } from "node:path";
 import { POST } from "@/app/api/live/analyze/route";
 import { GET } from "@/app/api/live/prs/route";
 import { POST as LAND } from "@/app/api/live/land/route";
-import { POST as RECORD } from "@/app/api/live/record/route";
+import { GET as RECORD_GET, POST as RECORD } from "@/app/api/live/record/route";
 import { POST as RUN } from "@/app/api/live/run/route";
 import { AnalyzeEvent, type Analysis } from "@/core/events";
 import type { RunRecord } from "@/core/run";
 import { signAnalysis } from "@/server/pipeline/analyze";
 import { signRun } from "@/server/pipeline/run";
+import { openRepo } from "@/server/github/access";
 import { installationOctokit } from "@/server/github/app";
+import { listPulls } from "@/server/github/prs";
 import { SESSION_COOKIE, sealSession } from "@/server/session";
 
+vi.mock("@/server/github/access", async () => {
+  const app = await import("@/server/github/app");
+  return {
+    // As the real one: a GitHub failure is a 503 answer, never a throw.
+    openRepo: vi.fn(async (_user: unknown, repo: string, permissions: object) => {
+      try {
+        return { ok: true, octokit: await app.installationOctokit(repo, permissions as never) };
+      } catch {
+        return { ok: false, status: 503, error: "GitHub isn't reachable right now. Try again." };
+      }
+    }),
+  };
+});
 vi.mock("@/server/github/app", () => ({
   installationOctokit: vi.fn(async () => ({})),
   splitRepo: (repo: string) => {
@@ -39,15 +54,15 @@ afterEach(() => {
 });
 
 const get = (cookie?: string) =>
-  new Request("http://localhost:3000/api/live/prs", {
+  new Request("http://localhost:3000/api/live/prs?repo=YearningAsian/merge-desk", {
     headers: cookie ? { cookie: `${SESSION_COOKIE}=${cookie}` } : {},
   });
 
 describe("GET /api/live/prs", () => {
   it("answers 401 signed out, 403 for another login, and the list when allowed", async () => {
     expect((await GET(get())).status).toBe(401);
-    expect((await GET(get(await sealSession("someone-else")))).status).toBe(403);
-    const ok = await GET(get(await sealSession("YearningAsian")));
+    expect((await GET(get(await sealSession({ login: "someone-else", id: 1 })))).status).toBe(403);
+    const ok = await GET(get(await sealSession({ login: "YearningAsian", id: 1 })));
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ repo: "YearningAsian/merge-desk", pulls: [] });
   });
@@ -59,11 +74,11 @@ describe("POST /api/live/analyze", () => {
       new Request("http://localhost:3000/api/live/analyze", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin: "https://evil.example",
           "content-type": "application/json",
         },
-        body: JSON.stringify({ pr: 1 }),
+        body: JSON.stringify({ repo: "YearningAsian/merge-desk", pr: 1 }),
       }),
     );
     expect(response.status).toBe(403);
@@ -74,11 +89,15 @@ describe("POST /api/live/analyze", () => {
       new Request("http://localhost:3000/api/live/analyze", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin: "http://localhost:3000",
           "content-type": "application/json",
         },
-        body: JSON.stringify({ pr: 1, model: "some-other-model" }),
+        body: JSON.stringify({
+          repo: "YearningAsian/merge-desk",
+          pr: 1,
+          model: "some-other-model",
+        }),
       }),
     );
     expect(response.status).toBe(400);
@@ -101,11 +120,11 @@ describe("POST /api/live/run", () => {
       new Request("http://localhost:3000/api/live/run", {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin,
           "content-type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ repo: "YearningAsian/merge-desk", ...(body as object) }),
       }),
     );
 
@@ -173,11 +192,11 @@ describe("POST /api/live/land and /api/live/record", () => {
       new Request(`http://localhost:3000${path}`, {
         method: "POST",
         headers: {
-          cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+          cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
           origin,
           "content-type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ repo: "YearningAsian/merge-desk", ...(body as object) }),
       }),
     );
 
@@ -216,11 +235,11 @@ describe("analyze and run read the base branch", () => {
     new Request(`http://localhost:3000${path}`, {
       method: "POST",
       headers: {
-        cookie: `${SESSION_COOKIE}=${await sealSession("YearningAsian")}`,
+        cookie: `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`,
         origin: "http://localhost:3000",
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ repo: "YearningAsian/merge-desk", ...(body as object) }),
     });
   beforeEach(() => {
     process.env.RUNNER = "local"; // no sandbox, so no daily count to read
@@ -285,5 +304,137 @@ describe("analyze and run read the base branch", () => {
     const response = await POST(await signedIn("/api/live/analyze", { pr: 10 }));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toMatch(/base branch release\/old/);
+  });
+});
+
+// Live mode is open to any account: every route asks openRepo for push access
+// to the named repository and stops at its refusal, before any other GitHub call.
+describe("a refused repository stops every live route", () => {
+  const access = vi.mocked(openRepo);
+  const REPO = "someone/private-app";
+  const ERROR = `You need write access to ${REPO} to use it in Merge Desk.`;
+  const cookie = async () =>
+    `${SESSION_COOKIE}=${await sealSession({ login: "YearningAsian", id: 1 })}`;
+  const post = async (path: string, body: object) =>
+    new Request(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: {
+        cookie: await cookie(),
+        origin: "http://localhost:3000",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ repo: REPO, ...body }),
+    });
+  const drop = readFileSync(
+    join(import.meta.dirname, "../e2e/fixtures/analyze-drop.ndjson"),
+    "utf8",
+  )
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => AnalyzeEvent.parse(JSON.parse(line)))
+    .flatMap((event) => ("type" in event && event.ok ? [event.analysis] : []))[0] as Analysis;
+  const run: RunRecord = {
+    v: 1,
+    repo: REPO,
+    pr: 1,
+    verdict: "HELD",
+    option: "combine",
+    drops: null,
+    revisions: { head: "a".repeat(40), base: "b".repeat(40) },
+    tree: "c".repeat(40),
+    changes: [],
+    changesNote: null,
+    description: null,
+    reason: "held",
+    summary: [],
+    checks: [],
+    analysisModel: "m",
+    proposeModel: "m",
+    steer: null,
+    finishedAt: "2026-10-21T12:00:00.000Z",
+  };
+  beforeEach(() => {
+    process.env.RUNNER = "local";
+    delete process.env.VERCEL;
+    delete process.env.ALLOWED_LOGINS;
+    access.mockClear();
+    vi.mocked(installationOctokit).mockClear();
+    vi.mocked(listPulls).mockClear();
+    access.mockResolvedValue({ ok: false, status: 403, error: ERROR });
+  });
+  afterEach(() => access.mockReset());
+
+  it.each([
+    [
+      "GET prs",
+      async () =>
+        GET(
+          new Request(`http://localhost:3000/api/live/prs?repo=${REPO}`, {
+            headers: { cookie: await cookie() },
+          }),
+        ),
+      { pull_requests: "read", contents: "read" },
+    ],
+    [
+      "analyze",
+      async () => POST(await post("/api/live/analyze", { pr: 1 })),
+      { pull_requests: "read", contents: "read" },
+    ],
+    [
+      "run",
+      async () =>
+        RUN(
+          await post("/api/live/run", {
+            pr: drop.pr,
+            token: signAnalysis({ ...drop, repo: REPO }, { user: "YearningAsian", secret: SECRET }),
+            option: drop.options[0]!.kind,
+          }),
+        ),
+      { pull_requests: "read", contents: "read" },
+    ],
+    [
+      "land",
+      async () =>
+        LAND(
+          await post("/api/live/land", {
+            pr: 1,
+            token: signRun(run, { user: "YearningAsian", secret: SECRET }),
+          }),
+        ),
+      { contents: "write", pull_requests: "write" },
+    ],
+    [
+      "GET record",
+      async () =>
+        RECORD_GET(
+          new Request(`http://localhost:3000/api/live/record?repo=${REPO}&pr=1`, {
+            headers: { cookie: await cookie() },
+          }),
+        ),
+      { pull_requests: "read" },
+    ],
+    [
+      "POST record",
+      async () =>
+        RECORD(
+          await post("/api/live/record", {
+            pr: 1,
+            token: signRun(run, { user: "YearningAsian", secret: SECRET }),
+            action: "held",
+          }),
+        ),
+      { contents: "write", pull_requests: "write" },
+    ],
+  ])("%s answers the refusal and reads nothing else", async (_name, call, permissions) => {
+    const response = await call();
+    expect(response.status).toBe(403);
+    expect(JSON.stringify(await response.json())).toContain(ERROR);
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ login: "YearningAsian", id: 1 }),
+      REPO,
+      permissions,
+    );
+    expect(installationOctokit).not.toHaveBeenCalled();
+    expect(listPulls).not.toHaveBeenCalled();
   });
 });

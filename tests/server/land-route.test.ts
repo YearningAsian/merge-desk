@@ -13,10 +13,22 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/server/session", () => ({ guardLive: mocks.guard }));
 vi.mock("@/server/pipeline/run", () => ({ verifyRun: mocks.verify }));
 vi.mock("@/server/env", () => ({
-  CODE_ALLOWED_REPOS: ["YearningAsian/merge-desk"],
   requireEnv: () => "test-only-secret-0123456789abcdef0123456789",
 }));
 vi.mock("@/server/guard", () => ({ checkLand: () => ({ ok: true }) }));
+vi.mock("@/server/github/access", async () => {
+  const app = await import("@/server/github/app");
+  return {
+    // As the real one: a GitHub failure is a 503 answer, never a throw.
+    openRepo: async (_login: string, repo: string, permissions: object) => {
+      try {
+        return { ok: true, octokit: await app.installationOctokit(repo, permissions as never) };
+      } catch {
+        return { ok: false, status: 503, error: "GitHub isn't reachable right now. Try again." };
+      }
+    },
+  };
+});
 vi.mock("@/server/github/app", () => ({
   installationOctokit: mocks.client,
   splitRepo: () => ({ owner: "YearningAsian", name: "merge-desk" }),
@@ -33,7 +45,7 @@ const request = () =>
   new Request("http://localhost:3000/api/live/land", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pr: 1, token: "fixture" }),
+    body: JSON.stringify({ repo: "YearningAsian/merge-desk", pr: 1, token: "fixture" }),
   });
 function prepare() {
   vi.resetAllMocks();
@@ -104,7 +116,7 @@ describe("Land route total deadline and writer scope", () => {
     const hosted = new Request("https://merge-desk.example.invalid/api/live/land", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr: 1, token: "fixture" }),
+      body: JSON.stringify({ repo: "YearningAsian/merge-desk", pr: 1, token: "fixture" }),
     });
     expect(await (await POST(hosted)).json()).toMatchObject({
       outcome: "LANDED",
@@ -119,7 +131,12 @@ describe("Land route total deadline and writer scope", () => {
     const input = new Request("https://merge-desk.example.invalid/api/live/record", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr: 1, token: "fixture", action: "discarded" }),
+      body: JSON.stringify({
+        repo: "YearningAsian/merge-desk",
+        pr: 1,
+        token: "fixture",
+        action: "discarded",
+      }),
     });
     await recordPOST(input);
     expect(mocks.client).toHaveBeenCalledWith("YearningAsian/merge-desk", {
@@ -180,7 +197,12 @@ describe("Land route total deadline and writer scope", () => {
       method: "POST",
       signal: controller.signal,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr: 1, token: "fixture", action: "discarded" }),
+      body: JSON.stringify({
+        repo: "YearningAsian/merge-desk",
+        pr: 1,
+        token: "fixture",
+        action: "discarded",
+      }),
     });
     await recordPOST(aborted);
     expect(mocks.client).not.toHaveBeenCalled();
@@ -194,7 +216,12 @@ describe("Land route total deadline and writer scope", () => {
       method: "POST",
       signal: controller.signal,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr: 1, token: "fixture", action: "discarded" }),
+      body: JSON.stringify({
+        repo: "YearningAsian/merge-desk",
+        pr: 1,
+        token: "fixture",
+        action: "discarded",
+      }),
     });
     await recordPOST(input);
     const signal = mocks.record.mock.calls[0]![1].signal as AbortSignal;
@@ -214,7 +241,12 @@ describe("Land route total deadline and writer scope", () => {
     const input = new Request("http://localhost:3000/api/live/record", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pr: 1, token: "fixture", action: "discarded" }),
+      body: JSON.stringify({
+        repo: "YearningAsian/merge-desk",
+        pr: 1,
+        token: "fixture",
+        action: "discarded",
+      }),
     });
     let response: Response | undefined;
     const done = recordPOST(input).then((value) => {
@@ -260,6 +292,32 @@ describe("Land route: mergeability after the push", () => {
     mocks.pull.mockResolvedValue(at("a".repeat(40), "conflicting"));
     const done = POST(request());
     await vi.advanceTimersByTimeAsync(20_000);
-    expect(await (await done).json()).toMatchObject({ outcome: "LANDED", mergeable: "checking" });
+    expect(await (await done).json()).toMatchObject({
+      outcome: "LANDED",
+      mergeable: "checking",
+      baseMoved: null,
+    });
+  });
+
+  // Review 17.3 M3: a push to the base during Land leaves the landed merge
+  // without the newest base commits; the answer says so.
+  it("says the base moved when a read after the push shows a newer base", async () => {
+    prepare();
+    const moved = at("c".repeat(40), "conflicting");
+    moved.summary.base.sha = "e".repeat(40);
+    mocks.pull.mockReset().mockResolvedValueOnce(at("a".repeat(40), "mergeable"));
+    mocks.pull.mockResolvedValue(moved);
+    expect(await (await POST(request())).json()).toMatchObject({
+      outcome: "LANDED",
+      baseMoved: true,
+    });
+  });
+
+  it("says the base didn't move only from a read at the landed commit", async () => {
+    prepare();
+    expect(await (await POST(request())).json()).toMatchObject({
+      outcome: "LANDED",
+      baseMoved: false,
+    });
   });
 });

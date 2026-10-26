@@ -96,6 +96,16 @@ export async function* runPipeline(input: RunInput): AsyncGenerator<RunEvent> {
     let applied: AppliedProposal | undefined;
     let parseState: StepState = "not_run";
     yield step("propose", "running");
+    try {
+      await input.runner.reserve?.(input.revisions);
+    } catch (error) {
+      yield step(
+        "propose",
+        "failed",
+        error instanceof Error ? error.message : "Could not start the run",
+      );
+      return yield* skipRest("write");
+    }
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       const retryAs = (reason: string) => {
         retry = { attempt: attempt + 1, reason };

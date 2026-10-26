@@ -5,11 +5,12 @@ import { z } from "zod";
 import { isAllowedRepo, requireEnv } from "@/server/env";
 
 // The GitHub App's identity. Each call mints an installation token scoped to
-// the one allowlisted repository and only the permissions that call needs.
+// one repository and only the permissions that call needs.
 // The private key stays in server memory; it is never logged or returned.
 
 type Env = Record<string, string | undefined>;
 export type RepoPermissions = {
+  metadata?: "read";
   contents?: "read" | "write";
   pull_requests?: "read" | "write";
 };
@@ -68,6 +69,16 @@ export async function installationOctokit(
   permissions: RepoPermissions,
   env: Env = process.env,
 ): Promise<Octokit> {
+  return new Octokit({ auth: await installationToken(repo, permissions, env) });
+}
+
+// The raw token, for the sandbox's clone of a private repository: one
+// repository, read-only contents, an hour at most.
+export async function installationToken(
+  repo: string,
+  permissions: RepoPermissions,
+  env: Env = process.env,
+): Promise<string> {
   if (!isAllowedRepo(repo, env)) throw new Error(`${repo} is not an allowed repository`);
   const { owner, name } = splitRepo(repo);
   const auth = appAuth(env);
@@ -85,7 +96,7 @@ export async function installationOctokit(
     repositoryNames: [name],
     permissions,
   });
-  return new Octokit({ auth: token });
+  return token;
 }
 
 // The App's own identity: its id (to recognise its own comments) and its bot

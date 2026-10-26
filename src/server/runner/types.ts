@@ -60,6 +60,8 @@ export type TestResult = {
 };
 
 export interface Runner {
+  // Takes the run's counted resources before the model is asked; throws on a refusal.
+  reserve?(revisions: Revisions): Promise<void>;
   prepareMerge(revisions: Revisions): Promise<PreparedMerge>;
   applyProposal(revisions: Revisions, files: ProposedFile[]): Promise<AppliedProposal>;
   parseCheck(paths: string[]): Promise<ParseResult[]>;

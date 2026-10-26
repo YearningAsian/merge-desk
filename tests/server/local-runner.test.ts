@@ -335,3 +335,13 @@ test("rewrites the candidate before importing it", async () => {
     expect(existsSync(dir)).toBe(false);
   }, 60_000);
 });
+
+describe("LocalRunner for another repository", () => {
+  it("runs none of its tests", async () => {
+    const runner = new LocalRunner({
+      source: "https://github.com/someone/app.git",
+      runsTests: false,
+    });
+    expect(await runner.runTests(["playground/src/api.js"])).toMatchObject({ state: "not_run" });
+  });
+});

@@ -83,9 +83,12 @@ export class LocalRunner implements Runner {
   workdir: string | null = null;
   private readonly source: string;
   private integrity: WorkspaceIntegrity | null = null;
+  private readonly runsTests: boolean;
 
-  constructor(options: { source: string }) {
+  // `runsTests: false`: another repository's code, which never runs here.
+  constructor(options: { source: string; runsTests?: boolean }) {
     this.source = options.source;
+    this.runsTests = options.runsTests ?? true;
   }
 
   private within(path: string): string {
@@ -148,7 +151,15 @@ export class LocalRunner implements Runner {
     return parseFiles(this.shell, paths);
   }
 
-  runTests(changedFiles: string[]): Promise<TestResult> {
+  async runTests(changedFiles: string[]): Promise<TestResult> {
+    if (!this.runsTests)
+      return {
+        state: "not_run",
+        suite: "tests",
+        exitCode: null,
+        output: "The local runner runs only the demo repository's tests.",
+        durationMs: 0,
+      };
     // Trusted manual use only. These before/after hashes catch persistent
     // changes; same-user Windows processes can still change and restore bytes.
     return runCheckedSuite(this.shell, this.shell, changedFiles, this.integrity);

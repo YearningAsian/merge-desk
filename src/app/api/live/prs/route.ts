@@ -1,32 +1,24 @@
-import { CODE_ALLOWED_REPOS } from "@/server/env";
-import { installationOctokit } from "@/server/github/app";
+import { openRepo } from "@/server/github/access";
 import { listPulls } from "@/server/github/prs";
 import { guardLive } from "@/server/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const REPO = CODE_ALLOWED_REPOS[0];
+const json = (body: unknown, status = 200) =>
+  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
-// Open pull requests on the one allowlisted repository, conflicting first.
+// Open pull requests on ?repo=owner/name, conflicting first, for someone who
+// can push to it.
 export async function GET(request: Request) {
   const guard = await guardLive(request);
   if (!guard.ok) return guard.response;
+  const repo = new URL(request.url).searchParams.get("repo") ?? "";
+  const access = await openRepo(guard, repo, { pull_requests: "read", contents: "read" });
+  if (!access.ok) return json({ error: access.error }, access.status);
   try {
-    const octokit = await installationOctokit(REPO, { pull_requests: "read", contents: "read" });
-    return Response.json(await listPulls(octokit, REPO), {
-      headers: { "cache-control": "no-store" },
-    });
-  } catch (error) {
-    const status = (error as { status?: number }).status;
-    return Response.json(
-      {
-        error:
-          status === 404
-            ? "GitHub can't see the repository: is the Merge Desk app installed on it?"
-            : "GitHub isn't reachable right now. Try again.",
-      },
-      { status: 503, headers: { "cache-control": "no-store" } },
-    );
+    return json(await listPulls(access.octokit, repo));
+  } catch {
+    return json({ error: "GitHub isn't reachable right now. Try again." }, 503);
   }
 }

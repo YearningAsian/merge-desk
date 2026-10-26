@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RunRecord } from "@/core/run";
 import { checkLand, chooseTestSuite, type LandInput } from "@/server/guard";
 
@@ -71,9 +71,15 @@ describe("checkLand", () => {
     expect(reason({})).toBe("ok");
   });
 
-  it("refuses another account or repository", () => {
-    expect(reason({ login: "someone-else" })).toMatch(/can't use live mode/);
+  it("refuses a run recorded for another repository, a malformed one, or a narrowed-out login", () => {
     expect(reason({ repo: "someone/else" })).toMatch(/repository isn't allowed/);
+    expect(reason({ repo: "someone/.." })).toMatch(/repository isn't allowed/);
+    vi.stubEnv("ALLOWED_LOGINS", "YearningAsian");
+    try {
+      expect(reason({ login: "someone-else" })).toMatch(/can't use live mode/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("refuses a held run", () => {

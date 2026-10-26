@@ -1,35 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { integrationStatus, isAllowedLogin, isAllowedRepo, requireEnv } from "@/server/env";
+import {
+  integrationStatus,
+  isAllowedLogin,
+  isAllowedRepo,
+  isRepoName,
+  requireEnv,
+} from "@/server/env";
 
-describe("allowlists: environment can narrow access but never widen it", () => {
-  it("allows the code default login and repository when variables are unset", () => {
-    expect(isAllowedLogin("YearningAsian", {})).toBe(true);
-    expect(isAllowedRepo("YearningAsian/merge-desk", {})).toBe(true);
+describe("narrowing: open to any account unless the environment lists names", () => {
+  it("allows any login and well-formed repository when the variables are unset", () => {
+    expect(isAllowedLogin("someone-else", {})).toBe(true);
+    expect(isAllowedRepo("someone/else", {})).toBe(true);
   });
 
-  it("compares logins and repositories case-insensitively, as GitHub does", () => {
-    expect(isAllowedLogin("yearningasian", {})).toBe(true);
-    expect(isAllowedRepo("yearningasian/Merge-Desk", {})).toBe(true);
-  });
-
-  it("refuses logins and repositories outside the code default even if the env lists them", () => {
-    const env = { ALLOWED_LOGINS: "YearningAsian,someone-else", ALLOWED_REPOS: "someone/else" };
+  it("allows only the listed names when set, case-insensitively as GitHub does", () => {
+    const env = { ALLOWED_LOGINS: "YearningAsian", ALLOWED_REPOS: "YearningAsian/merge-desk" };
+    expect(isAllowedLogin("yearningasian", env)).toBe(true);
+    expect(isAllowedRepo("yearningasian/Merge-Desk", env)).toBe(true);
     expect(isAllowedLogin("someone-else", env)).toBe(false);
     expect(isAllowedRepo("someone/else", env)).toBe(false);
   });
 
-  it("lets the env remove the default", () => {
-    expect(isAllowedLogin("YearningAsian", { ALLOWED_LOGINS: "someone-else" })).toBe(false);
+  it("treats a blank variable as unset", () => {
+    expect(isAllowedLogin("someone-else", { ALLOWED_LOGINS: " " })).toBe(true);
   });
 
-  it("treats an empty or blank variable as unset, never as allow-all", () => {
-    expect(isAllowedLogin("YearningAsian", { ALLOWED_LOGINS: " " })).toBe(true);
-    expect(isAllowedLogin("someone-else", { ALLOWED_LOGINS: "" })).toBe(false);
-  });
-
-  it("refuses empty input", () => {
+  it("refuses empty input and malformed repository names", () => {
     expect(isAllowedLogin("", {})).toBe(false);
     expect(isAllowedRepo("", {})).toBe(false);
+    for (const bad of [
+      "owner",
+      "owner/",
+      "/repo",
+      "a/b/c",
+      "owner/..",
+      "owner/.",
+      "-x/repo",
+      "o w/r",
+    ])
+      expect(isRepoName(bad), bad).toBe(false);
+    expect(isRepoName("Owner-1/repo.name_2")).toBe(true);
   });
 });
 

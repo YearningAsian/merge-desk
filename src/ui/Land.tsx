@@ -147,7 +147,12 @@ export function LandResult({
           ) : (
             <p>The current head differs from the Land commit and the checked head.</p>
           )}
-          {current.base.sha !== context.base ? (
+          {outcome.baseMoved ? (
+            <p className="text-wait-text">
+              The base moved while this landed, so the merge doesn&apos;t include its newest
+              commits. Run it again to bring them in.
+            </p>
+          ) : current.base.sha !== context.base ? (
             <p>The base differs from the checked base.</p>
           ) : null}
           <p className="text-ink/80">

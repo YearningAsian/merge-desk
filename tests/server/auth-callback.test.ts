@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/auth/callback/route";
-import { OAUTH_COOKIE, SESSION_COOKIE, sealOAuthState } from "@/server/session";
+import { OAUTH_COOKIE, SESSION_COOKIE, readSession, sealOAuthState } from "@/server/session";
 
 const ORIGIN = "http://localhost:3000";
 const STATE = "s".repeat(64);
@@ -10,7 +10,7 @@ function github(login: string) {
     const url = String(input instanceof Request ? input.url : input);
     if (url === "https://github.com/login/oauth/access_token")
       return Response.json({ access_token: "user-token-fixture" });
-    if (url === "https://api.github.com/user") return Response.json({ login });
+    if (url === "https://api.github.com/user") return Response.json({ login, id: 7 });
     if (url.endsWith("/token")) return new Response(null, { status: 204 });
     throw new Error(`Unexpected request: ${url}`);
   });
@@ -43,7 +43,8 @@ describe("sign-in callback", () => {
     vi.stubGlobal("fetch", github("YearningAsian"));
     const response = await callback(STATE);
     expect(response.headers.get("location")).toBe(`${ORIGIN}/live`);
-    expect(sessionCookie(response)).toBeDefined();
+    const cookie = sessionCookie(response)!.split(";")[0]!;
+    expect(await readSession(cookie)).toMatchObject({ login: "YearningAsian", id: 7 });
   });
 
   it("refuses any other GitHub login without a session", async () => {

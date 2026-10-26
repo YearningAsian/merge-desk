@@ -108,6 +108,7 @@ describe("recorded source", () => {
       commit: run.land!.commit,
       branch: run.land!.branch,
       mergeable: run.land!.mergeable,
+      baseMoved: null,
       record: run.land!.record,
     });
     expect(Date.now() - started).toBe(run.land!.ms);

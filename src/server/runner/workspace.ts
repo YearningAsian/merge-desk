@@ -134,7 +134,7 @@ export async function runCheckedSuite(
     const note = `Source integrity check failed: ${error instanceof Error ? error.message : "unknown integrity result"}`;
     return {
       state: "failed",
-      suite: result?.suite ?? chooseTestSuite(changedFiles).label,
+      suite: result?.suite ?? options.own?.label ?? chooseTestSuite(changedFiles).label,
       exitCode: result?.exitCode ?? null,
       output: truncateLog(`${result?.output ?? ""}\n${note}`),
       durationMs: result?.durationMs ?? 0,
@@ -173,7 +173,9 @@ export async function git(
   const result = await shell.exec("git", [...GIT_CONFIG, ...args], { timeoutMs: RUN_LIMIT_MS });
   if (result.code !== null && allowExit.includes(result.code))
     return { stdout: result.stdout, code: result.code };
-  throw new Error(`git ${args[0]} failed: ${result.output.trim().slice(0, 500)}`);
+  // Named by the subcommand: a leading -c value can hold a fetch token.
+  const command = args.find((arg, i) => !arg.startsWith("-") && args[i - 1] !== "-c");
+  throw new Error(`git ${command} failed: ${result.output.trim().slice(0, 500)}`);
 }
 
 export type MergeState = {
@@ -410,7 +412,12 @@ export async function parseFiles(shell: Shell, paths: string[]): Promise<ParseRe
 // `vitest`: the absolute path of the trusted dependency snapshot's Vitest,
 // given only after the runner checked this working copy may use it. The
 // app's own suite runs only with it, started directly, never through npm.
-export type SuiteOptions = { vitest?: string };
+// `own`: another repository's test command, given only after the sandbox
+// checked the dependencies it installed for it.
+export type SuiteOptions = {
+  vitest?: string;
+  own?: { label: string; command: readonly [string, readonly string[]] };
+};
 
 export const NO_DEPENDENCIES =
   "The app's test suite runs only from the trusted dependency snapshot, which this runner does not have.";
@@ -420,6 +427,7 @@ export async function runSuite(
   changedFiles: string[],
   options: SuiteOptions = {},
 ): Promise<TestResult> {
+  if (options.own) return runOwnSuite(shell, changedFiles, options.own);
   const suite = chooseTestSuite(changedFiles);
   if (suite.id === "none")
     return { state: "not_run", suite: suite.label, exitCode: null, output: "", durationMs: 0 };
@@ -442,27 +450,41 @@ export async function runSuite(
           cwd: suite.cwd,
           timeoutMs: TEST_LIMIT_MS,
         });
-  const durationMs = Date.now() - started;
-  if (exit.timedOut) {
+  return suiteResult(suite.label, exit, Date.now() - started);
+}
+
+async function runOwnSuite(
+  shell: Shell,
+  changedFiles: string[],
+  own: NonNullable<SuiteOptions["own"]>,
+): Promise<TestResult> {
+  if (!changedFiles.length)
+    return { state: "not_run", suite: own.label, exitCode: null, output: "", durationMs: 0 };
+  const started = Date.now();
+  const exit = await shell.exec(own.command[0], [...own.command[1]], { timeoutMs: TEST_LIMIT_MS });
+  return suiteResult(own.label, exit, Date.now() - started);
+}
+
+function suiteResult(label: string, exit: ExecResult, durationMs: number): TestResult {
+  if (exit.timedOut)
     return {
       state: "failed",
-      suite: suite.label,
+      suite: label,
       exitCode: null,
       output: truncateLog(`${exit.output}\nTimed out after ${TEST_LIMIT_MS / 1000} s.`),
       durationMs,
     };
-  }
   if (exit.code === null)
     return {
       state: "not_run",
-      suite: suite.label,
+      suite: label,
       exitCode: null,
       output: truncateLog(exit.output),
       durationMs,
     };
   return {
     state: exit.code === 0 ? "passed" : "failed",
-    suite: suite.label,
+    suite: label,
     exitCode: exit.code,
     output: truncateLog(exit.output),
     durationMs,

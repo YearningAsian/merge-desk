@@ -107,6 +107,7 @@ export function recordedSource(recordings: Recording[]): DataSource {
         commit: land.commit,
         branch: land.branch,
         mergeable: land.mergeable,
+        baseMoved: null,
         record: land.record,
       };
     },

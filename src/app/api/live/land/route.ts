@@ -52,6 +52,7 @@ export async function POST(request: Request) {
             commit: progress.commit,
             branch: progress.branch,
             mergeable: "checking",
+            baseMoved: null,
             record: {
               ok: false,
               reason: "The record update was not confirmed before the request deadline.",
@@ -181,11 +182,17 @@ async function performLand(
     );
   }
 
+  // A push to the base during Land isn't in the landed merge. Any later read
+  // showing another base says it moved; only a read at the landed commit says
+  // it didn't; otherwise it wasn't checked (null).
+  let baseMoved: boolean | null = null;
   const mergeability = async (): Promise<"mergeable" | "conflicting" | "checking"> => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         signal.throwIfAborted();
         const after = await readPull(octokit, repo, pr);
+        if (after.summary.base.sha !== run.revisions.base) baseMoved = true;
+        else if (after.summary.head.sha === commit) baseMoved ??= false;
         // Right after the push GitHub can still answer for the old head.
         if (after.summary.head.sha === commit && after.summary.mergeable !== "checking")
           return after.summary.mergeable;
@@ -234,5 +241,5 @@ async function performLand(
     }),
   ]);
 
-  return answer(200, "LANDED", { commit, branch: refs.head, mergeable, record });
+  return answer(200, "LANDED", { commit, branch: refs.head, mergeable, baseMoved, record });
 }

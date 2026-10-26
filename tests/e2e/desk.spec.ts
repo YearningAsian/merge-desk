@@ -662,6 +662,32 @@ test("land: one click on a verified run, LANDED only when GitHub confirmed, UNKN
   await noSeriousAxe(page);
 });
 
+test("land: says when the base moved while the merge landed", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  await page.route("**/api/live/land", (route) =>
+    route.fulfill({
+      json: {
+        outcome: "LANDED",
+        commit: "e".repeat(40),
+        branch: "demo/clean/rename",
+        mergeable: "conflicting",
+        baseMoved: true,
+        record: { ok: true },
+      },
+    }),
+  );
+  await page.goto(`/live?pr=${CLEAN}`);
+  const detail = page.getByRole("article");
+  await detail.getByRole("button", { name: "Run checks" }).click();
+  await detail
+    .getByRole("button", { name: "Land: push merge commit to demo/clean/rename" })
+    .click();
+  const done = detail.getByRole("group", { name: "Land: LANDED" });
+  await expect(done.getByText(/The base moved while this landed/)).toBeVisible();
+  await noSeriousAxe(page);
+});
+
 for (const phase of ["in-flight", "UNKNOWN"]) {
   test(`an ${phase} Land cannot be discarded or described as nothing pushed`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

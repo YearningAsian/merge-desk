@@ -11,6 +11,7 @@ const LandAnswer = z.union([
     commit: z.string().regex(/^[0-9a-f]{40}$/),
     branch: z.string(),
     mergeable: z.enum(["mergeable", "conflicting", "checking"]),
+    baseMoved: z.boolean().nullable().default(null),
     record: z.object({ ok: z.boolean(), reason: z.string().optional() }),
   }),
   z.object({ outcome: z.enum(["REFUSED", "UNKNOWN"]), reason: z.string() }),

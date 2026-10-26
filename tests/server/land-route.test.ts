@@ -292,6 +292,32 @@ describe("Land route: mergeability after the push", () => {
     mocks.pull.mockResolvedValue(at("a".repeat(40), "conflicting"));
     const done = POST(request());
     await vi.advanceTimersByTimeAsync(20_000);
-    expect(await (await done).json()).toMatchObject({ outcome: "LANDED", mergeable: "checking" });
+    expect(await (await done).json()).toMatchObject({
+      outcome: "LANDED",
+      mergeable: "checking",
+      baseMoved: null,
+    });
+  });
+
+  // Review 17.3 M3: a push to the base during Land leaves the landed merge
+  // without the newest base commits; the answer says so.
+  it("says the base moved when a read after the push shows a newer base", async () => {
+    prepare();
+    const moved = at("c".repeat(40), "conflicting");
+    moved.summary.base.sha = "e".repeat(40);
+    mocks.pull.mockReset().mockResolvedValueOnce(at("a".repeat(40), "mergeable"));
+    mocks.pull.mockResolvedValue(moved);
+    expect(await (await POST(request())).json()).toMatchObject({
+      outcome: "LANDED",
+      baseMoved: true,
+    });
+  });
+
+  it("says the base didn't move only from a read at the landed commit", async () => {
+    prepare();
+    expect(await (await POST(request())).json()).toMatchObject({
+      outcome: "LANDED",
+      baseMoved: false,
+    });
   });
 });
